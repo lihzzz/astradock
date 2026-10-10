@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import type { MemoryDaemonStatus, MemoryProjectConfig, MemoryRecallItem, MemoryStatusResult } from "@shared/types/memory";
 import { getAppSettings } from "../app-settings";
-import { log } from "../logger";
+import { reportError } from "../error-utils";
 import { captureEvent } from "../posthog";
 import { getMemoryDaemonStatus, getMemoryBaseUrl, isMemoryDaemonReady, startMemoryDaemon, stopMemoryDaemon } from "./daemon";
 import { getMemoryLlmKey, hasMemoryLlmKey, setMemoryLlmKey, clearMemoryLlmKey } from "./secrets";
@@ -141,6 +141,7 @@ export async function beforeMemorySend(sessionId: string, userText: string): Pro
     }
     if (revision !== memoryRevision) return { text: userText, turnId };
     results = recalled;
+    if (recallCache.size >= 128) recallCache.clear();
     recallCache.set(queryHash, { expiresAt: Date.now() + 60_000, items: results });
   }
   void captureEvent("memory_recall", { engine: context.engine, project_id: context.projectId, latency_ms: Date.now() - recallStartedAt, timed_out: false, cached: cacheHit, result_count: results.length });
@@ -191,8 +192,7 @@ export function observeCodexNotification(sessionId: string, method: string, para
 }
 
 async function retainToBank(bankId: string, content: string, sessionId: string, context: MemorySessionContext, source: "manual" | "auto", turnId?: string): Promise<void> {
-  const settings = getAppSettings().memory;
-  const value = settings.clientSideRedact ? redactSecrets(content) : content;
+
   const documentId = source === "auto" && turnId
     ? `${sessionId}-${turnId}`
     : `manual-${crypto.randomUUID()}`;
@@ -200,13 +200,18 @@ async function retainToBank(bankId: string, content: string, sessionId: string, 
   const tags = tagsForBank(bankId, context.projectId, context.engine, source, sessionId);
   const queue = retainQueues.get(bankId) ?? Promise.resolve();
   const next = queue.catch(() => undefined).then(async () => {
-    const usage = shouldUseMemory(context.projectId);
-    if (!usage.enabled || (source === "auto" && (!getAppSettings().memory.autoRetain || usage.config.memoryMode !== "auto"))) throw new Error("Memory retention is disabled");
-    if (bankId === MEMORY_USER_BANK && usage.config.memoryIsolated) throw new Error("Project is isolated from personal memory");
+    const assertEnabled = () => {
+      const usage = shouldUseMemory(context.projectId);
+      if (!usage.enabled || (source === "auto" && (!getAppSettings().memory.autoRetain || usage.config.memoryMode !== "auto"))) throw new Error("Memory retention is disabled");
+      if (bankId === MEMORY_USER_BANK && usage.config.memoryIsolated) throw new Error("Project is isolated from personal memory");
+    };
+    assertEnabled();
+    const value = getAppSettings().memory.clientSideRedact ? redactSecrets(content) : content;
     const startedAt = Date.now();
     const first = await retainMemory(bankId, value, { documentId, tags, operationId });
     if (!first) {
       await new Promise((resolve) => setTimeout(resolve, 250));
+      assertEnabled();
       if (!await retainMemory(bankId, value, { documentId, tags, operationId })) throw new Error("Memory service did not accept the write");
     }
     void captureEvent("memory_retain", { engine: context.engine, project_id: context.projectId, source, latency_ms: Date.now() - startedAt, bank: bankId });
@@ -227,7 +232,7 @@ export async function completeMemoryTurn(sessionId: string): Promise<void> {
   if (turn.userText.trim().length < 10 || turn.assistantText.trim().length < 10) return;
   const content = `User: ${turn.userText}\nAssistant: ${turn.assistantText}`;
   try { await retainToBank(projectBankId(context.projectId), content, sessionId, context, "auto", turn.turnId); }
-  catch (error) { log("MEMORY_RETAIN_ERR", { error }); }
+  catch (error) { reportError("MEMORY_RETAIN_ERR", error); }
 }
 
 export async function retainManualMemory(sessionId: string, content: string): Promise<{ ok: boolean; error?: string }> {
@@ -243,7 +248,7 @@ export async function retainManualMemory(sessionId: string, content: string): Pr
     }
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    return { ok: false, error: reportError("MEMORY_MANUAL_RETAIN", error) };
   }
 }
 

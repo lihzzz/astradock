@@ -57,6 +57,7 @@ describe("settings store", () => {
     const { selectProjectSettings, useSettingsStore } = await import("./settings-store");
 
     expect(selectProjectSettings(useSettingsStore.getState(), "project-1").toolOrder).toContain("fingerprint");
+    expect(selectProjectSettings(useSettingsStore.getState(), "project-1").toolOrder).toContain("memory");
   });
 
   it("adds missing tools to already persisted project orders", async () => {
@@ -70,6 +71,7 @@ describe("settings store", () => {
     const { selectProjectSettings, useSettingsStore } = await import("./settings-store");
 
     expect(selectProjectSettings(useSettingsStore.getState(), "project-1").toolOrder).toContain("fingerprint");
+    expect(selectProjectSettings(useSettingsStore.getState(), "project-1").toolOrder).toContain("memory");
   });
 
   it("defaults to Chinese and persists language changes", async () => {

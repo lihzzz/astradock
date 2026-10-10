@@ -6,7 +6,7 @@ const f = vi.hoisted(() => ({
   retain: vi.fn(), recall: vi.fn(), remove: vi.fn(), update: vi.fn(),
 }));
 vi.mock("../app-settings", () => ({ getAppSettings: () => ({ memory: f.settings }) }));
-vi.mock("../logger", () => ({ log: vi.fn() }));
+vi.mock("../error-utils", () => ({ reportError: (_label: string, error: Error) => error.message }));
 vi.mock("../posthog", () => ({ captureEvent: vi.fn() }));
 vi.mock("./daemon", () => ({ getMemoryDaemonStatus: vi.fn(), getMemoryBaseUrl: () => "", isMemoryDaemonReady: () => true, startMemoryDaemon: vi.fn(), stopMemoryDaemon: vi.fn() }));
 vi.mock("./secrets", () => ({ getMemoryLlmKey: vi.fn(), hasMemoryLlmKey: vi.fn(), setMemoryLlmKey: vi.fn(), clearMemoryLlmKey: vi.fn() }));
@@ -64,11 +64,10 @@ describe("memory trust and control", () => {
   });
   it("rechecks disabled retention when a queued write starts", async () => {
     const service = await import("./service");
-    let release!: () => void; f.retain.mockReturnValueOnce(new Promise<void>((done) => { release = done; }));
+    let release!: (value: object) => void; f.retain.mockReturnValueOnce(new Promise<object>((done) => { release = done; }));
     const first = service.retainProjectMemory("p", "First note", "project"); await vi.waitFor(() => expect(f.retain).toHaveBeenCalledOnce());
     const second = service.retainProjectMemory("p", "Second note", "project");
-    const rejected = expect(second).rejects.toThrow("disabled"); f.settings.enabled = false; release();
-    // The mock's undefined response triggers a retry of the already-started request.
+    const rejected = expect(second).rejects.toThrow("disabled"); f.settings.enabled = false; release({});
     await first; await rejected;
   });
 });
