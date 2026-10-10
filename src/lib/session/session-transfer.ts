@@ -17,6 +17,8 @@ export interface SessionTransferTarget {
   cachedConfigOptions?: ACPConfigOption[];
   /** Explicit model id; when omitted the engine's configured default model is used. */
   model?: string;
+  /** Explicit reasoning effort for the new session (Claude/Codex); omitted = current/default effort. */
+  effort?: string;
   /** Human-readable target label shown in toasts, e.g. "Codex · gpt-5". */
   label: string;
 }

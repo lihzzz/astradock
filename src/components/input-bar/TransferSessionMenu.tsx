@@ -28,8 +28,13 @@ export interface TransferSessionMenuProps {
   agents: InstalledAgent[];
   /** Cached Claude model catalog (shown even when the active session is not Claude). */
   claudeModels: ModelInfo[];
-  /** Cached Codex model catalog (id-based). */
-  codexModels: Array<{ id: string; isDefault?: boolean }>;
+  /** Cached Codex model catalog (id-based), with per-model effort levels. */
+  codexModels: Array<{
+    id: string;
+    isDefault?: boolean;
+    supportedReasoningEfforts?: Array<{ reasoningEffort: string; description: string }>;
+    defaultReasoningEffort?: string;
+  }>;
   /** Current session engine/agent/model, used to flag the active combination. */
   currentEngine?: EngineId;
   currentAgentId?: string | null;
@@ -73,7 +78,12 @@ export const TransferSessionMenu = memo(function TransferSessionMenu({
 
   const renderModelItems = (
     engine: "claude" | "codex",
-    models: Array<{ id: string; label: string; description?: string }>,
+    models: Array<{
+      id: string;
+      label: string;
+      description?: string;
+      efforts?: string[];
+    }>,
     engineLabel: string,
   ) => {
     if (models.length === 0) {
@@ -89,24 +99,67 @@ export const TransferSessionMenu = memo(function TransferSessionMenu({
     }
     return models.map((m) => {
       const active = isCurrent(engine, m.id);
+      const efforts = m.efforts ?? [];
+      if (efforts.length === 0) {
+        return (
+          <DropdownMenuItem
+            key={m.id}
+            disabled={active}
+            onClick={() =>
+              onTransfer({ engine, model: m.id, label: `${engineLabel} · ${m.label}` })
+            }
+          >
+            <div className="min-w-0">
+              <div className="truncate">{m.label}</div>
+              {m.description && (
+                <div className="truncate text-[10px] text-muted-foreground">
+                  {m.description}
+                </div>
+              )}
+            </div>
+            {currentSuffix(active)}
+          </DropdownMenuItem>
+        );
+      }
       return (
-        <DropdownMenuItem
-          key={m.id}
-          disabled={active}
-          onClick={() =>
-            onTransfer({ engine, model: m.id, label: `${engineLabel} · ${m.label}` })
-          }
-        >
-          <div className="min-w-0">
-            <div className="truncate">{m.label}</div>
-            {m.description && (
-              <div className="truncate text-[10px] text-muted-foreground">
-                {m.description}
-              </div>
-            )}
-          </div>
-          {currentSuffix(active)}
-        </DropdownMenuItem>
+        <DropdownMenuSub key={m.id}>
+          <DropdownMenuSubTrigger disabled={active}>
+            <div className="min-w-0">
+              <div className="truncate">{m.label}</div>
+              {m.description && (
+                <div className="truncate text-[10px] text-muted-foreground">
+                  {m.description}
+                </div>
+              )}
+            </div>
+            {currentSuffix(active)}
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="w-44">
+            <DropdownMenuItem
+              onClick={() =>
+                onTransfer({ engine, model: m.id, label: `${engineLabel} · ${m.label}` })
+              }
+            >
+              {t("transferDefaultEffort")}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {efforts.map((effort) => (
+              <DropdownMenuItem
+                key={effort}
+                onClick={() =>
+                  onTransfer({
+                    engine,
+                    model: m.id,
+                    effort,
+                    label: `${engineLabel} · ${m.label} · ${effort}`,
+                  })
+                }
+              >
+                <span className="capitalize">{effort}</span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
       );
     });
   };
@@ -152,7 +205,12 @@ export const TransferSessionMenu = memo(function TransferSessionMenu({
           <DropdownMenuSubContent className="w-56">
             {renderModelItems(
               "claude",
-              claudeModels.map((m) => ({ id: m.value, label: m.displayName, description: m.description })),
+              claudeModels.map((m) => ({
+                id: m.value,
+                label: m.displayName,
+                description: m.description,
+                efforts: m.supportsEffort ? (m.supportedEffortLevels ?? []) : [],
+              })),
               "Claude",
             )}
           </DropdownMenuSubContent>
@@ -170,6 +228,7 @@ export const TransferSessionMenu = memo(function TransferSessionMenu({
               codexModels.map((m) => ({
                 id: m.id,
                 label: m.id + (m.isDefault ? ` (${t("transferDefaultModel")})` : ""),
+                efforts: (m.supportedReasoningEfforts ?? []).map((e) => e.reasoningEffort),
               })),
               "Codex",
             )}

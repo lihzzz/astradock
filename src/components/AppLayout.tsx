@@ -27,7 +27,7 @@ import {
   TOOL_PICKER_WIDTH_ISLAND,
   equalWidthFractions,
 } from "@/lib/layout/constants";
-import type { EngineId, HandoffPurpose, InstalledAgent } from "@/types";
+import type { ClaudeEffort, EngineId, HandoffPurpose, InstalledAgent } from "@/types";
 import { AppSidebar } from "./AppSidebar";
 import { ChatHeader } from "./ChatHeader";
 import { ChatSearchBar } from "./ChatSearchBar";
@@ -246,8 +246,16 @@ export function AppLayout() {
         permissionMode: settings.permissionMode,
         planMode: false,
         thinkingEnabled: settings.thinking,
-        effort: target.engine === "claude" ? settings.claudeEffort : undefined,
+        effort:
+          target.engine === "claude"
+            ? ((target.effort as ClaudeEffort | undefined) ?? settings.claudeEffort)
+            : undefined,
       });
+      // Codex reads the effort at send time from the current store value --
+      // point it at the requested level before the first message goes out.
+      if (target.engine === "codex" && target.effort) {
+        manager.setCodexEffort(target.effort);
+      }
       const displayText = t("transferDisplayText")
         .replace("{{title}}", session.title)
         .replace("{{count}}", String(messageCount))
