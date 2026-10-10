@@ -77,7 +77,7 @@ const MIN_BOTTOM_HEIGHT = 120;
 const MAX_BOTTOM_HEIGHT = 600;
 const DEFAULT_BOTTOM_HEIGHT = 250;
 
-const DEFAULT_TOOL_ORDER: ToolId[] = ["terminal", "git", "browser", "files", "project-files", "mcp", "fingerprint"];
+const DEFAULT_TOOL_ORDER: ToolId[] = ["terminal", "git", "browser", "files", "project-files", "mcp", "memory", "fingerprint"];
 const VALID_TOOL_IDS = new Set<ToolId>([
   "terminal",
   "browser",
@@ -87,7 +87,7 @@ const VALID_TOOL_IDS = new Set<ToolId>([
   "tasks",
   "agents",
   "mcp",
-  "fingerprint",
+  "memory", "fingerprint",
 ]);
 
 // ── Hook ──

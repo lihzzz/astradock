@@ -8,6 +8,7 @@
  * - inline `toolNode` in `renderSplitBottomToolIsland` (split-view bottom dock)
  */
 
+import { MemoryPanel } from "@/components/memory/MemoryPanel";
 import type { ReactNode } from "react";
 import { ToolsPanel } from "@/components/ToolsPanel";
 import { BrowserPanel } from "@/components/BrowserPanel";
@@ -163,6 +164,8 @@ export function ToolIslandContent({
           headerControls={headerControls}
         />
       );
+    case "memory":
+      return <MemoryPanel key={projectId ?? "none"} projectId={projectId} headerControls={headerControls} />;
     case "fingerprint":
       return <FingerprintProbePanel headerControls={headerControls} />;
   }

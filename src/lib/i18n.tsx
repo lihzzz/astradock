@@ -1,3 +1,4 @@
+import { MEMORY_PANEL_ZH } from "@/components/memory/strings";
 import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from "react";
 import { useSettingsStore } from "@/stores/settings-store";
 import type { Language } from "@/types";
@@ -12,6 +13,7 @@ import { TASKS_EN, TASKS_ZH } from "@/components/tasks/strings";
  * used as the fallback so newly added copy stays readable before it is translated.
  */
 const ZH_CN: Record<string, string> = {
+  ...MEMORY_PANEL_ZH,
   ...APPS_ZH,
   ...TASKS_ZH,
   sessionRecoveryCancelled: "会话已切换或停用，已取消恢复。未发送内容保留在原会话队列中。",

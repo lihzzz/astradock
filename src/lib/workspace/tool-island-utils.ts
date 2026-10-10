@@ -14,7 +14,7 @@ import type { ToolColumn, ToolIslandMemory, TopColumnLocation } from "@/types";
 
 /** The set of tool IDs that render as panels in the tools column. */
 export const PANEL_TOOL_IDS = new Set<PanelToolId>([
-  "terminal", "browser", "git", "files", "project-files", "mcp", "fingerprint",
+  "terminal", "browser", "git", "files", "project-files", "mcp", "memory", "fingerprint",
 ]);
 
 /** Type guard: is this ToolId one of the panel tools? */

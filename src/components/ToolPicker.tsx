@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo, useState } from "react";
-import { Terminal, Globe, GitBranch, FileText, FolderTree, ListTodo, Bot, Plug, Fingerprint, SquareArrowOutUpRight, ArrowDown, ArrowRight } from "lucide-react";
+import { Brain, Terminal, Globe, GitBranch, FileText, FolderTree, ListTodo, Bot, Plug, Fingerprint, SquareArrowOutUpRight, ArrowDown, ArrowRight } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
@@ -76,6 +76,7 @@ export const PANEL_TOOLS_MAP: Record<string, ToolDef> = {
   files: { id: "files", label: "Open Files", icon: FileText },
   "project-files": { id: "project-files", label: "Project Files", icon: FolderTree },
   mcp: { id: "mcp", label: "MCP Servers", icon: Plug },
+  memory: { id: "memory", label: "长期记忆 / Memory", icon: Brain },
   fingerprint: { id: "fingerprint", label: "Fingerprint Probe", icon: Fingerprint },
 };
 

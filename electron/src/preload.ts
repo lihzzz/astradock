@@ -451,6 +451,9 @@ contextBridge.exposeInMainWorld("claude", {
     list: () => ipcRenderer.invoke("skills:list"),
   },
   memory: {
+    getDocument: (bankId: string, documentId: string) => ipcRenderer.invoke("memory:get-document", { bankId, documentId }),
+    projectBank: (projectId: string) => ipcRenderer.invoke("memory:project-bank", projectId),
+    retainProject: (projectId: string, content: string, scope: "project" | "user") => ipcRenderer.invoke("memory:retain-project", { projectId, content, scope }),
     getStatus: () => ipcRenderer.invoke("memory:get-status"),
     setLlmKey: (key: string) => ipcRenderer.invoke("memory:set-llm-key", key),
     clearLlmKey: () => ipcRenderer.invoke("memory:clear-llm-key"),

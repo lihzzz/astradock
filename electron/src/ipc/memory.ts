@@ -1,3 +1,8 @@
+import { getMemoryClient } from "../lib/memory/client";
+import { assertMainRenderer } from "../lib/productivity-ipc";
+import { readProjects } from "./projects";
+import { projectBankId } from "../lib/memory/bank-router";
+import { invalidateMemoryCache, retainProjectMemory } from "../lib/memory/service";
 import { BrowserWindow, ipcMain } from "electron";
 import type { MemoryProjectConfig } from "@shared/types/memory";
 import { getAppSettings, setAppSettings } from "../lib/app-settings";
@@ -29,9 +34,32 @@ function normalizeProjectPatch(patch: Partial<MemoryProjectConfig>): Partial<Mem
 }
 
 export function register(getMainWindow: () => BrowserWindow | null): void {
-  ipcMain.handle("memory:get-status", async () => getMemoryStatus());
+  const handle: typeof ipcMain.handle = (channel, listener) => ipcMain.handle(channel, async (event, ...args) => {
+    try { assertMainRenderer(event, getMainWindow); return await listener(event, ...args); }
+    catch (error) { return { error: reportError("MEMORY_IPC", error) }; }
+  });
+  const project = (id: unknown): string => {
+    if (typeof id !== "string" || !readProjects().some((entry) => entry.id === id)) throw new Error("Project unavailable");
+    return id;
+  };
+  handle("memory:get-document", async (_event, data: { bankId?: unknown; documentId?: unknown }) => {
+    if (typeof data?.bankId !== "string" || typeof data.documentId !== "string") throw new Error("Document identifiers required");
+    const client = await getMemoryClient();
+    if (!client) throw new Error("Memory service unavailable");
+    const doc = await client.getDocument(data.bankId, data.documentId);
+    if (!doc) throw new Error("Memory document unavailable");
+    return { text: doc.original_text ?? "", tags: doc.tags ?? [] };
+  });
+  handle("memory:project-bank", (_event, id: unknown) => ({ bankId: projectBankId(project(id)) }));
+  handle("memory:retain-project", async (_event, data: { projectId?: unknown; content?: unknown; scope?: unknown }) => {
+    if (typeof data?.content !== "string") throw new Error("Memory content required");
+    if (data.scope !== "project" && data.scope !== "user") throw new Error("Explicit memory scope required");
+    await retainProjectMemory(project(data.projectId), data.content, data.scope);
+    return { ok: true };
+  });
+  handle("memory:get-status", async () => getMemoryStatus());
 
-  ipcMain.handle("memory:set-llm-key", async (_event, key: unknown) => {
+  handle("memory:set-llm-key", async (_event, key: unknown) => {
     if (typeof key !== "string") return { error: "LLM key must be a string" };
     try {
       setMemoryKey(key);
@@ -45,7 +73,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     }
   });
 
-  ipcMain.handle("memory:clear-llm-key", async () => {
+  handle("memory:clear-llm-key", async () => {
     try {
       clearMemoryKey();
       if (getAppSettings().memory.enabled) {
@@ -58,13 +86,13 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     }
   });
 
-  ipcMain.handle("memory:test-connection", async (_event, key?: unknown) => {
+  handle("memory:test-connection", async (_event, key?: unknown) => {
     if (key !== undefined && typeof key !== "string") return { ok: false, error: "LLM key must be a string" };
     const result = await testMemoryLlm(key);
     return result;
   });
 
-  ipcMain.handle("memory:daemon-start", async () => {
+  handle("memory:daemon-start", async () => {
     try {
       setAppSettings({ memory: { ...getAppSettings().memory, enabled: true } });
       await setMemoryEnabled(true);
@@ -75,7 +103,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     }
   });
 
-  ipcMain.handle("memory:daemon-stop", async () => {
+  handle("memory:daemon-stop", async () => {
     try {
       setAppSettings({ memory: { ...getAppSettings().memory, enabled: false } });
       await setMemoryEnabled(false);
@@ -85,7 +113,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     }
   });
 
-  ipcMain.handle("memory:daemon-install-deps", async () => {
+  handle("memory:daemon-install-deps", async () => {
     try {
       const installed = await installMemoryDependencies();
       if (!installed.ok) {
@@ -101,10 +129,11 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     }
   });
 
-  ipcMain.handle("memory:list-documents", async (_event, bankId: unknown) => {
+  handle("memory:list-documents", async (_event, bankId: unknown) => {
     if (typeof bankId !== "string" || !bankId.trim()) return { error: "bankId is required" };
     try {
       const result = await listMemoryDocuments(bankId.trim());
+      if (!result) throw new Error("Memory service unavailable");
       return {
         documents: (result?.items ?? []).map((item) => ({
           id: item.id,
@@ -122,16 +151,17 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     }
   });
 
-  ipcMain.handle("memory:delete-document", async (_event, data: { bankId?: unknown; documentId?: unknown }) => {
+  handle("memory:delete-document", async (_event, data: { bankId?: unknown; documentId?: unknown }) => {
     if (typeof data?.bankId !== "string" || typeof data?.documentId !== "string") return { error: "bankId and documentId are required" };
     const ok = await deleteMemoryDocument(data.bankId, data.documentId);
     return ok ? { ok: true } : { error: "Unable to delete memory document" };
   });
 
-  ipcMain.handle("memory:list-memories", async (_event, bankId: unknown) => {
+  handle("memory:list-memories", async (_event, bankId: unknown) => {
     if (typeof bankId !== "string" || !bankId.trim()) return { error: "bankId is required" };
     try {
       const result = await listMemoryUnits(bankId.trim());
+      if (!result) throw new Error("Memory service unavailable");
       return {
         memories: (result?.items ?? []).map((item) => ({
           id: item.id,
@@ -153,7 +183,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     }
   });
 
-  ipcMain.handle("memory:update-memory", async (_event, data: { bankId?: unknown; memoryId?: unknown; patch?: Record<string, unknown> }) => {
+  handle("memory:update-memory", async (_event, data: { bankId?: unknown; memoryId?: unknown; patch?: Record<string, unknown> }) => {
     if (typeof data?.bankId !== "string" || typeof data?.memoryId !== "string") return { error: "bankId and memoryId are required" };
     const raw = data.patch ?? {};
     const patch: { text?: string; context?: string; state?: "valid" | "invalidated"; reason?: string } = {};
@@ -166,7 +196,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     return ok ? { ok: true } : { error: "Unable to update memory" };
   });
 
-  ipcMain.handle("memory:run-golden-set", async (_event, bankId: unknown) => {
+  handle("memory:run-golden-set", async (_event, bankId: unknown) => {
     if (typeof bankId !== "string" || !bankId.trim()) return { error: "bankId is required" };
     try {
       const report = await runMemoryGoldenSet(bankId.trim());
@@ -176,19 +206,20 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     }
   });
 
-  ipcMain.handle("memory:retain-manual", async (_event, data: { sessionId?: unknown; content?: unknown }) => {
+  handle("memory:retain-manual", async (_event, data: { sessionId?: unknown; content?: unknown }) => {
     if (typeof data?.sessionId !== "string" || typeof data?.content !== "string") return { error: "sessionId and content are required" };
     return retainManualMemory(data.sessionId, data.content);
   });
 
-  ipcMain.handle("memory:get-project-config", (_event, projectId: unknown) => {
+  handle("memory:get-project-config", (_event, projectId: unknown) => {
     if (typeof projectId !== "string") return { error: "projectId is required" };
     return getMemoryProjectConfig(projectId);
   });
 
-  ipcMain.handle("memory:set-project-config", (_event, data: { projectId?: unknown; patch?: Partial<MemoryProjectConfig> }) => {
+  handle("memory:set-project-config", (_event, data: { projectId?: unknown; patch?: Partial<MemoryProjectConfig> }) => {
     if (typeof data?.projectId !== "string") return { error: "projectId is required" };
-    return setMemoryProjectConfig(data.projectId, normalizeProjectPatch(data.patch ?? {}));
+    invalidateMemoryCache();
+    return setMemoryProjectConfig(project(data.projectId), normalizeProjectPatch(data.patch ?? {}));
   });
 
   // Keep a cheap status event available for a future settings panel refresh.

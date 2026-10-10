@@ -82,7 +82,7 @@ export async function retainMemory(
   return hindsight.retain(bankId, content, {
     documentId: options.documentId,
     tags: options.tags,
-    async: true,
+    async: false,
     operationId: options.operationId,
     updateMode: "replace",
   });

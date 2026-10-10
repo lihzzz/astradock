@@ -7,7 +7,7 @@ import type { PermissionUpdate } from "./permissions";
 import type { GitRepoInfo, GitStatus, GitBranch, GitLogEntry } from "@shared/types/git";
 import type { InstalledAgent } from "@shared/types/registry";
 import type { AppSettings, MacBackgroundEffect, ThemeOption } from "@shared/types/settings";
-import type { MemoryFact, MemoryGoldenReport, MemoryProjectConfig, MemoryStatusResult } from "@shared/types/memory";
+import type { MemoryDocument, MemoryFact, MemoryGoldenReport, MemoryProjectConfig, MemoryStatusResult } from "@shared/types/memory";
 import type { SkillsListResult } from "@shared/types/skills";
 import type { UsageRange, UsageReport } from "@shared/types/usage";
 import type {
@@ -411,6 +411,9 @@ declare global {
         list: () => Promise<SkillsListResult>;
       };
       memory: {
+        getDocument: (bankId: string, documentId: string) => Promise<{ text?: string; tags?: string[]; error?: string }>;
+        projectBank: (projectId: string) => Promise<{ bankId?: string; error?: string }>;
+        retainProject: (projectId: string, content: string, scope: "project" | "user") => Promise<IpcResult>;
         getStatus: () => Promise<MemoryStatusResult>;
         setLlmKey: (key: string) => Promise<IpcResult & { hasLlmKey?: boolean }>;
         clearLlmKey: () => Promise<IpcResult>;
@@ -418,7 +421,7 @@ declare global {
         daemonStart: () => Promise<{ ok?: boolean; error?: string; status?: MemoryStatusResult }>;
         daemonStop: () => Promise<{ ok?: boolean; error?: string }>;
         daemonInstallDeps: () => Promise<{ ok?: boolean; error?: string; status?: MemoryStatusResult }>;
-        listDocuments: (bankId: string) => Promise<{ documents?: unknown[]; total?: number; error?: string }>;
+        listDocuments: (bankId: string) => Promise<{ documents?: MemoryDocument[]; total?: number; error?: string }>;
         listMemories: (bankId: string) => Promise<{ memories?: MemoryFact[]; total?: number; error?: string }>;
         updateMemory: (bankId: string, memoryId: string, patch: Record<string, unknown>) => Promise<IpcResult>;
         runGoldenSet: (bankId: string) => Promise<{ report?: MemoryGoldenReport; error?: string }>;

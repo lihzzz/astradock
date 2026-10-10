@@ -125,7 +125,9 @@ export const MemorySettings = memo(function MemorySettings({ appSettings, onUpda
   }, [projectId]);
 
   const deleteDocument = useCallback(async (bankId: string, documentId: string) => {
-    await window.claude.memory.deleteDocument(bankId, documentId);
+    const result = await window.claude.memory.deleteDocument(bankId, documentId);
+    if (result.error) { setMessage(result.error); return; }
+    setFacts((current) => current.filter((fact) => fact.bankId !== bankId || fact.documentId !== documentId));
     setDocuments((current) => current.filter((document) => document.id !== documentId || document.bankId !== bankId));
   }, []);
 

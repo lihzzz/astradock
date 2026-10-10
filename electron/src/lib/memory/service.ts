@@ -7,7 +7,7 @@ import { getMemoryDaemonStatus, getMemoryBaseUrl, isMemoryDaemonReady, startMemo
 import { getMemoryLlmKey, hasMemoryLlmKey, setMemoryLlmKey, clearMemoryLlmKey } from "./secrets";
 import { getMemoryProjectConfig, setMemoryProjectConfig } from "./project-config";
 import { banksForProject, memoryMcpUrl, projectBankId, tagsForBank, MEMORY_USER_BANK } from "./bank-router";
-import { deleteMemoryDocument, ensureMemoryBank, listMemoryBanks, listMemoryDocuments, listMemoryUnits, recallMemory, retainMemory, resetMemoryClient, updateMemoryUnit, type MemoryUpdatePatch } from "./client";
+import { deleteMemoryDocument as deleteDocument, ensureMemoryBank, listMemoryBanks, listMemoryDocuments, listMemoryUnits, recallMemory, retainMemory, resetMemoryClient, updateMemoryUnit as updateUnit, type MemoryUpdatePatch } from "./client";
 import { runMemoryGoldenSet } from "./golden-set";
 import type { McpServerInput } from "@shared/lib/mcp-config";
 
@@ -19,6 +19,16 @@ export interface MemorySessionContext {
 }
 
 const sessions = new Map<string, MemorySessionContext>();
+let memoryRevision = 0;
+export function invalidateMemoryCache(): void { memoryRevision++; recallCache.clear(); }
+export async function deleteMemoryDocument(bank: string, id: string): Promise<boolean> {
+  invalidateMemoryCache();
+  try { return await deleteDocument(bank, id); } finally { invalidateMemoryCache(); }
+}
+export async function updateMemoryUnit(bank: string, id: string, patch: MemoryUpdatePatch): Promise<boolean> {
+  invalidateMemoryCache();
+  try { return await updateUnit(bank, id, patch); } finally { invalidateMemoryCache(); }
+}
 const recallCache = new Map<string, { expiresAt: number; items: MemoryRecallItem[] }>();
 const retainQueues = new Map<string, Promise<void>>();
 
@@ -108,6 +118,7 @@ export async function beforeMemorySend(sessionId: string, userText: string): Pro
   // Include the bank topology so switching a project to isolation cannot reuse
   // a cached result that contains shared user memories.
   const queryHash = crypto.createHash("sha1").update(`${context.projectId}:${banks.join(",")}:${userText}`).digest("hex");
+  const revision = memoryRevision;
   const recallStartedAt = Date.now();
   const cached = recallCache.get(queryHash);
   let results = cached && cached.expiresAt > Date.now() ? cached.items : undefined;
@@ -128,10 +139,14 @@ export async function beforeMemorySend(sessionId: string, userText: string): Pro
       void captureEvent("memory_recall", { engine: context.engine, project_id: context.projectId, latency_ms: Date.now() - recallStartedAt, timed_out: true, result_count: 0 });
       return { text: userText, turnId };
     }
+    if (revision !== memoryRevision) return { text: userText, turnId };
     results = recalled;
     recallCache.set(queryHash, { expiresAt: Date.now() + 60_000, items: results });
   }
   void captureEvent("memory_recall", { engine: context.engine, project_id: context.projectId, latency_ms: Date.now() - recallStartedAt, timed_out: false, cached: cacheHit, result_count: results.length });
+  const current = shouldUseMemory(context.projectId);
+  if (sessions.get(sessionId) !== context || !current.enabled || getAppSettings().memory.injectionPolicy === "off"
+    || banksForProject(context.projectId, current.config).join() !== banks.join() || revision !== memoryRevision) return { text: userText, turnId };
   context.firstRecallDone = true;
   const selected = results.slice(0, Math.max(0, settings.recallMaxItems));
   if (selected.length === 0) return { text: userText, turnId };
@@ -184,17 +199,21 @@ async function retainToBank(bankId: string, content: string, sessionId: string, 
   const operationId = crypto.randomUUID();
   const tags = tagsForBank(bankId, context.projectId, context.engine, source, sessionId);
   const queue = retainQueues.get(bankId) ?? Promise.resolve();
-  const next = queue.then(async () => {
+  const next = queue.catch(() => undefined).then(async () => {
+    const usage = shouldUseMemory(context.projectId);
+    if (!usage.enabled || (source === "auto" && (!getAppSettings().memory.autoRetain || usage.config.memoryMode !== "auto"))) throw new Error("Memory retention is disabled");
+    if (bankId === MEMORY_USER_BANK && usage.config.memoryIsolated) throw new Error("Project is isolated from personal memory");
     const startedAt = Date.now();
     const first = await retainMemory(bankId, value, { documentId, tags, operationId });
     if (!first) {
       await new Promise((resolve) => setTimeout(resolve, 250));
-      await retainMemory(bankId, value, { documentId, tags, operationId });
+      if (!await retainMemory(bankId, value, { documentId, tags, operationId })) throw new Error("Memory service did not accept the write");
     }
     void captureEvent("memory_retain", { engine: context.engine, project_id: context.projectId, source, latency_ms: Date.now() - startedAt, bank: bankId });
-  }).catch((error) => log("MEMORY_RETAIN_ERR", { bankId, error }));
+    invalidateMemoryCache();
+  });
   retainQueues.set(bankId, next);
-  await next;
+  try { await next; } finally { if (retainQueues.get(bankId) === next) retainQueues.delete(bankId); }
 }
 
 export async function completeMemoryTurn(sessionId: string): Promise<void> {
@@ -207,9 +226,8 @@ export async function completeMemoryTurn(sessionId: string): Promise<void> {
   if (!usage.enabled || !settings.autoRetain || usage.config.memoryMode !== "auto") return;
   if (turn.userText.trim().length < 10 || turn.assistantText.trim().length < 10) return;
   const content = `User: ${turn.userText}\nAssistant: ${turn.assistantText}`;
-  for (const bankId of banksForProject(context.projectId, usage.config)) {
-    await retainToBank(bankId, content, sessionId, context, "auto", turn.turnId);
-  }
+  try { await retainToBank(projectBankId(context.projectId), content, sessionId, context, "auto", turn.turnId); }
+  catch (error) { log("MEMORY_RETAIN_ERR", { error }); }
 }
 
 export async function retainManualMemory(sessionId: string, content: string): Promise<{ ok: boolean; error?: string }> {
@@ -217,15 +235,22 @@ export async function retainManualMemory(sessionId: string, content: string): Pr
   if (!context) return { ok: false, error: "Session is not registered for memory" };
   const usage = shouldUseMemory(context.projectId);
   if (!usage.enabled) return { ok: false, error: "Long-term memory is disabled for this project" };
+  if (content.length > 20000) return { ok: false, error: "Memory content exceeds 20000 characters" };
   if (content.trim().length < 3) return { ok: false, error: "Memory content is too short" };
   try {
-    for (const bankId of banksForProject(context.projectId, usage.config)) {
+    for (const bankId of [projectBankId(context.projectId)]) {
       await retainToBank(bankId, content.trim(), sessionId, context, "manual");
     }
     return { ok: true };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
   }
+}
+
+export async function retainProjectMemory(projectId: string, content: string, scope: "project" | "user"): Promise<void> {
+  if (content.trim().length < 3 || content.length > 20000) throw new Error("Memory must contain 3–20000 characters");
+  if (scope === "user" && getMemoryProjectConfig(projectId).memoryIsolated) throw new Error("Project is isolated from personal memory");
+  await retainToBank(scope === "user" ? MEMORY_USER_BANK : projectBankId(projectId), content.trim(), "manual-panel", { projectId, engine: "manual", firstRecallDone: false }, "manual");
 }
 
 export async function getMemoryStatus(): Promise<MemoryStatusResult> {
@@ -235,6 +260,7 @@ export async function getMemoryStatus(): Promise<MemoryStatusResult> {
 }
 
 export async function setMemoryEnabled(enabled: boolean): Promise<void> {
+  invalidateMemoryCache();
   if (enabled) {
     await startMemoryDaemon();
   } else {
@@ -246,5 +272,5 @@ export function setMemoryKey(key: string): void { setMemoryLlmKey(key); resetMem
 export function clearMemoryKey(): void { clearMemoryLlmKey(); resetMemoryClient(); }
 export function memoryHasKey(): boolean { return hasMemoryLlmKey(); }
 export function getMemoryKeyForDaemon(): string | undefined { return getMemoryLlmKey(); }
-export { getMemoryProjectConfig, setMemoryProjectConfig, listMemoryDocuments, listMemoryUnits, deleteMemoryDocument, ensureMemoryBank, updateMemoryUnit, runMemoryGoldenSet, getMemoryBaseUrl };
+export { getMemoryProjectConfig, setMemoryProjectConfig, listMemoryDocuments, listMemoryUnits, ensureMemoryBank, runMemoryGoldenSet, getMemoryBaseUrl };
 export type { MemoryUpdatePatch };
