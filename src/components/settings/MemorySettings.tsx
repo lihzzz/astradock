@@ -1,3 +1,4 @@
+import { reportError } from "@/lib/analytics/analytics";
 import { memo, useCallback, useEffect, useState } from "react";
 import { Brain, Database, KeyRound, Pencil, RefreshCw, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -125,10 +126,12 @@ export const MemorySettings = memo(function MemorySettings({ appSettings, onUpda
   }, [projectId]);
 
   const deleteDocument = useCallback(async (bankId: string, documentId: string) => {
-    const result = await window.claude.memory.deleteDocument(bankId, documentId);
-    if (result.error) { setMessage(result.error); return; }
-    setFacts((current) => current.filter((fact) => fact.bankId !== bankId || fact.documentId !== documentId));
-    setDocuments((current) => current.filter((document) => document.id !== documentId || document.bankId !== bankId));
+    try {
+      const result = await window.claude.memory.deleteDocument(bankId, documentId);
+      if (result.error) { setMessage(result.error); return; }
+      setFacts((current) => current.filter((fact) => fact.bankId !== bankId || fact.documentId !== documentId));
+      setDocuments((current) => current.filter((document) => document.id !== documentId || document.bankId !== bankId));
+    } catch (error) { setMessage(reportError("MEMORY_DELETE", error)); }
   }, []);
 
   const saveFact = useCallback(async (fact: MemoryFact) => {
