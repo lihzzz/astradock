@@ -47,7 +47,6 @@ export function useAppSessionActions(input: UseAppSessionActionsInput) {
         engine,
         input.settings.getModelForEngine,
         input.settings.permissionMode,
-        input.settings.planMode,
         input.settings.thinking,
         getClaudeEffortForModel,
         input.selectedAgent,
@@ -75,7 +74,6 @@ export function useAppSessionActions(input: UseAppSessionActionsInput) {
         wantedEngine,
         input.settings.getModelForEngine,
         input.settings.permissionMode,
-        input.settings.planMode,
         input.settings.thinking,
         getClaudeEffortForModel,
         agent,
@@ -99,13 +97,11 @@ export function useAppSessionActions(input: UseAppSessionActionsInput) {
 
   const handleNewChat = useCallback(async (projectId: string) => {
     input.setShowSettings(false);
-    input.settings.setPlanMode(false);
     const wantedEngine = input.selectedAgent?.engine ?? "claude";
     const options = buildSessionOptions(
       wantedEngine,
       input.settings.getModelForEngine,
       input.settings.permissionMode,
-      false,
       input.settings.thinking,
       getClaudeEffortForModel,
       input.selectedAgent,
@@ -125,7 +121,6 @@ export function useAppSessionActions(input: UseAppSessionActionsInput) {
         wantedEngine,
         input.settings.getModelForEngine,
         input.settings.permissionMode,
-        input.settings.planMode,
         input.settings.thinking,
         getClaudeEffortForModel,
         input.selectedAgent,
@@ -156,11 +151,6 @@ export function useAppSessionActions(input: UseAppSessionActionsInput) {
     input.manager.setActivePermissionMode(nextMode);
   }, [input.manager, input.settings]);
 
-  const handlePlanModeChange = useCallback((enabled: boolean) => {
-    input.settings.setPlanMode(enabled);
-    input.manager.setActivePlanMode(enabled);
-  }, [input.manager, input.settings]);
-
   const handleClaudeModelEffortChange = useCallback((model: string, effort: ClaudeEffort) => {
     input.settings.setModel(model);
     input.settings.setClaudeEffort(effort);
@@ -181,7 +171,6 @@ export function useAppSessionActions(input: UseAppSessionActionsInput) {
 
   const handleSelectSession = useCallback((sessionId: string) => {
     input.setShowSettings(false);
-    input.settings.setPlanMode(false);
     input.manager.switchSession(sessionId);
   }, [input.manager, input.setShowSettings, input.settings]);
 
@@ -207,7 +196,6 @@ export function useAppSessionActions(input: UseAppSessionActionsInput) {
   }, [input.activeSpaceId, input.manager.refreshSessions, input.projectManager.createDevProject, input.projectManager.projects]);
 
   const handleNavigateToMessage = useCallback((sessionId: string, setScrollToMessageId: (messageId: string) => void, messageId: string) => {
-    input.settings.setPlanMode(false);
     input.manager.switchSession(sessionId);
     setTimeout(() => setScrollToMessageId(messageId), 200);
   }, [input.manager, input.settings]);
@@ -229,7 +217,6 @@ export function useAppSessionActions(input: UseAppSessionActionsInput) {
     handleSend,
     handleModelChange,
     handlePermissionModeChange,
-    handlePlanModeChange,
     handleClaudeModelEffortChange,
     handleStop,
     handleSendQueuedNow,

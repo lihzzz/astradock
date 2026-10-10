@@ -6,7 +6,6 @@ export function buildSessionOptions(
   engine: EngineId,
   getModelForEngine: (engine: EngineId) => string | null,
   permissionMode: string,
-  planMode: boolean,
   thinking: boolean,
   getClaudeEffortForModel: (model: string | undefined) => ClaudeEffort | undefined,
   agent: InstalledAgent | null,
@@ -15,22 +14,11 @@ export function buildSessionOptions(
   return {
     model,
     permissionMode,
-    planMode,
+    planMode: false,
     thinkingEnabled: thinking,
     effort: engine === "claude" ? getClaudeEffortForModel(model) : undefined,
     engine,
     agentId: agent?.id ?? "claude-code",
     cachedConfigOptions: agent?.cachedConfigOptions,
   };
-}
-
-export function getSyncedPlanMode(
-  sessionPlanMode: boolean | undefined,
-  permissionMode: string | undefined,
-): boolean {
-  const normalizedPermissionMode = permissionMode?.trim();
-  if (normalizedPermissionMode) {
-    return normalizedPermissionMode === "plan";
-  }
-  return !!sessionPlanMode;
 }

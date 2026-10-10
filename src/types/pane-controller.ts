@@ -17,7 +17,6 @@ export interface PaneController {
   paneModel: string;
   paneHeaderModel: string;
   panePermissionMode: string;
-  panePlanMode: boolean;
   paneSupportedModels: ModelInfo[];
   paneClaudeEffort: ClaudeEffort;
   paneSlashCommands: SlashCommand[];
@@ -36,7 +35,6 @@ export interface PaneController {
   handlePaneGoalClear: () => Promise<boolean>;
   handlePaneModelChange: (nextModel: string) => void;
   handlePaneClaudeModelEffortChange: (nextModel: string, effort: ClaudeEffort | undefined) => void;
-  handlePanePlanModeChange: (enabled: boolean) => void;
   handlePanePermissionModeChange: (nextMode: string) => void;
   handlePaneCodexEffortChange: (effort: string) => void;
   handlePaneAgentChange: (agent: InstalledAgent | null) => Promise<void>;

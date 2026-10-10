@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, type ReactN
 import { useSettingsStore } from "@/stores/settings-store";
 import type { Language } from "@/types";
 import { APPS_EN, APPS_ZH } from "@/components/apps/strings";
+import { TASKS_EN, TASKS_ZH } from "@/components/tasks/strings";
 
 /**
  * Small, dependency-free UI translation layer.
@@ -12,6 +13,7 @@ import { APPS_EN, APPS_ZH } from "@/components/apps/strings";
  */
 const ZH_CN: Record<string, string> = {
   ...APPS_ZH,
+  ...TASKS_ZH,
   sessionRecoveryCancelled: "会话已切换或停用，已取消恢复。未发送内容保留在原会话队列中。",
   sessionRecoveryNoAgent: "此会话缺少 Agent 配置，请选择有效的 Agent 后重试。",
   sessionRecoveryNoThread: "未找到可恢复的 Codex 线程。",
@@ -419,6 +421,14 @@ const ZH_CN: Record<string, string> = {
   closePane: "关闭面板",
   model: "模型",
   plan: "计划",
+  transferSession: "转交会话",
+  transferDescription: "将当前会话导出为 Markdown，交给所选模型继续处理",
+  transferDefaultModel: "默认模型",
+  transferCurrent: "当前",
+  transferStarted: "已转交给 {{target}}",
+  transferFailed: "转交失败",
+  transferEmpty: "当前会话还没有内容可以转交",
+  transferDisplayText: "↪ 转交自「{{title}}」的会话上下文（{{count}} 条消息）→ {{target}}",
   permissions: "权限",
   session: "会话",
   on: "开启",
@@ -511,6 +521,7 @@ export type TranslationKey = keyof typeof ZH_CN;
 
 const EN_US: Record<TranslationKey, string> = {
   ...APPS_EN,
+  ...TASKS_EN,
   sessionRecoveryCancelled: "The conversation changed or became unavailable. Restoration was cancelled; unsent input remains in its queue.",
   sessionRecoveryNoAgent: "This conversation has no agent configuration. Select an available agent and retry.",
   sessionRecoveryNoThread: "No resumable Codex thread was found.",
@@ -774,6 +785,14 @@ const EN_US: Record<TranslationKey, string> = {
   closePane: "Close pane",
   model: "Model",
   plan: "Plan",
+  transferSession: "Transfer session",
+  transferDescription: "Export this conversation as Markdown and hand it to the selected model to continue",
+  transferDefaultModel: "Default model",
+  transferCurrent: "Current",
+  transferStarted: "Transferred to {{target}}",
+  transferFailed: "Transfer failed",
+  transferEmpty: "Nothing to transfer yet — send a message first",
+  transferDisplayText: "↪ Session context transferred from \"{{title}}\" ({{count}} messages) → {{target}}",
   permissions: "Permissions",
   session: "Session",
   on: "On",

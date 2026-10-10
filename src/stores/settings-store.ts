@@ -30,7 +30,6 @@ function normalizeHistoryPreferences(value: unknown): HistoryPreferences {
 
 const DEFAULT_MODEL = "default";
 const DEFAULT_PERMISSION_MODE = "default";
-const DEFAULT_PLAN_MODE = true;
 const DEFAULT_CLAUDE_EFFORT: ClaudeEffort = "high";
 export const DEFAULT_ENGINE_MODELS: Record<EngineId, string> = {
   claude: DEFAULT_MODEL,
@@ -148,7 +147,6 @@ interface GlobalSettingsState {
   macNativeBackgroundEffect: Exclude<MacBackgroundEffect, "off">;
   /** Whether transparency is enabled (combines with macNativeBackgroundEffect to derive macBackgroundEffect) */
   transparency: boolean;
-  planMode: boolean;
   permissionMode: string;
   acpPermissionBehavior: AcpPermissionBehavior;
   thinking: boolean;
@@ -188,7 +186,6 @@ interface SettingsActions {
   setIslandShine: (enabled: boolean) => void;
   setMacBackgroundEffect: (effect: MacBackgroundEffect) => void;
   setTransparency: (enabled: boolean) => void;
-  setPlanMode: (enabled: boolean) => void;
   setPermissionMode: (mode: string) => void;
   setAcpPermissionBehavior: (b: AcpPermissionBehavior) => void;
   setThinking: (on: boolean) => void;
@@ -343,16 +340,6 @@ function readLegacyGlobalSettings(): GlobalSettingsState {
   const theme: ThemePreference =
     (themeRaw === "light" || themeRaw === "dark" || themeRaw === "system" || themeRaw === "auto") ? themeRaw : "dark";
 
-  // Plan mode with legacy migration
-  let planMode = DEFAULT_PLAN_MODE;
-  const storedPlanMode = localStorage.getItem("harnss-plan-mode");
-  if (storedPlanMode !== null) {
-    planMode = storedPlanMode === "true";
-  } else {
-    const legacyPermission = localStorage.getItem("harnss-permission-mode");
-    if (legacyPermission === "plan") planMode = true;
-  }
-
   // Permission mode with legacy migration
   const storedPermission = localStorage.getItem("harnss-permission-mode");
   const permissionMode = (!storedPermission || storedPermission === "plan") ? DEFAULT_PERMISSION_MODE : storedPermission;
@@ -390,7 +377,6 @@ function readLegacyGlobalSettings(): GlobalSettingsState {
     islandShine: readLegacyBool("harnss-island-shine", true),
     macNativeBackgroundEffect: "liquid-glass",
     transparency: readLegacyBool("harnss-transparency", true),
-    planMode,
     permissionMode,
     acpPermissionBehavior,
     thinking: readLegacyBool("harnss-thinking", true),
@@ -553,7 +539,6 @@ export const useSettingsStore = create<SettingsStore>()(
       islandShine: true,
       macNativeBackgroundEffect: "liquid-glass",
       transparency: true,
-      planMode: DEFAULT_PLAN_MODE,
       permissionMode: DEFAULT_PERMISSION_MODE,
       acpPermissionBehavior: "ask",
       thinking: true,
@@ -630,12 +615,10 @@ export const useSettingsStore = create<SettingsStore>()(
         }
       },
 
-      setPlanMode: (enabled) => set({ planMode: enabled }),
-
       setPermissionMode: (mode) => {
-        // Legacy: treat "plan" as enabling the dedicated plan toggle
+        // Legacy: "plan" used to be a dedicated toggle -- fall back to default
         if (mode === "plan") {
-          set({ planMode: true, permissionMode: DEFAULT_PERMISSION_MODE });
+          set({ permissionMode: DEFAULT_PERMISSION_MODE });
           return;
         }
         set({ permissionMode: mode });
@@ -800,7 +783,6 @@ export const useSettingsStore = create<SettingsStore>()(
         islandShine: state.islandShine,
         macNativeBackgroundEffect: state.macNativeBackgroundEffect,
         transparency: state.transparency,
-        planMode: state.planMode,
         permissionMode: state.permissionMode,
         acpPermissionBehavior: state.acpPermissionBehavior,
         thinking: state.thinking,

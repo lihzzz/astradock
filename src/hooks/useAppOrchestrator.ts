@@ -18,13 +18,11 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { canonicalizeModelValue, resolveModelValue } from "@/lib/model-utils";
 import type { ToolId } from "@/types/tools";
 import type { AcpPermissionBehavior, EngineId, InstalledAgent } from "@/types";
-import { getSyncedPlanMode } from "@/hooks/app-layout/session-utils";
 import { useAppEnvironmentState } from "@/hooks/app-layout/useAppEnvironmentState";
 import { useAppSessionActions } from "@/hooks/app-layout/useAppSessionActions";
 import { useAppSpaceWorkflow } from "@/hooks/app-layout/useAppSpaceWorkflow";
 import { useAppContextualPanels } from "@/hooks/app-layout/useAppContextualPanels";
 
-export { getSyncedPlanMode } from "@/hooks/app-layout/session-utils";
 
 export function useAppOrchestrator() {
   const sidebar = useSidebar();
@@ -212,35 +210,9 @@ export function useAppOrchestrator() {
 
   // ── Keyboard shortcuts ──
   useKeyboardShortcuts({
-    planMode: settings.planMode,
-    setPlanMode: settings.setPlanMode,
-    setActivePlanMode: manager.setActivePlanMode,
-    activeEngine: manager.activeSession?.engine ?? selectedAgent?.engine ?? "claude",
     activeSessionId: manager.activeSessionId,
     setChatSearchOpen: environment.setChatSearchOpen,
   });
-
-  // Sync plan toggle to the active chat session (handles both sessionInfo.permissionMode
-  // changes like ExitPlanMode and session switches).
-  useEffect(() => {
-    if (!manager.activeSessionId || manager.isDraft || !manager.activeSession) return;
-    const nextPlanMode = getSyncedPlanMode(
-      manager.activeSession.planMode,
-      manager.sessionInfo?.permissionMode,
-    );
-    if (settings.planMode !== nextPlanMode) settings.setPlanMode(nextPlanMode);
-    if (!!manager.activeSession.planMode !== nextPlanMode) {
-      manager.setActivePlanMode(nextPlanMode);
-    }
-  }, [
-    manager.activeSessionId,
-    manager.activeSession?.planMode,
-    manager.isDraft,
-    manager.sessionInfo?.permissionMode,
-    manager.setActivePlanMode,
-    settings.planMode,
-    settings.setPlanMode,
-  ]);
 
   const activeSpaceTerminals = spaceTerminals.getSpaceState(spaceManager.activeSpaceId);
 
@@ -307,7 +279,6 @@ export function useAppOrchestrator() {
     handleSend: sessionActions.handleSend,
     handleModelChange: sessionActions.handleModelChange,
     handlePermissionModeChange: sessionActions.handlePermissionModeChange,
-    handlePlanModeChange: sessionActions.handlePlanModeChange,
     handleClaudeModelEffortChange: sessionActions.handleClaudeModelEffortChange,
     handleAgentWorktreeChange: sessionActions.handleAgentWorktreeChange,
     handleStop: sessionActions.handleStop,
@@ -416,7 +387,6 @@ export function useAppOrchestrator() {
     handleSend: sessionActions.handleSend,
     handleModelChange: sessionActions.handleModelChange,
     handlePermissionModeChange: sessionActions.handlePermissionModeChange,
-    handlePlanModeChange: sessionActions.handlePlanModeChange,
     handleClaudeModelEffortChange: sessionActions.handleClaudeModelEffortChange,
     handleAgentWorktreeChange: sessionActions.handleAgentWorktreeChange,
     handleStop: sessionActions.handleStop,

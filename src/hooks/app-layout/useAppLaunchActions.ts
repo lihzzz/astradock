@@ -39,7 +39,7 @@ export function useAppLaunchActions(input: AppLaunchActionsInput) {
         conversationId, workspaceBinding: checked.value.workspace, origin: context.origin,
         engine, agentId: input.selectedAgent?.id ?? "claude-code",
         model: projectSettings.modelsByEngine[engine] || undefined,
-        permissionMode: settings.permissionMode, planMode: settings.planMode,
+        permissionMode: settings.permissionMode, planMode: false,
         thinkingEnabled: settings.thinking, effort: engine === "claude" ? settings.claudeEffort : undefined,
         cachedConfigOptions: input.selectedAgent?.cachedConfigOptions,
       }, { beforeActivate: () => {

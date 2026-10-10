@@ -98,8 +98,14 @@ import {
   loadPersistedInputHistory,
   mergeInputHistory,
 } from "@/lib/chat/input-history";
+import {
+  buildSessionTransferPrompt,
+  type SessionTransferTarget,
+} from "@/lib/session/session-transfer";
+import { useI18n } from "@/lib/i18n";
 
 export function AppLayout() {
+  const { t } = useI18n();
   const o = useAppOrchestrator();
   const { managers, agentState, state, ui, actions } = o;
   const {
@@ -124,7 +130,7 @@ export function AppLayout() {
   } = ui;
   const {
     handleToggleTool, handleToolReorder, handleNewChat, handleSend,
-    handleModelChange, handlePermissionModeChange, handlePlanModeChange,
+    handleModelChange, handlePermissionModeChange,
     handleClaudeModelEffortChange, handleAgentWorktreeChange, handleStop, handleSelectSession,
     handleSendQueuedNow, handleUnqueueMessage, handleCreateProject, handleImportCCSession,
     handleStartCreateSpace, handleConfirmCreateSpace, handleCancelCreateSpace,
@@ -206,6 +212,59 @@ export function AppLayout() {
     }
     return { targetConversationId, targetSessionId: sendResult.sessionId };
   }, [activeProjectId, manager, settings.getModelForEngine, settings.permissionMode, settings.thinking]);
+
+  // ── Session transfer: export the live conversation as Markdown and hand it
+  // to a fresh session running the selected engine/model. ──
+  const [isTransferring, setIsTransferring] = useState(false);
+  const handleTransferSession = useCallback(async (target: SessionTransferTarget) => {
+    const session = manager.activeSession;
+    const projectId = session?.projectId ?? activeProjectId;
+    const sourceMessages = manager.messages.filter((message) => !message.isQueued);
+    if (!session || !projectId) {
+      toast.error(t("transferFailed"), { description: t("workflowOpenSessionFirst") });
+      return;
+    }
+    if (sourceMessages.length === 0) {
+      toast.error(t("transferEmpty"));
+      return;
+    }
+    setIsTransferring(true);
+    try {
+      const { prompt, messageCount } = buildSessionTransferPrompt({
+        session: { ...session, lastMessageAt: session.lastMessageAt ?? session.createdAt },
+        messages: sourceMessages,
+        projectPath: activeProjectPath,
+      });
+      const targetAgent = target.agentId
+        ? agents.find((agent) => agent.id === target.agentId) ?? null
+        : agents.find((agent) => agent.engine === target.engine) ?? null;
+      await manager.createSession(projectId, {
+        engine: target.engine,
+        agentId: target.agentId ?? targetAgent?.id ?? (target.engine === "claude" ? "claude-code" : undefined),
+        cachedConfigOptions: target.cachedConfigOptions ?? targetAgent?.cachedConfigOptions,
+        model: target.model ?? (settings.getModelForEngine(target.engine) || undefined),
+        permissionMode: settings.permissionMode,
+        planMode: false,
+        thinkingEnabled: settings.thinking,
+        effort: target.engine === "claude" ? settings.claudeEffort : undefined,
+      });
+      const displayText = t("transferDisplayText")
+        .replace("{{title}}", session.title)
+        .replace("{{count}}", String(messageCount))
+        .replace("{{target}}", target.label);
+      const result = await manager.send(prompt, undefined, displayText);
+      if (!result?.sessionId) {
+        throw new Error(result?.error ?? "Target session did not start.");
+      }
+      toast.success(t("transferStarted").replace("{{target}}", target.label));
+    } catch (error) {
+      toast.error(t("transferFailed"), {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setIsTransferring(false);
+    }
+  }, [activeProjectId, activeProjectPath, agents, manager, settings, t]);
 
 
   // Wrap handleSend to clear grabbed elements after sending
@@ -361,7 +420,7 @@ export function AppLayout() {
         origin: context?.origin ?? replaced?.origin,
         model: wantedModel,
         permissionMode: settings.permissionMode,
-        planMode: settings.planMode,
+        planMode: false,
         thinkingEnabled: settings.thinking,
         effort: wantedEngine === "claude" ? settings.claudeEffort : undefined,
         engine: wantedEngine,
@@ -902,13 +961,11 @@ export function AppLayout() {
     settings: {
       getModelForEngine: settings.getModelForEngine,
       permissionMode: settings.permissionMode,
-      planMode: settings.planMode,
       claudeEffort: settings.claudeEffort,
       acpPermissionBehavior: settings.acpPermissionBehavior,
     },
     handleModelChange,
     handleClaudeModelEffortChange,
-    handlePlanModeChange,
     handlePermissionModeChange,
     handleAgentChange,
     handleStop,
@@ -917,7 +974,6 @@ export function AppLayout() {
     manager: {
       setSessionModel: manager.setSessionModel,
       setSessionClaudeModelAndEffort: manager.setSessionClaudeModelAndEffort,
-      setSessionPlanMode: manager.setSessionPlanMode,
       setSessionPermissionMode: manager.setSessionPermissionMode,
       setCodexEffort: manager.setCodexEffort,
       codexEffort: manager.codexEffort,
@@ -945,7 +1001,7 @@ export function AppLayout() {
     queueSplitPaneSendAfterSwitch,
   }), [
     agents, selectedAgent, settings, manager, splitView.setFocusedSession,
-    handleModelChange, handleClaudeModelEffortChange, handlePlanModeChange,
+    handleModelChange, handleClaudeModelEffortChange,
     handlePermissionModeChange, handleAgentChange, handleStop,
     handleComposerClear, wrappedHandleSend,
     createSplitPaneDraftSession, queueSplitPaneSendAfterSwitch,
@@ -1590,7 +1646,6 @@ export function AppLayout() {
                   totalCost={manager.totalCost}
                   title={manager.activeSession?.title}
                   titleGenerating={manager.activeSession?.titleGenerating}
-                  planMode={activePaneCtrl?.panePlanMode ?? settings.planMode}
                   permissionMode={activePaneCtrl?.panePermissionMode}
                   acpPermissionBehavior={manager.activeSession?.engine === "acp" ? settings.acpPermissionBehavior : undefined}
                   onToggleSidebar={sidebar.toggle}
@@ -1653,11 +1708,9 @@ export function AppLayout() {
                   queuedCount={manager.queuedCount}
                   model={activePaneCtrl?.paneModel ?? settings.model}
                   claudeEffort={activePaneCtrl?.paneClaudeEffort ?? settings.claudeEffort}
-                  planMode={activePaneCtrl?.panePlanMode ?? settings.planMode}
                   permissionMode={activePaneCtrl?.panePermissionMode ?? (manager.sessionInfo?.permissionMode ?? settings.permissionMode)}
                   onModelChange={activePaneCtrl?.handlePaneModelChange ?? handleModelChange}
                   onClaudeModelEffortChange={activePaneCtrl?.handlePaneClaudeModelEffortChange ?? handleClaudeModelEffortChange}
-                  onPlanModeChange={activePaneCtrl?.handlePanePlanModeChange ?? handlePlanModeChange}
                   onPermissionModeChange={activePaneCtrl?.handlePanePermissionModeChange ?? handlePermissionModeChange}
                   projectPath={activeProjectPath}
                   currentBranch={currentBranch}
@@ -1688,6 +1741,10 @@ export function AppLayout() {
                   onManageACPs={() => setShowSettings("agents")}
                   inputHistory={inputHistory}
                   inputHistorySessionId={manager.activeSessionId}
+                  onTransferSession={handleTransferSession}
+                  transferBusy={isTransferring}
+                  transferDisabled={manager.messages.length === 0}
+                  transferClaudeModels={manager.cachedClaudeModels}
                 />
               </div>
               </>

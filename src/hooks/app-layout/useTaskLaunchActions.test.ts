@@ -10,7 +10,7 @@ import { useTaskLaunchActions } from "./useTaskLaunchActions";
 
 vi.mock("@/lib/i18n", () => ({ useI18n: () => ({ t: (text: string) => text }) }));
 vi.mock("@/lib/analytics/analytics", () => ({ reportError: (_label: string, error: unknown) => String(error) }));
-vi.mock("@/stores/settings-store", () => ({ useSettingsStore: { getState: () => ({ permissionMode: "default", planMode: true, thinking: true, claudeEffort: "medium" }) }, selectProjectSettings: () => ({ modelsByEngine: { codex: "test-model" } }) }));
+vi.mock("@/stores/settings-store", () => ({ useSettingsStore: { getState: () => ({ permissionMode: "default", planMode: false, thinking: true, claudeEffort: "medium" }) }, selectProjectSettings: () => ({ modelsByEngine: { codex: "test-model" } }) }));
 const cleanup: Array<() => void> = [];
 afterEach(() => { for (const dispose of cleanup.splice(0)) dispose(); vi.unstubAllGlobals(); });
 function gate() { let release!: () => void; const promise = new Promise<void>((resolve) => { release = resolve; }); return { release, promise }; }
@@ -47,7 +47,7 @@ function fixture() {
 describe("task draft navigation", () => {
   it("creates a bound draft preserving existing permission and plan settings without sending", async () => {
     const f = fixture(); f.activation.release(); await f.actions.prepareDraft(f.prepared);
-    expect(f.manager.createSession).toHaveBeenCalledWith("project", expect.objectContaining({ conversationId: "conversation", workspaceBinding: f.prepared.task.workspace, engine: "codex", model: "test-model", permissionMode: "default", planMode: true }), expect.any(Object));
+    expect(f.manager.createSession).toHaveBeenCalledWith("project", expect.objectContaining({ conversationId: "conversation", workspaceBinding: f.prepared.task.workspace, engine: "codex", model: "test-model", permissionMode: "default", planMode: false }), expect.any(Object));
     expect(f.insertDraft).toHaveBeenCalledWith(f.prepared.prompt); expect(f.input.selectSpace).toHaveBeenCalledWith("space");
   });
   it("rejects existing unsent attachments without changing navigation", async () => {

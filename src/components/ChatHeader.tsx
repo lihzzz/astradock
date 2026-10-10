@@ -31,7 +31,6 @@ interface ChatHeaderProps {
   totalCost: number;
   title?: string;
   titleGenerating?: boolean;
-  planMode?: boolean;
   permissionMode?: string;
   acpPermissionBehavior?: AcpPermissionBehavior;
   onToggleSidebar: () => void;
@@ -61,7 +60,6 @@ export const ChatHeader = memo(function ChatHeader({
   totalCost,
   title,
   titleGenerating,
-  planMode,
   permissionMode,
   acpPermissionBehavior,
   onToggleSidebar,
@@ -92,7 +90,6 @@ export const ChatHeader = memo(function ChatHeader({
   // Collect all session detail rows for the unified tooltip
   const detailRows: { label: string; value: string }[] = [];
   if (model) detailRows.push({ label: t("model"), value: model });
-  detailRows.push({ label: t("plan"), value: planMode ? t("on") : t("off") });
   if (permissionDisplay) detailRows.push({ label: t("permissions"), value: permissionDisplay });
   if (totalCost > 0) detailRows.push({ label: "Cost", value: `$${totalCost.toFixed(4)}` });
   if (sessionId) detailRows.push({ label: t("session"), value: sessionId });

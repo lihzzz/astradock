@@ -1,4 +1,4 @@
-import { ChevronDown, Map, Shield } from "lucide-react";
+import { ChevronDown, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -6,11 +6,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import type { AcpPermissionBehavior } from "@/types";
 import {
   TOOLBAR_BTN,
@@ -84,43 +79,6 @@ function PermissionDropdown({
   );
 }
 
-/** Plan mode toggle button -- used by Claude and Codex engines */
-function PlanModeToggle({
-  planMode,
-  onPlanModeChange,
-  disabled,
-}: {
-  planMode: boolean;
-  onPlanModeChange: (enabled: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="ghost"
-          size="xs"
-          disabled={disabled}
-          onClick={() => onPlanModeChange(!planMode)}
-          className={`rounded-lg font-normal ${
-            planMode
-              ? "text-blue-400 bg-blue-500/10 hover:bg-blue-500/15 hover:text-blue-400 dark:hover:bg-blue-500/15"
-              : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-          }`}
-        >
-          <Map className="size-3" />
-          Plan
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="top">
-        <p className="text-xs">
-          {planMode ? "Plan mode on" : "Plan mode off"} (Shift+Tab)
-        </p>
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
 // ── Main component ──
 
 export interface EngineControlsProps {
@@ -130,13 +88,11 @@ export interface EngineControlsProps {
   disabled?: boolean;
   permissionMode: string;
   onPermissionModeChange: (mode: string) => void;
-  planMode: boolean;
-  onPlanModeChange: (enabled: boolean) => void;
   acpPermissionBehavior?: AcpPermissionBehavior;
   onAcpPermissionBehaviorChange?: (behavior: AcpPermissionBehavior) => void;
 }
 
-/** Renders plan/permission controls per engine (model/config moved to engine picker). */
+/** Renders permission controls per engine (model/config moved to engine picker). */
 export function EngineControls({
   isCodexAgent,
   isACPAgent,
@@ -144,8 +100,6 @@ export function EngineControls({
   disabled,
   permissionMode,
   onPermissionModeChange,
-  planMode,
-  onPlanModeChange,
   acpPermissionBehavior,
   onAcpPermissionBehaviorChange,
 }: EngineControlsProps) {
@@ -188,18 +142,11 @@ export function EngineControls({
   }
 
   return (
-    <>
-      <PlanModeToggle
-        planMode={planMode}
-        onPlanModeChange={onPlanModeChange}
-        disabled={disabled}
-      />
-      <PermissionDropdown
-        permissionMode={permissionMode}
-        onPermissionModeChange={onPermissionModeChange}
-        showDetails={isCodexAgent}
-        disabled={disabled}
-      />
-    </>
+    <PermissionDropdown
+      permissionMode={permissionMode}
+      onPermissionModeChange={onPermissionModeChange}
+      showDetails={isCodexAgent}
+      disabled={disabled}
+    />
   );
 }

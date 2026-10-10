@@ -37,7 +37,7 @@ export function useTaskLaunchActions(input: TaskLaunchInput) {
         conversationId: prepared.run.conversationId, workspaceBinding: checked.workspace,
         engine: agent.engine, agentId: agent.id, cachedConfigOptions: agent.cachedConfigOptions,
         model: scoped.modelsByEngine[agent.engine] || undefined, permissionMode: settings.permissionMode,
-        planMode: settings.planMode, thinkingEnabled: settings.thinking, effort: agent.engine === "claude" ? settings.claudeEffort : undefined,
+        planMode: false, thinkingEnabled: settings.thinking, effort: agent.engine === "claude" ? settings.claudeEffort : undefined,
       }, { beforeActivate: () => { guardDraft(); input.selectSpace(project.spaceId || "default"); input.closeSplit(); } });
       input.closeWorkbench();
       for (let frame = 0; frame < 120; frame++) {

@@ -22,7 +22,8 @@ export function toChatSession(
     model: session.model,
     effort: toClaudeEffort(session.effort),
     permissionMode: session.permissionMode,
-    planMode: session.planMode,
+    // Plan mode was removed -- normalize legacy persisted sessions to off.
+    planMode: false,
     totalCost: session.totalCost ?? 0,
     isActive,
     engine: session.engine,

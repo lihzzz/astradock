@@ -46,7 +46,6 @@ export function useSettingsCompat(projectId: string | null, engine: EngineId = "
       islandShine: s.islandShine,
       macNativeBackgroundEffect: s.macNativeBackgroundEffect,
       transparency: s.transparency,
-      planMode: s.planMode,
       permissionMode: s.permissionMode,
       acpPermissionBehavior: s.acpPermissionBehavior,
       thinking: s.thinking,
@@ -69,7 +68,6 @@ export function useSettingsCompat(projectId: string | null, engine: EngineId = "
   const setIslandShine = useSettingsStore((s) => s.setIslandShine);
   const setMacBackgroundEffect = useSettingsStore((s) => s.setMacBackgroundEffect);
   const setTransparency = useSettingsStore((s) => s.setTransparency);
-  const setPlanMode = useSettingsStore((s) => s.setPlanMode);
   const storeSetPermissionMode = useSettingsStore((s) => s.setPermissionMode);
   const setAcpPermissionBehavior = useSettingsStore((s) => s.setAcpPermissionBehavior);
   const setThinking = useSettingsStore((s) => s.setThinking);
@@ -256,8 +254,6 @@ export function useSettingsCompat(projectId: string | null, engine: EngineId = "
     setMacBackgroundEffect,
     transparency: globalState.transparency,
     setTransparency,
-    planMode: globalState.planMode,
-    setPlanMode,
     permissionMode: globalState.permissionMode,
     setPermissionMode,
     acpPermissionBehavior: globalState.acpPermissionBehavior,

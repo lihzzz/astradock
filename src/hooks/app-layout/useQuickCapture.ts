@@ -55,7 +55,7 @@ export function useQuickCapture(input: QuickCaptureInput) {
       await input.manager.createSession(project.id, {
         conversationId: identity,
         engine: agent.engine, agentId: agent.id, model: projectSettings.modelsByEngine[agent.engine] || undefined,
-        permissionMode: settings.permissionMode, planMode: settings.planMode, thinkingEnabled: settings.thinking,
+        permissionMode: settings.permissionMode, planMode: false, thinkingEnabled: settings.thinking,
         effort: agent.engine === "claude" ? settings.claudeEffort : undefined, cachedConfigOptions: agent.cachedConfigOptions,
       });
       // Allow React to commit the new draft's composer registration before resolving focus.

@@ -95,7 +95,7 @@ export function useSessionCache({
         model: data.model,
         effort: data.effort,
         permissionMode: data.permissionMode,
-        planMode: !!data.planMode,
+        planMode: false,
         agentId: data.agentId,
       };
       startOptionsRef.current = sessionOptions;
@@ -129,7 +129,7 @@ export function useSessionCache({
             ...(data.engine === "codex" ? { codexGoal } : {}),
             ...(data.effort ? { effort: data.effort } : {}),
             ...(data.permissionMode ? { permissionMode: data.permissionMode } : {}),
-            planMode: !!data.planMode,
+            planMode: false,
             hasPendingPermission: false,
             hasUnreadCompletion: false,
           } : {}),

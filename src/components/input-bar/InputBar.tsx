@@ -66,6 +66,8 @@ import { ContextGauge } from "./ContextGauge";
 import { AttachmentPreview } from "./AttachmentPreview";
 import { EnginePickerDropdown } from "./EnginePickerDropdown";
 import { EngineControls } from "./EngineControls";
+import { TransferSessionMenu } from "./TransferSessionMenu";
+import type { SessionTransferTarget } from "@/lib/session/session-transfer";
 import { MentionPicker } from "./MentionPicker";
 import { useMentionAutocomplete } from "./useMentionAutocomplete";
 import { CommandPicker } from "./CommandPicker";
@@ -81,11 +83,9 @@ export interface InputBarProps {
   isProcessing: boolean;
   model: string;
   claudeEffort: ClaudeEffort;
-  planMode: boolean;
   permissionMode: string;
   onModelChange: (model: string) => void;
   onClaudeModelEffortChange: (model: string, effort: ClaudeEffort) => void;
-  onPlanModeChange: (enabled: boolean) => void;
   onPermissionModeChange: (mode: string) => void;
   projectPath?: string;
   currentBranch?: string;
@@ -129,6 +129,14 @@ export interface InputBarProps {
   onRemoveGrabbedElement?: (id: string) => void;
   /** Open ACP Agents settings */
   onManageACPs?: () => void;
+  /** Hand the current session (exported as Markdown) to another engine/model. */
+  onTransferSession?: (target: SessionTransferTarget) => void;
+  /** Transfer in progress -- shows a spinner on the transfer button. */
+  transferBusy?: boolean;
+  /** Disable transfer (e.g. the session has no messages yet). */
+  transferDisabled?: boolean;
+  /** Cached Claude model catalog for the transfer target picker. */
+  transferClaudeModels?: ModelInfo[];
   /** User prompts sent in the current session, in chronological order. */
   inputHistory?: string[];
   /** Session identity used to reset keyboard history navigation when switching sessions. */
@@ -142,11 +150,9 @@ export const InputBar = memo(function InputBar({
   isProcessing,
   model,
   claudeEffort,
-  planMode,
   permissionMode,
   onModelChange,
   onClaudeModelEffortChange,
-  onPlanModeChange,
   onPermissionModeChange,
   projectPath,
   currentBranch,
@@ -173,6 +179,10 @@ export const InputBar = memo(function InputBar({
   grabbedElements,
   onRemoveGrabbedElement,
   onManageACPs,
+  onTransferSession,
+  transferBusy,
+  transferDisabled,
+  transferClaudeModels,
   inputHistory,
   inputHistorySessionId,
 }: InputBarProps) {
@@ -1133,11 +1143,23 @@ export const InputBar = memo(function InputBar({
               isProcessing={isProcessing}
               permissionMode={permissionMode}
               onPermissionModeChange={onPermissionModeChange}
-              planMode={planMode}
-              onPlanModeChange={onPlanModeChange}
               acpPermissionBehavior={acpPermissionBehavior}
               onAcpPermissionBehaviorChange={onAcpPermissionBehaviorChange}
             />
+
+            {onTransferSession && (
+              <TransferSessionMenu
+                agents={agents ?? []}
+                claudeModels={transferClaudeModels ?? []}
+                codexModels={codexModelData ?? []}
+                currentEngine={isACPAgent ? "acp" : isCodexAgent ? "codex" : "claude"}
+                currentAgentId={selectedAgent?.id ?? null}
+                currentModelId={selectedModelId}
+                disabled={transferDisabled || isProcessing}
+                busy={transferBusy}
+                onTransfer={onTransferSession}
+              />
+            )}
 
             {currentBranch && (
               <>

@@ -246,7 +246,6 @@ function SplitChatPaneInner({
               totalCost={paneState.totalCost}
               title={session?.title}
               titleGenerating={session?.titleGenerating}
-              planMode={paneController.panePlanMode}
               permissionMode={paneController.panePermissionMode}
               acpPermissionBehavior={paneController.paneEngine === "acp" ? acpPermissionBehavior : undefined}
               onToggleSidebar={displayIndex === 0 ? onToggleSidebar : () => {}}
@@ -295,11 +294,9 @@ function SplitChatPaneInner({
               queuedCount={isActiveSessionPane ? queuedCount : 0}
               model={paneController.paneModel}
               claudeEffort={paneController.paneClaudeEffort}
-              planMode={paneController.panePlanMode}
               permissionMode={paneController.panePermissionMode}
               onModelChange={paneController.handlePaneModelChange}
               onClaudeModelEffortChange={paneController.handlePaneClaudeModelEffortChange}
-              onPlanModeChange={paneController.handlePanePlanModeChange}
               onPermissionModeChange={paneController.handlePanePermissionModeChange}
               projectPath={projectPath}
               currentBranch={currentBranch}

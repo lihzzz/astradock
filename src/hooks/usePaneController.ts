@@ -57,14 +57,12 @@ export interface PaneControllerContext {
   settings: {
     getModelForEngine: (engine: EngineId) => string;
     permissionMode: string;
-    planMode: boolean;
     claudeEffort: ClaudeEffort;
     acpPermissionBehavior: "ask" | "auto_accept" | "allow_all";
   };
   // Manager methods for active-pane path
   handleModelChange: (nextModel: string) => void;
   handleClaudeModelEffortChange: (nextModel: string, effort: ClaudeEffort) => void;
-  handlePlanModeChange: (enabled: boolean) => void;
   handlePermissionModeChange: (nextMode: string) => void;
   handleAgentChange: (agent: InstalledAgent | null) => void;
   handleStop: () => Promise<void>;
@@ -74,7 +72,6 @@ export interface PaneControllerContext {
   manager: {
     setSessionModel: (sessionId: string, model: string) => void;
     setSessionClaudeModelAndEffort: (sessionId: string, model: string, effort: ClaudeEffort) => void;
-    setSessionPlanMode: (sessionId: string, enabled: boolean) => void;
     setSessionPermissionMode: (sessionId: string, mode: string) => void;
     setCodexEffort: (effort: string) => void;
     codexEffort: string;
@@ -133,9 +130,6 @@ export function usePaneController(
       paneState.sessionInfo?.permissionMode
       ?? session?.permissionMode
       ?? (isActiveSessionPane ? ctx.settings.permissionMode : DEFAULT_PERMISSION_MODE);
-    const panePlanMode = panePermissionMode === "plan"
-      || !!session?.planMode
-      || (isActiveSessionPane && !session ? ctx.settings.planMode : false);
     const paneSupportedModels = paneEngine === "acp"
       ? []
       : paneEngine === "codex"
@@ -180,14 +174,6 @@ export function usePaneController(
         return;
       }
       ctx.manager.setSessionClaudeModelAndEffort(sessionId, nextModel, resolvedEffort);
-    };
-
-    const handlePanePlanModeChange = (enabled: boolean) => {
-      if (isActiveSessionPane) {
-        ctx.handlePlanModeChange(enabled);
-        return;
-      }
-      ctx.manager.setSessionPlanMode(sessionId, enabled);
     };
 
     const handlePanePermissionModeChange = (nextMode: string) => {
@@ -278,7 +264,7 @@ export function usePaneController(
 
       if (paneEngine === "codex") {
         try {
-          const collaborationMode = buildCodexCollabMode(panePlanMode, paneModel);
+          const collaborationMode = buildCodexCollabMode(false, paneModel);
           const sendResult = await paneState.codex.send(text, images, displayText, collaborationMode);
           if (!sendResult.ok && isRetryableUpstreamError(sendResult.error ?? "")) {
             await ctx.queueSplitPaneSendAfterSwitch?.(sessionId, text, images, displayText);
@@ -339,7 +325,6 @@ export function usePaneController(
       paneModel,
       paneHeaderModel: liveModel || paneModel,
       panePermissionMode,
-      panePlanMode,
       paneSupportedModels,
       paneClaudeEffort: session?.effort ?? ctx.settings.claudeEffort,
       paneSlashCommands: paneState.engine.slashCommands,
@@ -358,7 +343,6 @@ export function usePaneController(
       handlePaneGoalClear,
       handlePaneModelChange,
       handlePaneClaudeModelEffortChange,
-      handlePanePlanModeChange,
       handlePanePermissionModeChange,
       handlePaneCodexEffortChange,
       handlePaneAgentChange,

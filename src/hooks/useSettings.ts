@@ -66,7 +66,6 @@ const DEFAULT_SPLIT = 0.5;
 
 const DEFAULT_MODEL = "default";
 const DEFAULT_PERMISSION_MODE = "default";
-const DEFAULT_PLAN_MODE = true;
 const DEFAULT_CLAUDE_EFFORT: ClaudeEffort = "high";
 const DEFAULT_ENGINE_MODELS: Record<EngineId, string> = {
   claude: DEFAULT_MODEL,
@@ -105,8 +104,6 @@ export interface Settings {
   setMacBackgroundEffect: (effect: MacBackgroundEffect) => void;
   transparency: boolean;
   setTransparency: (enabled: boolean) => void;
-  planMode: boolean;
-  setPlanMode: (enabled: boolean) => void;
   permissionMode: string;
   setPermissionMode: (mode: string) => void;
   acpPermissionBehavior: AcpPermissionBehavior;
@@ -335,19 +332,6 @@ export function useSettings(projectId: string | null, engine: EngineId = "claude
     }
   }, [macNativeBackgroundEffect]);
 
-  const [planMode, setPlanModeRaw] = useState(() => {
-    const stored = localStorage.getItem("harnss-plan-mode");
-    if (stored !== null) return stored === "true";
-    // Legacy migration: old builds encoded plan in permissionMode.
-    const legacyPermissionMode = localStorage.getItem("harnss-permission-mode");
-    if (legacyPermissionMode === "plan") return true;
-    return DEFAULT_PLAN_MODE;
-  });
-  const setPlanMode = useCallback((enabled: boolean) => {
-    setPlanModeRaw(enabled);
-    localStorage.setItem("harnss-plan-mode", String(enabled));
-  }, []);
-
   const [permissionMode, setPermissionModeRaw] = useState(() =>
     (() => {
       const stored = localStorage.getItem("harnss-permission-mode");
@@ -356,10 +340,8 @@ export function useSettings(projectId: string | null, engine: EngineId = "claude
     })(),
   );
   const setPermissionMode = useCallback((mode: string) => {
-    // Legacy fallback: treat selecting "plan" as enabling the dedicated plan toggle.
+    // Legacy fallback: "plan" used to be a dedicated toggle -- fall back to default.
     if (mode === "plan") {
-      setPlanModeRaw(true);
-      localStorage.setItem("harnss-plan-mode", "true");
       mode = DEFAULT_PERMISSION_MODE;
     }
     setPermissionModeRaw(mode);
@@ -707,8 +689,6 @@ export function useSettings(projectId: string | null, engine: EngineId = "claude
     setMacBackgroundEffect,
     transparency,
     setTransparency,
-    planMode,
-    setPlanMode,
     permissionMode,
     setPermissionMode,
     acpPermissionBehavior,
