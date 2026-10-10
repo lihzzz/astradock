@@ -4,6 +4,7 @@ import type { UIMessage } from "@/types";
 import {
   buildSessionTransferPrompt,
   buildTransferMarkdown,
+  getHighestEffort,
   TRANSFER_MARKDOWN_MAX_BYTES,
 } from "./session-transfer";
 
@@ -51,6 +52,26 @@ describe("buildTransferMarkdown", () => {
     const messages = Array.from({ length: 200 }, (_, i) => msg("assistant", `m${i} ${"y".repeat(4000)}`));
     const { markdown } = buildTransferMarkdown(session, messages);
     expect(new TextEncoder().encode(markdown).byteLength).toBeLessThanOrEqual(TRANSFER_MARKDOWN_MAX_BYTES + 1024);
+  });
+});
+
+describe("getHighestEffort", () => {
+  it("returns undefined for an empty list", () => {
+    expect(getHighestEffort([])).toBeUndefined();
+  });
+
+  it("picks the strongest known Claude level", () => {
+    expect(getHighestEffort(["low", "medium", "high", "max"])).toBe("max");
+  });
+
+  it("picks the strongest known Codex level", () => {
+    expect(getHighestEffort(["minimal", "low", "medium", "high", "xhigh"])).toBe("xhigh");
+    expect(getHighestEffort(["low", "medium", "high", "xhigh", "max", "ultra"])).toBe("ultra");
+  });
+
+  it("is case-insensitive and falls back to list order for unknown levels", () => {
+    expect(getHighestEffort(["LOW", "High"])).toBe("High");
+    expect(getHighestEffort(["foo", "bar"])).toBe("bar");
   });
 });
 

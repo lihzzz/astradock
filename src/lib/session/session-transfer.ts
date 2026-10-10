@@ -23,6 +23,41 @@ export interface SessionTransferTarget {
   label: string;
 }
 
+/** Known reasoning-effort levels ranked from lowest to highest. */
+const EFFORT_RANK: Record<string, number> = {
+  none: 0,
+  minimal: 1,
+  low: 2,
+  medium: 3,
+  high: 4,
+  xhigh: 5,
+  max: 6,
+  ultra: 7,
+};
+
+function effortScore(effort: string): number {
+  return EFFORT_RANK[effort.trim().toLowerCase()] ?? -1;
+}
+
+/**
+ * Pick the strongest effort a model supports. Known levels win by rank;
+ * unknown levels are treated as lowest and ties fall to the later list entry
+ * (catalogs list efforts in ascending order).
+ */
+export function getHighestEffort(efforts: readonly string[]): string | undefined {
+  if (efforts.length === 0) return undefined;
+  let best = efforts[0];
+  let bestScore = effortScore(efforts[0]);
+  for (let i = 1; i < efforts.length; i++) {
+    const value = effortScore(efforts[i]);
+    if (value >= bestScore) {
+      best = efforts[i];
+      bestScore = value;
+    }
+  }
+  return best;
+}
+
 /** Upper bound for the transcript embedded in a transfer prompt (~240 KB). */
 export const TRANSFER_MARKDOWN_MAX_BYTES = 240 * 1024;
 

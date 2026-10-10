@@ -21,7 +21,7 @@ import type { EngineId, InstalledAgent, ModelInfo } from "@/types";
 import { AgentIcon } from "@/components/AgentIcon";
 import { ENGINE_ICONS, getAgentIcon } from "@/lib/engine-icons";
 import { useI18n } from "@/lib/i18n";
-import type { SessionTransferTarget } from "@/lib/session/session-transfer";
+import { getHighestEffort, type SessionTransferTarget } from "@/lib/session/session-transfer";
 import { TOOLBAR_BTN } from "./constants";
 
 export interface TransferSessionMenuProps {
@@ -121,6 +121,7 @@ export const TransferSessionMenu = memo(function TransferSessionMenu({
           </DropdownMenuItem>
         );
       }
+      const maxEffort = getHighestEffort(efforts);
       return (
         <DropdownMenuSub key={m.id}>
           <DropdownMenuSubTrigger disabled={active}>
@@ -137,10 +138,15 @@ export const TransferSessionMenu = memo(function TransferSessionMenu({
           <DropdownMenuSubContent className="w-44">
             <DropdownMenuItem
               onClick={() =>
-                onTransfer({ engine, model: m.id, label: `${engineLabel} · ${m.label}` })
+                onTransfer({
+                  engine,
+                  model: m.id,
+                  effort: maxEffort,
+                  label: `${engineLabel} · ${m.label} · ${maxEffort}`,
+                })
               }
             >
-              {t("transferDefaultEffort")}
+              {t("transferHighestEffort").replace("{{effort}}", maxEffort ?? "")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {efforts.map((effort) => (
