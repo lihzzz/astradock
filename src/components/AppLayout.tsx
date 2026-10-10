@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useAppOrchestrator } from "@/hooks/useAppOrchestrator";
 import { useQuickCapture } from "@/hooks/app-layout/useQuickCapture";
 import { useAppLaunchActions } from "@/hooks/app-layout/useAppLaunchActions";
+import { useTaskLaunchActions } from "@/hooks/app-layout/useTaskLaunchActions";
 import { ProjectAppAgentPermissions } from "./apps/ProjectAppAgentPermissions";
 import { QuickCapturePanel } from "./QuickCapturePanel";
 import type { HistoryLocation } from "@shared/types/productivity";
@@ -179,6 +180,11 @@ export function AppLayout() {
     displayText?: string;
   } | null>(null);
   const [workflowOpen, setWorkflowOpen] = useState(false);
+  const taskActions = useTaskLaunchActions({
+    manager, projects: projectManager.projects, agents,
+    closeWorkbench: () => { setWorkflowOpen(false); setShowApps(false); setShowSettings(false); },
+    selectSpace: spaceManager.setActiveSpaceId, closeSplit: splitView.dismissSplitView,
+  });
 
   const handleWorkflowHandoff = useCallback(async ({ targetEngine, prompt }: { targetEngine: EngineId; purpose: HandoffPurpose; prompt: string }) => {
     if (!activeProjectId || !manager.activeSession) throw new Error("Open a project session before handing off work");
@@ -1157,6 +1163,7 @@ export function AppLayout() {
 
       {workflowOpen && (
         <WorkflowCenter
+          taskActions={{ agents, onPrepareDraft: taskActions.prepareDraft, onOpenConversation: taskActions.openConversation }}
           sessions={manager.sessions}
           projects={projectManager.projects}
           activeSessionId={manager.activeSessionId}

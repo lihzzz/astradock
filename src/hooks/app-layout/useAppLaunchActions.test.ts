@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppSessionLink, PreparedAppContext } from "@shared/types/project-apps";
 import type { HistoryLocation } from "@shared/types/productivity";
 import { registerQuickCaptureComposer } from "@/lib/quick-capture-composer";
+import { conversationKey } from "@shared/lib/session-identity";
+import type { SessionMeta as SessionListItem } from "@shared/lib/session-persistence";
 import { DRAFT_ID } from "@/hooks/session/types";
 import { useAppLaunchActions } from "./useAppLaunchActions";
 
@@ -29,7 +31,8 @@ function fixture() {
   const context: PreparedAppContext = { appId: "app", appName: "Web", workspaceBinding: workspace,
     origin: { kind: "project-app", appId: "app", runId: "run" }, text: "Review the running web app" };
   const link: AppSessionLink = { appId: "app", projectId: project.id, conversationId: "conversation", engine: "claude", workspace, createdAt: 1 };
-  const location: HistoryLocation = { projectId: project.id, conversationKey: link.conversationId,
+  const savedSession: SessionListItem = { id: "runtime", projectId: project.id, conversationId: link.conversationId, engine: "claude", title: "App conversation", createdAt: 1, lastMessageAt: 1, totalCost: 0 };
+  const location: HistoryLocation = { projectId: project.id, conversationKey: conversationKey(savedSession),
     runtimeSessionId: "runtime", messageId: null, spaceId: project.spaceId };
   const activationGate = gate();
   const activated = vi.fn();
@@ -52,7 +55,8 @@ function fixture() {
   };
   const resolve = vi.fn<Window["claude"]["history"]["resolve"]>(async () => ({ ok: true, value: location }));
   const linkSession = vi.fn<Window["claude"]["projectApps"]["linkSession"]>(async () => ({ ok: true, value: null }));
-  vi.stubGlobal("window", { claude: { history: { resolve }, projectApps: {
+  const listSessions = vi.fn<Window["claude"]["sessions"]["list"]>(async () => [savedSession]);
+  vi.stubGlobal("window", { claude: { sessions: { list: listSessions }, history: { resolve }, projectApps: {
     validateWorkspace: async () => ({ ok: true, value: { workspace, cwd: "/project/apps/web" } }), linkSession,
   } } });
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => { callback(0); return 1; });
@@ -62,7 +66,7 @@ function fixture() {
   function Harness() { actions = useAppLaunchActions(input); return null; }
   renderToString(createElement(Harness));
   if (!actions) throw new Error("Application launch hook did not render");
-  return { actions, input, manager, context, link, location, activationGate, activated, composer, resolve, linkSession, insertDraft };
+  return { actions, input, manager, context, link, location, activationGate, activated, composer, resolve, linkSession, insertDraft, listSessions, savedSession };
 }
 
 function expectUnchanged(f: ReturnType<typeof fixture>) {
@@ -75,6 +79,18 @@ function expectUnchanged(f: ReturnType<typeof fixture>) {
 }
 
 describe("application conversation launch actions", () => {
+  it("resolves the canonical Codex conversation key after a runtime restart", async () => {
+    const f = fixture(); f.activationGate.release();
+    const saved = { ...f.savedSession, engine: "codex" as const, id: "restarted-runtime", codexThreadId: "stable-thread" };
+    f.listSessions.mockResolvedValue([saved]);
+    await f.actions.openAppSession({ ...f.link, engine: "codex" });
+    expect(f.resolve).toHaveBeenCalledWith(expect.objectContaining({ conversationKey: conversationKey(saved), runtimeSessionId: saved.id }));
+  });
+  it("reports a deleted conversation without navigating or changing the draft", async () => {
+    const f = fixture(); f.listSessions.mockResolvedValue([]);
+    await expect(f.actions.openAppSession(f.link)).rejects.toThrow("appsSessionUnavailable");
+    expect(f.resolve).not.toHaveBeenCalled(); expectUnchanged(f);
+  });
   it("preserves text typed during createSession validation before changing space or split", async () => {
     const f = fixture();
     const pending = f.actions.continueApp(f.context);
@@ -102,6 +118,7 @@ describe("application conversation launch actions", () => {
     const f = fixture(); const resolutionGate = gate();
     f.resolve.mockImplementation(async () => { await resolutionGate.pending; return { ok: true, value: f.location }; });
     const pending = f.actions.openAppSession(f.link);
+    await vi.waitFor(() => expect(f.resolve).toHaveBeenCalledOnce());
     f.composer.attachment = true; resolutionGate.release();
     await expect(pending).rejects.toThrow("unsent draft");
     expect(f.manager.switchSession).not.toHaveBeenCalled();

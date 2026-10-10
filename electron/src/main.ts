@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, screen, session, shell, systemPreferences, Tray, webContents } from "electron";
+import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, powerMonitor, screen, session, shell, systemPreferences, Tray, webContents } from "electron";
 import path from "path";
 import http from "http";
 import contextMenu from "electron-context-menu";
@@ -8,6 +8,7 @@ import { fitWindowToWorkArea } from "./lib/window-bounds";
 import { isAllowedPreviewUrl } from "./lib/browser-safety";
 import { prepareManagedQuit } from "./lib/app-quit";
 import * as projectAppsIpc from "./ipc/project-apps";
+import * as tasksIpc from "./ipc/tasks";
 import { getProjectAppsService } from "./lib/project-apps";
 import { shutdownProjectAppAgentBridge } from "./lib/project-apps/agent-bridge";
 
@@ -468,6 +469,7 @@ ipcMain.on("glass:set-theme", (_event, theme: string) => {
 spacesIpc.register();
 projectsIpc.register(getMainWindow);
 projectAppsIpc.register(getMainWindow);
+tasksIpc.register(getMainWindow);
 configureProjectAppCleanup((projectId) => getProjectAppsService().removeProject(projectId));
 sessionsIpc.register();
 sessionOperationsIpc.register(getMainWindow);
@@ -622,6 +624,7 @@ app.whenReady().then(() => {
   createWindow();
   screen.on("display-metrics-changed", fitMainWindowToDisplay);
   screen.on("display-removed", fitMainWindowToDisplay);
+  powerMonitor.on("resume", () => { void getProjectAppsService().recheckHealth().catch((error) => reportError("PROJECT_APPS:RESUME", error)); });
 
   // Restore an explicitly enabled memory daemon in the background. If its
   // dependency is unavailable, the memory service remains fail-safe and the

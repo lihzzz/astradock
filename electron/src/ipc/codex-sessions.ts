@@ -25,6 +25,8 @@ import {
 import { getHindsightCodexMcpOverrides, registerMemorySession, unregisterMemorySession, beforeMemorySend, observeCodexNotification, completeMemoryTurn } from "../lib/memory/service";
 import { cancelProjectAppAgentPermissions, registerProjectAppAgentSession, revokeProjectAppAgentSession, getProjectAppMcpServer } from "../lib/project-apps/agent-bridge";
 import { beginUsageTurn, endUsageTurn, stopUsageSession } from "../lib/usage";
+import { observeCodexTaskEvent } from "../lib/tasks/engine-events";
+import { taskRuntimeEvents } from "../lib/tasks/runtime-events";
 import { getSessionRepository } from "../lib/session-service";
 import type { SessionRuntimeLease } from "../lib/session-repository";
 import type { SessionResumeSource } from "@shared/types/productivity";
@@ -86,7 +88,7 @@ function assertCodexSessionActive(session: CodexSession): void {
 
 export async function stopForDeletion(sessionId: string): Promise<void> {
   revokeProjectAppAgentSession(sessionId);
-  stopUsageSession(sessionId);
+  stopUsageSession(sessionId);  taskRuntimeEvents.stop(sessionId);
   const session = codexSessions.get(sessionId);
   if (!session) return;
   await session.rpc.destroyAndWait();
@@ -456,6 +458,8 @@ function setupCodexHandlers(
       }
     }
 
+    observeCodexTaskEvent(internalId, notification.method, notification.params);
+
     // Track active turn from turn events
     if (notification.method === "turn/started") {
       beginUsageTurn(internalId, notification.params.turn.id);
@@ -483,6 +487,7 @@ function setupCodexHandlers(
       `[srvreq:${internalId.slice(0, 8)}] ${msg.method} id=${msg.id}`,
     );
     if (isSupportedServerRequestMethod(msg.method)) {
+      taskRuntimeEvents.wait(internalId, "codex", String(msg.id), msg.method.includes("requestUserInput") ? "waiting_user" : "waiting_permission");
       safeSend(getMainWindow, "codex:approval_request", {
         _sessionId: internalId,
         rpcId: msg.id,
@@ -497,7 +502,7 @@ function setupCodexHandlers(
   };
 
   rpc.onExit = (code, signal) => {
-    stopUsageSession(internalId);
+    stopUsageSession(internalId);    taskRuntimeEvents.stop(internalId);
     log("codex", ` Process exited: code=${code} signal=${signal} session=${internalId}`);
     codexSessions.delete(internalId);
     unregisterMemorySession(internalId); revokeProjectAppAgentSession(internalId);
@@ -718,6 +723,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
         return { turnId: result.turn.id };
       } catch (err) {
         const errMsg = reportError("CODEX_SEND_ERR", err, { engine: "codex", sessionId: data.sessionId });
+        if (codexSessions.has(data.sessionId)) taskRuntimeEvents.publish(data.sessionId, "codex", "failed", errMsg);
         return { error: errMsg };
       }
     },
@@ -765,6 +771,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
         const result: Record<string, unknown> = { decision: data.decision };
         if (data.acceptSettings) result.acceptSettings = data.acceptSettings;
         session.rpc.respondToServer(data.rpcId, result);
+        taskRuntimeEvents.resolve(data.sessionId, String(data.rpcId));
         return { ok: true };
       } catch (err) {
         return {
@@ -793,6 +800,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
       if (!session) return { error: "Session not found" };
       try {
         session.rpc.respondToServer(data.rpcId, { answers: data.answers });
+        taskRuntimeEvents.resolve(data.sessionId, String(data.rpcId));
         return { ok: true };
       } catch (err) {
         return {
@@ -822,6 +830,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
       if (!session) return { error: "Session not found" };
       try {
         session.rpc.respondToServerError(data.rpcId, data.code, data.message);
+        taskRuntimeEvents.resolve(data.sessionId, String(data.rpcId));
         return { ok: true };
       } catch (err) {
         return {
@@ -1151,7 +1160,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
 export async function stopAll(): Promise<void> {
   const stopping: Promise<void>[] = [];
   for (const [id, session] of codexSessions) {
-    stopUsageSession(id);
+    stopUsageSession(id);    taskRuntimeEvents.stop(id);
     stopping.push(session.rpc.destroyAndWait());
     codexSessions.delete(id);
     unregisterMemorySession(id); revokeProjectAppAgentSession(id);

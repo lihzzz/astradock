@@ -2,6 +2,18 @@ import { describe, expect, it, vi } from "vitest";
 import { prepareManagedQuit } from "../app-quit";
 
 describe("managed application quit", () => {
+  it("offers a decision after 15 seconds and observes the live attempt on retry", async () => {
+    vi.useFakeTimers();
+    try {
+      let complete = () => {};
+      const stop = vi.fn(() => new Promise<void>((resolve) => { complete = resolve; }));
+      const onFailure = vi.fn(async () => "retry" as const);
+      const pending = prepareManagedQuit({ stop, onFailure });
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(onFailure).toHaveBeenCalledOnce(); expect(stop).toHaveBeenCalledOnce();
+      complete(); expect(await pending).toBe(true); expect(stop).toHaveBeenCalledOnce();
+    } finally { vi.useRealTimers(); }
+  });
   it("waits for every stop before allowing exit", async () => {
     let finish: () => void = () => {};
     let completed = false;

@@ -17,6 +17,11 @@ docs/
 !/docs/project-apps/integration-plan.md
 !/docs/project-apps/user-guide.md
 !/docs/project-apps/implementation-status.md
+!/docs/task-workbench/
+/docs/task-workbench/*
+!/docs/task-workbench/iteration-plan.md
+!/docs/task-workbench/implementation-status.md
+!/docs/task-workbench/user-guide.md
 /release/
 .cache/
 .claude/agent-memory/

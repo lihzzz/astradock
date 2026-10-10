@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { BackgroundSessionStore } from "@/lib/background/session-store";
 import type { WorkspaceBinding } from "@shared/types/workspace";
 import type { PersistedSession } from "@/types";
+import { conversationKey } from "@shared/lib/session-identity";
 import type { HistoryLocation } from "@shared/types/productivity";
 import { useSessionCrud } from "./useSessionCrud";
 
@@ -91,7 +92,7 @@ describe("programmatic draft activation guard", () => {
     const f = fixture();
     const data: PersistedSession = { id: "app-runtime", conversationId: "app-conversation", projectId: "project",
       title: "App conversation", createdAt: 1, totalCost: 0, messages: [] };
-    const location: HistoryLocation = { projectId: data.projectId, conversationKey: "app-conversation",
+    const location: HistoryLocation = { projectId: data.projectId, conversationKey: conversationKey(data),
       runtimeSessionId: data.id, messageId: null, spaceId: null };
     let finishLoad!: (value: PersistedSession) => void;
     const loaded = new Promise<PersistedSession>((resolve) => { finishLoad = resolve; });

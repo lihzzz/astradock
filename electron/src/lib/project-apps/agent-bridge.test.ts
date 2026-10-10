@@ -24,7 +24,7 @@ async function fixture(timeoutMs = 2000, tokenTtlMs = 60_000) {
     phase: "running", health: "unknown", pid: 123, port: null, url: null, startedAt: 1,
     endedAt: null, exitCode: null, error: null, cleanupPending: false };
   const snapshot: AppCatalogSnapshot = { revision: 1, apps: [app, { ...app, id: "other", workspace: otherWorkspace }],
-    runs: [run, { ...run, runId: "other-run", appId: "other", workspace: otherWorkspace }], errors: [] };
+    runs: [run, { ...run, runId: "other-run", appId: "other", workspace: otherWorkspace }], errors: [], workspaceErrors: {} };
   const service: ConstructorParameters<typeof ProjectAppAgentBridge>[0] = {
     workspaces: vi.fn(async () => [workspace]),
     validateWorkspace: vi.fn(async (value: unknown) => {

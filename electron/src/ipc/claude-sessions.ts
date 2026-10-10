@@ -19,6 +19,8 @@ import { captureEvent } from "../lib/posthog";
 import { withComputerUseMcpServer } from "../lib/computer-use-runtime";
 import { withHindsightMcpServers, registerMemorySession, unregisterMemorySession, beforeMemorySend, observeClaudeEvent, completeMemoryTurn } from "../lib/memory/service";
 import { beginUsageTurn, endUsageTurn, stopUsageSession } from "../lib/usage";
+import { observeClaudeTaskEvent } from "../lib/tasks/engine-events";
+import { taskRuntimeEvents } from "../lib/tasks/runtime-events";
 import { getSessionRepository } from "../lib/session-service";
 import type { SessionRuntimeLease } from "../lib/session-repository";
 import type { SessionResumeSource } from "@shared/types/productivity";
@@ -65,7 +67,7 @@ function assertClaudeSessionActive(sessionId: string, session: SessionEntry): vo
 
 async function stopSession(sessionId: string, reason: string): Promise<void> {
   revokeProjectAppAgentSession(sessionId);
-  stopUsageSession(sessionId);
+  stopUsageSession(sessionId);  taskRuntimeEvents.stop(sessionId);
   const session = sessions.get(sessionId);
   if (!session) return;
   session.stopping = true;
@@ -314,6 +316,7 @@ function startEventLoop(
           log("EVENT_FULL", message);
         }
         observeClaudeEvent(sessionId, msgObj);
+        if (!session.stopping) observeClaudeTaskEvent(sessionId, msgObj);
         if (msgObj.type === "system" && typeof msgObj.task_id === "string") {
           if (msgObj.subtype === "task_started") beginUsageTurn(sessionId, `task:${msgObj.task_id}`);
           if (msgObj.subtype === "task_notification") endUsageTurn(sessionId, `task:${msgObj.task_id}`);
@@ -368,6 +371,7 @@ function startEventLoop(
       }
     } catch (err) {
       queryError = reportError("QUERY_ERROR", err, { engine: "claude", sessionId });
+      if (!session.stopping && taskRuntimeEvents.get(sessionId)?.status === "running") taskRuntimeEvents.publish(sessionId, "claude", "failed", queryError);
       log("QUERY_ERROR", `${logPrefix} stopping=${!!session.stopping} reason=${session.stopReason ?? "none"}`);
     } finally {
       session.runtimeLease?.release();
@@ -377,7 +381,7 @@ function startEventLoop(
         unregisterMemorySession(sessionId); revokeProjectAppAgentSession(sessionId);
       }
       if (!session.restarting && ownsSession) {
-        stopUsageSession(sessionId);
+        stopUsageSession(sessionId);        taskRuntimeEvents.stop(sessionId);
         // Requested stop: treat teardown errors as clean exit
         const stopRequested = session.stopping;
         const exitCode = (queryError && !stopRequested) ? 1 : 0;
@@ -654,6 +658,7 @@ async function startSession(options: StartOptions, getMainWindow: () => BrowserW
         catch { resolve({ behavior: "deny", message: "Session stopped" }); return; }
         const requestId = crypto.randomUUID();
         session.pendingPermissions.set(requestId, { resolve });
+        taskRuntimeEvents.wait(sessionId, "claude", requestId, toolName === "AskUserQuestion" ? "waiting_user" : "waiting_permission");
         log("PERMISSION_REQUEST", {
           session: sessionId.slice(0, 8),
           tool: toolName,
@@ -791,6 +796,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
       session_id: sessionId,
     });
     beginUsageTurn(sessionId);
+    taskRuntimeEvents.publish(sessionId, "claude", "running");
     return { ok: true };
   });
 
@@ -837,6 +843,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     }
 
     session.pendingPermissions.delete(requestId);
+    taskRuntimeEvents.resolve(sessionId, requestId);
 
     if (behavior === "allow") {
       pending.resolve({ behavior: "allow", updatedInput: toolInput, updatedPermissions });
@@ -926,7 +933,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     (_event, payload: string | { sessionId: string; reason?: string }) => {
       const { sessionId, reason } = parseStopRequest(payload);
       revokeProjectAppAgentSession(sessionId);
-      stopUsageSession(sessionId);
+      stopUsageSession(sessionId);      taskRuntimeEvents.stop(sessionId);
       const session = sessions.get(sessionId);
       if (session) {
         // Mark as requested stop so teardown errors are suppressed
@@ -969,6 +976,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
 
     try {
       await session.queryHandle!.interrupt();
+      taskRuntimeEvents.stop(sessionId);
       log("INTERRUPT", `session=${sessionId.slice(0, 8)} acknowledged`);
     } catch (err) {
       const errMsg = reportError("INTERRUPT_ERR", err, { engine: "claude", sessionId });

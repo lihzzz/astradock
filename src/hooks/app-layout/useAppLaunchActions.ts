@@ -5,6 +5,7 @@ import type { InstalledAgent, Project } from "@/types";
 import type { useSessionManager } from "@/hooks/useSessionManager";
 import { selectProjectSettings, useSettingsStore } from "@/stores/settings-store";
 import { getQuickCaptureComposer, hasUnsentComposerDraft } from "@/lib/quick-capture-composer";
+import { conversationKey } from "@shared/lib/session-identity";
 import { DRAFT_ID } from "@/hooks/session/types";
 import { useI18n } from "@/lib/i18n";
 
@@ -72,11 +73,14 @@ export function useAppLaunchActions(input: AppLaunchActionsInput) {
     if (hasUnsentComposerDraft()) throw new Error(t("Send or clear your unsent draft before continuing. Your text and attachments are preserved."));
     const project = input.projects.find((entry) => entry.id === link.projectId);
     if (!project) throw new Error(t("Project is unavailable"));
-    const match = input.manager.sessions.find((session) => session.projectId === link.projectId
+    const metadata = await window.claude.sessions.list(link.projectId);
+    const match = metadata.find((session) => session.projectId === link.projectId
+      && (session.engine ?? "claude") === link.engine
       && (session.conversationId ?? session.id) === link.conversationId);
+    if (!match) throw new Error(t("appsSessionUnavailable"));
     const resolved = await window.claude.history.resolve({
-      projectId: link.projectId, conversationKey: link.conversationId,
-      runtimeSessionId: match?.id ?? link.conversationId, messageId: null, spaceId: project.spaceId || "default",
+      projectId: link.projectId, conversationKey: conversationKey(match),
+      runtimeSessionId: match.id, messageId: null, spaceId: project.spaceId || "default",
     });
     if (!resolved.ok) throw new Error(resolved.error.message);
     if (hasUnsentComposerDraft()) throw new Error(t("Send or clear your unsent draft before continuing. Your text and attachments are preserved."));

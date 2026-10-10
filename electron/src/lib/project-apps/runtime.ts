@@ -31,6 +31,7 @@ interface RuntimeEntry {
   startup: Promise<void> | null;
   stopping: Promise<AppRun> | null;
   healthTimer: ReturnType<typeof setTimeout> | null;
+  healthVersion: number;
   persistence: Promise<void>;
   assertAuthorized: () => void;
 }
@@ -70,7 +71,7 @@ export class ProjectAppRuntimeManager {
       run: { runId, appId: app.id, configRevision: app.revision, workspace: structuredClone(binding), launch: structuredClone(app.launch),
         phase: "starting", health: app.launch.readiness.kind === "http" ? "checking" : "unknown", pid: null, port: null, url: null,
         startedAt: Date.now(), endedAt: null, exitCode: null, error: null, cleanupPending: false },
-      key: runtimeKey(app.id, binding), process: null, lease: null, abort: new AbortController(), startup: null, stopping: null, healthTimer: null, persistence: Promise.resolve(), assertAuthorized,
+      key: runtimeKey(app.id, binding), process: null, lease: null, abort: new AbortController(), startup: null, stopping: null, healthTimer: null, healthVersion: 0, persistence: Promise.resolve(), assertAuthorized,
       logs: new AppLogBuffer(runId, this.dependencies.store.runPath(runId), (page) => this.dependencies.emit({ kind: "logs", page }), this.dependencies.report, secrets),
     };
     this.entries.set(runId, entry);
@@ -143,9 +144,17 @@ export class ProjectAppRuntimeManager {
       this.dependencies.onEnded();
     }
   }
+  recheckHealth(): void {
+    for (const entry of this.entries.values()) {
+      if (entry.run.phase !== "running" || entry.run.launch.readiness.kind !== "http") continue;
+      if (entry.healthTimer) clearTimeout(entry.healthTimer);
+      this.scheduleHealth(entry);
+    }
+  }
   private scheduleHealth(entry: RuntimeEntry): void {
+    const version = ++entry.healthVersion;
     const tick = async () => {
-      if (entry.abort.signal.aborted || entry.run.phase !== "running" || !entry.run.url) return;
+      if (version !== entry.healthVersion || entry.abort.signal.aborted || entry.run.phase !== "running" || !entry.run.url) return;
       const url = new URL(entry.run.url);
       const port = Number(url.port || (url.protocol === "https:" ? 443 : 80));
       const checkedAfter = Date.now();
@@ -153,7 +162,7 @@ export class ProjectAppRuntimeManager {
       // Match the actual socket's address/family, not just a port number. A
       // different local service can bind the same port on another interface.
       const ready = http.ready && http.address !== null && await entry.process?.ownsPort(port, http.address, checkedAfter) === true;
-      if (entry.abort.signal.aborted || entry.run.phase !== "running") return;
+      if (version !== entry.healthVersion || entry.abort.signal.aborted || entry.run.phase !== "running") return;
       if (ready) {
         if (entry.run.health !== "ready") { entry.run.health = "ready"; this.publish(entry); }
       } else if (entry.run.health === "ready" || entry.run.health === "unhealthy") {
@@ -230,8 +239,9 @@ export class ProjectAppRuntimeManager {
   }
   async shutdown(): Promise<void> {
     this.quitting = true;
-    try { await this.stopMatching(() => true); }
-    catch (error) { this.quitting = false; throw error; }
-    await Promise.all([...this.entries.values()].map(async (entry) => { await entry.logs.close(); await entry.persistence; }));
+    try {
+      await this.stopMatching(() => true);
+      await Promise.all([...this.entries.values()].map(async (entry) => { await entry.logs.close(); await entry.persistence; }));
+    } finally { this.quitting = false; }
   }
 }

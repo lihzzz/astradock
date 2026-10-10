@@ -57,7 +57,7 @@ export interface AppRun {
 }
 export interface AppLogEntry { seq: number; timestamp: number; stream: "stdout" | "stderr" | "system"; text: string }
 export interface AppLogPage { runId: string; entries: AppLogEntry[]; nextSeq: number; truncated: boolean }
-export interface AppCatalogSnapshot { revision: number; apps: ProjectApp[]; runs: AppRun[]; errors: OperationError[] }
+export interface AppCatalogSnapshot { revision: number; apps: ProjectApp[]; runs: AppRun[]; errors: OperationError[]; workspaceErrors: Record<string, OperationError> }
 export type AppEvent =
   | { kind: "catalog"; snapshot: AppCatalogSnapshot }
   | { kind: "run"; revision: number; run: AppRun }
@@ -90,6 +90,7 @@ export interface ProjectAppsApi {
   respondAgentPermission(response: ProjectAppAgentPermissionResponse): Promise<OperationResult<null>>;
   onAgentPermission(listener: (event: ProjectAppAgentPermissionEvent) => void): () => void;
   list(): Promise<OperationResult<AppCatalogSnapshot>>;
+  markUsed(appId: string): Promise<OperationResult<null>>;
   workspaces(projectId: string): Promise<OperationResult<WorkspaceBinding[]>>;
   validateWorkspace(workspace: WorkspaceBinding): Promise<OperationResult<{ workspace: WorkspaceBinding; cwd: string }>>;
   discover(workspace: WorkspaceBinding): Promise<OperationResult<AppDiscovery>>;

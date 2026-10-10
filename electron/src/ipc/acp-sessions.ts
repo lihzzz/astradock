@@ -40,6 +40,8 @@ import { withComputerUseMcpServer } from "../lib/computer-use-runtime";
 import { withHindsightMcpServers, registerMemorySession, unregisterMemorySession, beforeMemorySend, observeAcpUpdate, completeMemoryTurn } from "../lib/memory/service";
 import { cancelProjectAppAgentPermissions, registerProjectAppAgentSession, revokeProjectAppAgentSession, withProjectAppMcpServer } from "../lib/project-apps/agent-bridge";
 import { beginUsageTurn, endUsageTurn, stopUsageSession } from "../lib/usage";
+import { finishAcpTaskTurn } from "../lib/tasks/engine-events";
+import { taskRuntimeEvents } from "../lib/tasks/runtime-events";
 import { stopProcessAndWait } from "@shared/lib/process-stop";
 import { getSessionRepository } from "../lib/session-service";
 import type { SessionRuntimeLease } from "../lib/session-repository";
@@ -111,7 +113,7 @@ function assertAcpProcessActive(sessionId: string): void {
 
 export async function stopForDeletion(sessionId: string): Promise<void> {
   revokeProjectAppAgentSession(sessionId);
-  stopUsageSession(sessionId);
+  stopUsageSession(sessionId);  taskRuntimeEvents.stop(sessionId);
   const runtime = acpProcesses.get(sessionId);
   if (!runtime) return;
   runtime.stopping = true;
@@ -368,7 +370,7 @@ async function createAcpConnection(
 
   // Process lifecycle handlers
   proc.on("error", (err) => {
-    stopUsageSession(internalId);
+    stopUsageSession(internalId);    taskRuntimeEvents.stop(internalId);
     log(logLabel, `ERROR: spawn failed: ${err.message}`);
     safeSend(getMainWindow, "acp:exit", {
       _sessionId: internalId,
@@ -400,7 +402,7 @@ async function createAcpConnection(
   });
 
   proc.on("exit", (code) => {
-    stopUsageSession(internalId);
+    stopUsageSession(internalId);    taskRuntimeEvents.stop(internalId);
     acpProcesses.delete(internalId);
     options.runtimeLease?.release();
     for (const permission of pendingPermissions.values()) permission.resolve({ outcome: { outcome: "cancelled" } });
@@ -500,6 +502,7 @@ async function createAcpConnection(
         const toolCall = (params as { toolCall: Record<string, unknown> }).toolCall;
         const opts = (params as { options: unknown[] }).options;
         pendingPermissions.set(requestId, { resolve });
+        taskRuntimeEvents.wait(internalId, "acp", requestId, "waiting_permission");
 
         log("ACP_PERMISSION_REQUEST", {
           session: internalId.slice(0, 8),
@@ -832,6 +835,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     try {
       assertAcpProcessActive(sessionId);
       beginUsageTurn(sessionId, usageTurnId);
+      taskRuntimeEvents.publish(sessionId, "acp", "running");
       session.lastStderrError = undefined;
       const result = await session.connection.prompt({
         sessionId: acpSessionId,
@@ -840,6 +844,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
 
       log("ACP_TURN_COMPLETE", `session=${sessionId.slice(0, 8)} stopReason=${result.stopReason} usage=${JSON.stringify(result.usage ?? null)}`);
       void completeMemoryTurn(sessionId);
+      finishAcpTaskTurn(sessionId, result.stopReason);
 
       safeSend(getMainWindow,"acp:turn_complete", {
         _sessionId: sessionId,
@@ -852,6 +857,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
       const msg = extractErrorMessage(err);
       const surfacedError = msg === "Internal error" && session.lastStderrError ? session.lastStderrError : msg;
       reportError("ACP_PROMPT_ERR", err, { engine: "acp", sessionId, surfacedError });
+      if (taskRuntimeEvents.get(sessionId)?.status !== "interrupted") taskRuntimeEvents.publish(sessionId, "acp", "failed", surfacedError);
       return { error: surfacedError };
     } finally {
       endUsageTurn(sessionId, usageTurnId);
@@ -1040,6 +1046,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     log("ACP_PERMISSION_RESPONSE", `session=${sessionId.slice(0, 8)} requestId=${requestId} optionId=${optionId}`);
     resolver.resolve({ outcome: { outcome: "selected", optionId } });
     session.pendingPermissions.delete(requestId);
+    taskRuntimeEvents.resolve(sessionId, requestId);
     return { ok: true };
   });
 }
@@ -1049,7 +1056,7 @@ export async function stopAll(): Promise<void> {
   const stopping: Promise<void>[] = [];
   for (const [sessionId, runtime] of acpProcesses) {
     revokeProjectAppAgentSession(sessionId);
-    stopUsageSession(sessionId);
+    stopUsageSession(sessionId);    taskRuntimeEvents.stop(sessionId);
     log("CLEANUP", `Stopping ACP session ${sessionId.slice(0, 8)}`);
     runtime.stopping = true;
     for (const permission of runtime.pendingPermissions.values()) permission.resolve({ outcome: { outcome: "cancelled" } });

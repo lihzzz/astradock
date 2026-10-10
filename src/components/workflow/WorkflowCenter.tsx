@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useSyncExternalStore, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useSyncExternalStore, useState } from "react";
 import { AlertCircle, CheckCircle2, ChevronRight, CircleDashed, Clipboard, Clock3, GitPullRequest, Inbox, LoaderCircle, MessageSquare, Send, ShieldAlert, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -10,9 +10,12 @@ import { deriveAttentionItems, deriveExecutionPhase, getAttentionPriority } from
 import { makeWorkflowId, workflowStore } from "@/lib/workflow/workflow-store";
 import { parseUnifiedDiff } from "@/lib/workflow/unified-diff";
 
-type Tab = "inbox" | "review" | "handoff";
+import type { TaskWorkbenchProps } from "../tasks/TaskWorkbench";
+const TaskWorkbench = lazy(() => import("../tasks/TaskWorkbench").then((module) => ({ default: module.TaskWorkbench })));
+type Tab = "tasks" | "inbox" | "review" | "handoff";
 
 interface WorkflowCenterProps {
+  taskActions: Pick<TaskWorkbenchProps, "agents" | "onPrepareDraft" | "onOpenConversation">;
   sessions: ChatSession[];
   projects: Project[];
   activeSessionId: string | null;
@@ -83,6 +86,7 @@ function useWorkflowState() {
 }
 
 export function WorkflowCenter({
+  taskActions,
   sessions,
   projects,
   activeSessionId,
@@ -92,7 +96,7 @@ export function WorkflowCenter({
   onHandoff,
 }: WorkflowCenterProps) {
   const { t } = useI18n();
-  const [tab, setTab] = useState<Tab>("inbox");
+  const [tab, setTab] = useState<Tab>("tasks");
   const [selectedAttentionId, setSelectedAttentionId] = useState<string | null>(null);
   const [selectedCommentIds, setSelectedCommentIds] = useState<string[]>([]);
   const [commentText, setCommentText] = useState("");
@@ -370,15 +374,16 @@ export function WorkflowCenter({
       </header>
       <div className="flex min-h-0 flex-1">
         <nav className="w-52 shrink-0 border-e border-border/50 p-3">
-          {(["inbox", "review", "handoff"] as const).map((item) => (
+          {(["tasks", "inbox", "review", "handoff"] as const).map((item) => (
             <button key={item} className={`mb-1 flex w-full items-center gap-2 rounded-md px-3 py-2 text-start text-xs ${tab === item ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"}`} onClick={() => setTab(item)}>
-              {item === "inbox" ? <Inbox className="h-3.5 w-3.5" /> : item === "review" ? <GitPullRequest className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
-              {item === "inbox" ? t("workflowTaskInbox") : item === "review" ? t("workflowReviewChanges") : t("workflowHandoff")}
+              {item === "tasks" ? <Clipboard className="h-3.5 w-3.5" /> : item === "inbox" ? <Inbox className="h-3.5 w-3.5" /> : item === "review" ? <GitPullRequest className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
+              {item === "tasks" ? t("tasksTitle") : item === "inbox" ? t("workflowTaskInbox") : item === "review" ? t("workflowReviewChanges") : t("workflowHandoff")}
               {item === "inbox" && actionItems.length > 0 ? <Badge className="ms-auto px-1.5 text-[10px]">{actionItems.length}</Badge> : null}
             </button>
           ))}
         </nav>
         <main className="min-w-0 flex-1 overflow-auto p-6">
+          {tab === "tasks" ? <Suspense fallback={<p role="status">{t("tasksLoading")}</p>}><TaskWorkbench projects={projects} {...taskActions} /></Suspense> : null}
           {tab === "inbox" && (
             <div className="mx-auto max-w-3xl space-y-6">
               <div className="flex items-start justify-between gap-4">

@@ -18,6 +18,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
       const response = appRecord(value);
       return respondProjectAppPermission({ requestId: appId(response.requestId), sessionId: appId(response.sessionId), allow: appBoolean(response.allow, "allow") });
     },
+    "mark-used": (value) => service.markUsed(value),
     list: () => service.list(), workspaces: (value) => service.workspaces(value), "validate-workspace": (value) => service.validateWorkspace(value),
     discover: (value) => service.discover(value), save: (value) => service.save(value), remove: (value) => service.remove(value),
     start: (value) => service.start(value), stop: (value) => service.stop(value), restart: (value) => service.restart(value), logs: (value) => service.logs(value),

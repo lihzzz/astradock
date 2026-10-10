@@ -3,7 +3,7 @@ import type { WorkspaceBinding } from "@shared/types/workspace";
 import type { OperationResult } from "@shared/types/productivity";
 
 export interface AppViewSnapshot extends AppCatalogSnapshot { catalogRevision: number; runRevisions: Record<string, number> }
-export const EMPTY_APP_SNAPSHOT: AppViewSnapshot = { revision: -1, catalogRevision: -1, runRevisions: {}, apps: [], runs: [], errors: [] };
+export const EMPTY_APP_SNAPSHOT: AppViewSnapshot = { revision: -1, catalogRevision: -1, runRevisions: {}, apps: [], runs: [], errors: [], workspaceErrors: {} };
 export const isActiveRun = (run: AppRun): boolean => run.phase === "starting" || run.phase === "running" || run.phase === "stopping" || run.cleanupPending;
 export function workspaceKey(workspace: WorkspaceBinding): string {
   return JSON.stringify([workspace.projectId, workspace.rootKind, workspace.rootPath, workspace.relativeCwd]);
@@ -33,6 +33,12 @@ export function preferredAppRun(app: ProjectApp, runs: AppRun[]): AppRun | undef
   if (app.kind === "web") return undefined;
   return runs.filter((run) => workspaceKey(run.workspace) === workspaceKey(app.workspace))
     .sort((a, b) => Number(isActiveRun(b)) - Number(isActiveRun(a)) || b.startedAt - a.startedAt)[0];
+}
+export interface AppDetailOpenRequest { requestId: string; workspace: WorkspaceBinding | null; runId: string | null; tab: "preview" | "logs" }
+export function selectedAppRun(runs: AppRun[], target: WorkspaceBinding | null, runId: string | null): AppRun | null {
+  if (!target) return null;
+  const candidates = runs.filter((run) => workspaceKey(run.workspace) === workspaceKey(target));
+  return candidates.find((run) => run.runId === runId) ?? candidates.find(isActiveRun) ?? candidates[0] ?? null;
 }
 export function getHttpSearchUrl(input: string): string | null {
   try { const url = new URL(input.trim()); return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password ? url.href : null; }

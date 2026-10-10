@@ -1,5 +1,6 @@
 /** Project Apps copy, consumed by the application's existing i18n provider. */
 export const APPS_EN = {
+  appsUnavailable: "Workspace unavailable", appsSessionUnavailable: "This conversation has been deleted or has not been saved yet.",
   "Apps": "Apps", "Add to Apps": "Add to Apps", "Project is unavailable": "Project is unavailable",
   "New Tab": "New Tab", "Browser": "Browser", appsPreviewUnverified: "The process is running. This preview has not been verified by an HTTP health check.",
   "App context could not be inserted. Open Apps and try again.": "App context could not be inserted. Open Apps and try again.",
@@ -56,6 +57,7 @@ export const APPS_EN = {
 } as const;
 
 export const APPS_ZH: Record<keyof typeof APPS_EN, string> = {
+  appsUnavailable: "工作区不可用", appsSessionUnavailable: "此会话已删除或尚未保存。",
   "Apps": "应用", "Add to Apps": "添加到应用", "Project is unavailable": "项目不可用",
   "New Tab": "新标签页", "Browser": "浏览器", appsPreviewUnverified: "进程正在运行，此预览尚未经 HTTP 健康检查验证。",
   "App context could not be inserted. Open Apps and try again.": "无法插入应用上下文，请打开应用面板后重试。",

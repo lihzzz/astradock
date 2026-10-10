@@ -9,6 +9,7 @@ import type { OperationError } from "@shared/types/productivity";
 import { ProjectAppsStore } from "./store";
 import { ProjectAppRuntimeManager, type AppRuntimeLease } from "./runtime";
 import { listWorkspaces, pathIdentity, resolveWorkspace, containsPath, type AppProject } from "./workspace";
+import { workspaceAvailability } from "./availability";
 import { discoverApps } from "./discovery";
 
 export interface ProjectAppsDependencies {
@@ -24,6 +25,7 @@ export class ProjectAppsService {
   private readonly store: ProjectAppsStore;
   private readonly runtime: ProjectAppRuntimeManager;
   private apps: ProjectApp[] = [];
+  private workspaceErrors: Record<string, OperationError> = {};
   private sessionLinks: AppSessionLink[] = [];
   private readonly errors: OperationError[] = [];
   private initialized: Promise<void> | null = null;
@@ -48,7 +50,7 @@ export class ProjectAppsService {
     for (const listener of this.listeners) { try { listener(event); } catch (error) { this.dependencies.report(error); } }
   }
   private changed(): void { ++this.revision; this.emit({ kind: "catalog", snapshot: this.snapshot() }); }
-  private snapshot(): AppCatalogSnapshot { return { revision: this.revision, apps: structuredClone(this.apps), runs: this.runtime.snapshot(), errors: [...this.errors] }; }
+  private snapshot(): AppCatalogSnapshot { return { revision: this.revision, apps: structuredClone(this.apps), runs: this.runtime.snapshot(), errors: [...this.errors], workspaceErrors: structuredClone(this.workspaceErrors) }; }
   async initialize(): Promise<void> {
     if (this.initialized) return this.initialized;
     this.initialized = (async () => {
@@ -120,7 +122,24 @@ export class ProjectAppsService {
       if (pathIdentity(resolved.binding.rootPath) !== pathIdentity(scope.binding.rootPath) || !containsPath(scope.cwd, resolved.cwd)) throw new ProductivityError("FORBIDDEN_TARGET", "This application or one of its runs is outside the agent's workspace scope");
     }
   }
-  async list(): Promise<AppCatalogSnapshot> { await this.initialize(); return this.snapshot(); }
+  async list(): Promise<AppCatalogSnapshot> {
+    await this.initialize();
+    const apps = this.apps;
+    const errors = await workspaceAvailability(apps);
+    // Ignore a check that raced with a catalog mutation. The next refresh uses
+    // the new binding, and runtime operations always validate it independently.
+    if (apps === this.apps && JSON.stringify(errors) !== JSON.stringify(this.workspaceErrors)) {
+      this.workspaceErrors = errors; this.changed();
+    }
+    return this.snapshot();
+  }
+  async markUsed(value: unknown): Promise<null> {
+    return this.serial(async () => {
+      this.assertWritable(); const app = this.app(appId(value));
+      const next = this.apps.map((entry) => entry.id === app.id ? { ...entry, lastUsedAt: Date.now() } : entry);
+      await this.store.saveCatalog(next, this.sessionLinks); this.apps = next; this.changed(); return null;
+    });
+  }
   async workspaces(value: unknown): Promise<WorkspaceBinding[]> { await this.initialize(); return listWorkspaces(this.project(appId(value))); }
   async validateWorkspace(value: unknown): Promise<{ workspace: WorkspaceBinding; cwd: string }> {
     await this.initialize(); const result = await this.resolve(validateWorkspaceBinding(value)); return { workspace: result.binding, cwd: result.cwd };
@@ -290,7 +309,7 @@ export class ProjectAppsService {
     return this.serial(async () => {
       this.assertWritable(); const input = appRecord(value); const content = appString(input.content, "configuration manifest", 2 * 1024 * 1024);
       const manifest = appRecord(JSON.parse(content));
-      if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.apps) || manifest.apps.length > 100) throw new ProductivityError("INVALID_ARGUMENT", "Unsupported manifest or too many applications");
+      if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.apps) || manifest.apps.length > 1000) throw new ProductivityError("INVALID_ARGUMENT", "Unsupported manifest or too many applications");
       const projectId = input.projectId === null ? null : appId(input.projectId); const spaceId = appId(input.spaceId);
       if (!this.dependencies.spaces().includes(spaceId)) throw new ProductivityError("TARGET_GONE", "Space no longer exists");
       const primary = projectId ? (await listWorkspaces(this.project(projectId)))[0] : null;
@@ -359,5 +378,6 @@ export class ProjectAppsService {
       if (!ids.has(run.appId) || count > 20 || total > 128) await this.runtime.forget(run.runId);
     }
   }
+  async recheckHealth(): Promise<void> { await this.initialize(); this.runtime.recheckHealth(); }
   async shutdown(): Promise<void> { await this.initialize(); await this.tail; await this.runtime.shutdown(); await this.pruneHistory(); }
 }

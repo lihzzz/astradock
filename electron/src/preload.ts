@@ -4,6 +4,7 @@ import type { BackgroundEffectState } from "@shared/types/background-effect";
 import type { BatchJob, BatchPreparedRequest, BatchStartRequest, HistoryApi, HistoryIndexStatus, QuickCaptureApi, QuickCaptureTarget, QuickCaptureUpdate, SessionBatchApi, SessionResumeSource } from "@shared/types/productivity";
 import { applyBackgroundEffectClasses } from "@shared/lib/background-effect-classes";
 import type { AppEvent, ProjectAppsApi } from "@shared/types/project-apps";
+import type { TasksApi, TaskSnapshot } from "@shared/types/tasks";
 import type { ProjectAppAgentPermissionEvent } from "@shared/types/project-app-agent";
 
 interface PreloadDocument {
@@ -95,6 +96,7 @@ const projectApps: ProjectAppsApi = {
     return () => ipcRenderer.removeListener("project-apps:agent-permission", listener);
   },
   list: () => ipcRenderer.invoke("project-apps:list"),
+  markUsed: (appId) => ipcRenderer.invoke("project-apps:mark-used", appId),
   workspaces: (projectId) => ipcRenderer.invoke("project-apps:workspaces", projectId),
   validateWorkspace: (workspace) => ipcRenderer.invoke("project-apps:validate-workspace", workspace),
   discover: (workspace) => ipcRenderer.invoke("project-apps:discover", workspace),
@@ -116,7 +118,20 @@ const projectApps: ProjectAppsApi = {
   },
 };
 
+const tasks: TasksApi = {
+  list: () => ipcRenderer.invoke("tasks:list"), create: (input) => ipcRenderer.invoke("tasks:create", input),
+  prepare: (input) => ipcRenderer.invoke("tasks:prepare", input), abandonDraft: (input) => ipcRenderer.invoke("tasks:abandon-draft", input),
+  addDeliverable: (input) => ipcRenderer.invoke("tasks:add-deliverable", input), review: (input) => ipcRenderer.invoke("tasks:review", input),
+  revealFile: (id) => ipcRenderer.invoke("tasks:reveal-file", id),
+  onChanged: (callback) => {
+    const listener = (_event: IpcRendererEvent, snapshot: TaskSnapshot) => callback(snapshot);
+    ipcRenderer.on("tasks:changed", listener);
+    return () => ipcRenderer.removeListener("tasks:changed", listener);
+  },
+};
+
 contextBridge.exposeInMainWorld("claude", {
+  tasks,
   projectApps,
   getGlassSupported: () => ipcRenderer.invoke("app:getGlassSupported"),
   getBackgroundEffect: () => ipcRenderer.invoke("app:get-background-effect"),

@@ -30,6 +30,7 @@ import type { AppInfo } from "./codex-protocol/v2/AppInfo";
 import type { CodexFingerprintProbeRequest, CodexFingerprintProbeResult } from "./codex-fingerprint";
 import type { BackgroundEffectState } from "@shared/types/background-effect";
 import type { ProjectAppsApi } from "@shared/types/project-apps";
+import type { TasksApi } from "@shared/types/tasks";
 import type { SessionMeta as SessionListItem } from "@shared/lib/session-persistence";
 import type { HistoryApi, OperationResult, QuickCaptureApi, SessionBatchApi, SessionResumeSource, ShortcutStatus } from "@shared/types/productivity";
 
@@ -45,6 +46,7 @@ declare global {
   interface Window {
     claude: {
       projectApps: ProjectAppsApi;
+      tasks: TasksApi;
       getGlassSupported: () => Promise<boolean>;
       getBackgroundEffect: () => Promise<BackgroundEffectState>;
       setTransparency: (enabled: boolean) => Promise<BackgroundEffectState>;

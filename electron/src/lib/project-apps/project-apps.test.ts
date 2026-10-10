@@ -71,6 +71,32 @@ afterEach(async () => {
 }, 30_000);
 
 describe("project application catalog", () => {
+  it("records website use without invalidating its configuration revision", async () => {
+    const f = await fixture();
+    const app = await f.service.save({ id: null, expectedRevision: null, definition: { name: "Website", icon: "🌐", iconType: "emoji", favorite: false, folder: "", order: 0, kind: "web", spaceId: "default", url: "https://example.invalid" } });
+    await f.service.markUsed(app.id);
+    const changed = (await f.service.list()).apps[0];
+    expect(changed.lastUsedAt).toBeTypeOf("number"); expect(changed.revision).toBe(app.revision);
+  });
+  it("round-trips a 500-app manifest without running any application", async () => {
+    const f = await fixture();
+    const apps = Array.from({ length: 500 }, (_, index) => ({ name: `Website ${index}`, icon: "🌐", iconType: "emoji", favorite: false, folder: "", order: index, kind: "web", url: "https://example.invalid" }));
+    const imported = await f.service.importConfig({ content: JSON.stringify({ schemaVersion: 1, apps }), projectId: null, spaceId: "default" });
+    const exported = await f.service.exportConfig(imported.map((app) => app.id));
+    const copy = await fixture();
+    expect(await copy.service.importConfig({ content: exported, projectId: null, spaceId: "default" })).toHaveLength(500);
+    expect((await copy.service.list()).runs).toHaveLength(0);
+  });
+  it("reports a missing working directory and clears its warning after restoration", async () => {
+    const f = await fixture(); const app = await f.save();
+    expect((await f.service.list()).workspaceErrors).toEqual({});
+    const moved = `${f.projectPath}-moved`;
+    await fs.rename(f.projectPath, moved);
+    expect((await f.service.list()).workspaceErrors[app.id]?.code).toBe("WORKSPACE_UNAVAILABLE");
+    expect((await f.service.list()).apps).toHaveLength(1);
+    await fs.rename(moved, f.projectPath);
+    expect((await f.service.list()).workspaceErrors).toEqual({});
+  });
   it("atomically persists definitions, rejects stale edits and restores them", async () => {
     const f = await fixture(); const app = await f.save();
     const saved = await f.service.save({ id: app.id, expectedRevision: app.revision, definition: { ...f.definition, name: "Updated" } });
@@ -167,6 +193,18 @@ describe("project application catalog", () => {
 });
 
 describe("real managed application processes", () => {
+  it("rechecks health on resume without changing the running instance", async () => {
+    const f = await fixture();
+    const marker = path.join(f.projectPath, "unhealthy");
+    await fs.writeFile(path.join(f.projectPath, "server with spaces.cjs"), `const http=require('node:http'),fs=require('node:fs');http.createServer((req,res)=>{res.statusCode=fs.existsSync('unhealthy')?503:200;res.end('health')}).listen(Number(process.argv[2]),'127.0.0.1');`);
+    const app = await f.save(); const run = await f.start(app);
+    await until(() => f.service.list(), (state) => state.runs[0]?.health === "ready");
+    await fs.writeFile(marker, "1"); await f.service.recheckHealth();
+    await until(() => f.service.list(), (state) => state.runs[0]?.health === "unhealthy", 3000);
+    await fs.unlink(marker); await f.service.recheckHealth();
+    const restored = await until(() => f.service.list(), (state) => state.runs[0]?.health === "ready", 3000);
+    expect(restored.runs[0].runId).toBe(run.runId);
+  });
   it.skipIf(process.platform !== "win32")("preserves special arguments through a generic Windows batch entry", async () => {
     const f = await fixture(); const script = path.join(f.projectPath, "arguments.cjs");
     await fs.writeFile(script, "process.stdout.write(JSON.stringify(process.argv.slice(2)))");

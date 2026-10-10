@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useI18n } from "@/lib/i18n";
 import { reportError } from "@/lib/analytics/analytics";
 import type { Project, Space } from "@/types";
 import type { AppDiscoveryCandidate, AppLaunchProfile, ProjectApp, ProjectAppInput } from "@shared/types/project-apps";
 import type { WorkspaceBinding } from "@shared/types/workspace";
-import { appInputClass, AppField, AppSelect } from "./AppFields";
+import { AppDialogContent, appInputClass, AppField, AppSelect } from "./AppFields";
 import { parseEnvironment, unwrapAppResult, workspaceKey } from "./app-utils";
 
 const DEFAULT_LAUNCH: AppLaunchProfile = { command: { kind: "package-script", manager: "pnpm", script: "dev", args: [] }, adapter: "generic", env: {}, port: { kind: "none" }, previewUrl: "", readiness: { kind: "process" }, startupTimeoutMs: 60000 };
@@ -103,7 +103,7 @@ export function ProjectAppEditor({ app, initialProjectId, initialUrl, projects, 
     finally { setSaving(false); }
   };
 
-  return <Dialog open onOpenChange={(open) => { if (!open && !saving) onClose(); }}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>{t(app ? "appsEdit" : "appsAdd")}</DialogTitle><DialogDescription>{t("appsSubtitle")}</DialogDescription></DialogHeader>
+  return <Dialog open onOpenChange={(open) => { if (!open && !saving) onClose(); }}><AppDialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>{t(app ? "appsEdit" : "appsAdd")}</DialogTitle><DialogDescription>{t("appsSubtitle")}</DialogDescription></DialogHeader>
     <form onSubmit={(event) => void submit(event)} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <AppField label={t("appsName")}>{(id) => <input id={id} autoFocus required maxLength={120} className={appInputClass} value={name} onChange={(e) => setName(e.target.value)} />}</AppField>
@@ -116,7 +116,7 @@ export function ProjectAppEditor({ app, initialProjectId, initialUrl, projects, 
         <div className="flex items-end gap-2"><div className="flex-1"><AppField label={t("appsProject")}>{(id) => <AppSelect id={id} value={projectId} onChange={(e) => { setWorkspace(null); setDirectory(""); setProjectId(e.target.value); }}><option value="" disabled>{t("appsNoProject")}</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</AppSelect>}</AppField></div><Button variant="outline" type="button" onClick={() => { void onAddProject().then((project) => { if (project) setProjectId(project.id); }).catch((cause) => setError(reportError("project-apps:add-project", cause))); }}>{t("appsAddProject")}</Button></div>
         <AppField label={t("appsWorkspace")}>{(id) => <AppSelect id={id} value={workspace ? workspaceKey({ ...workspace, relativeCwd: "" }) : ""} onChange={(e) => setWorkspace(workspaces.find((item) => workspaceKey({ ...item, relativeCwd: "" }) === e.target.value) ?? null)}><option value="" disabled>{t("appsValidationWorkspace")}</option>{workspaces.map((item) => <option key={item.rootPath} value={workspaceKey({ ...item, relativeCwd: "" })}>{item.rootKind === "project" ? `${t("appsProjectRoot")} · ` : ""}{item.rootPath}</option>)}</AppSelect>}</AppField>
         <AppField label={t("appsWorkingDirectory")}>{(id) => <input id={id} className={appInputClass} value={directory} placeholder="." onChange={(e) => { setDirectory(e.target.value); setCandidates(null); }} />}</AppField>
-        <Button variant="outline" type="button" disabled={!workspace || discovering} onClick={() => void discover()}>{discovering ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}{t(discovering ? "appsDiscovering" : "appsDiscover")}</Button>
+        <Button variant="outline" type="button" disabled={!workspace || discovering} onClick={() => void discover()}>{discovering ? <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" /> : <Search className="size-4" />}{t(discovering ? "appsDiscovering" : "appsDiscover")}</Button>
         {candidates && <div className="space-y-2 rounded-md bg-muted/40 p-3"><p className="text-xs font-medium">{t("appsCandidates")}</p>{candidates.length ? candidates.map((candidate, index) => <button type="button" key={`${candidate.label}:${index}`} className="block w-full rounded border bg-background p-2 text-start text-sm hover:bg-accent" onClick={() => applyCandidate(candidate)}>{candidate.label}<span className="block text-xs text-muted-foreground">{candidate.reason}</span></button>) : <p className="text-xs text-muted-foreground">{t("appsNoCandidates")}</p>}{warnings.map((warning) => <p key={warning} className="text-xs text-amber-600">{warning}</p>)}</div>}
         <div className="grid grid-cols-2 gap-3">
           <AppField label={t("appsCommandType")}>{(id) => <AppSelect id={id} value={launch.command.kind} onChange={(e) => changeLaunch({ command: e.target.value === "executable" ? { kind: "executable", executable: "", args: [] } : { kind: "package-script", manager: "pnpm", script: "dev", args: [] } })}><option value="package-script">{t("appsPackageScript")}</option><option value="executable">{t("appsExecutable")}</option></AppSelect>}</AppField>
@@ -132,7 +132,7 @@ export function ProjectAppEditor({ app, initialProjectId, initialUrl, projects, 
         {launch.readiness.kind === "http" && <><AppField label={t("appsHealthPath")}>{(id) => <input id={id} className={appInputClass} value={launch.readiness.kind === "http" ? launch.readiness.path : "/"} onChange={(e) => changeLaunch({ readiness: { kind: "http", path: e.target.value, acceptedStatuses: [200] } })} />}</AppField><AppField label={t("appsHttpStatuses")}>{(id) => <input id={id} className={appInputClass} value={statusText} onChange={(e) => setStatusText(e.target.value)} />}</AppField></>}</div>
       </>}
       {error && <p role="alert" className="wrap-break-word text-sm text-destructive">{error}</p>}
-      <div className="sticky bottom-0 flex justify-end gap-2 border-t bg-background pt-3"><Button type="button" variant="outline" disabled={saving} onClick={onClose}>{t("appsCancel")}</Button><Button type="submit" disabled={saving}>{saving && <LoaderCircle className="size-4 animate-spin" />}{t(saving ? "appsSaving" : "appsSave")}</Button></div>
+      <div className="sticky bottom-0 flex justify-end gap-2 border-t bg-background pt-3"><Button type="button" variant="outline" disabled={saving} onClick={onClose}>{t("appsCancel")}</Button><Button type="submit" disabled={saving}>{saving && <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" />}{t(saving ? "appsSaving" : "appsSave")}</Button></div>
     </form>
-  </DialogContent></Dialog>;
+  </AppDialogContent></Dialog>;
 }

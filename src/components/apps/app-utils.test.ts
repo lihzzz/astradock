@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AppRun, ProjectApp } from "@shared/types/project-apps";
-import { EMPTY_APP_SNAPSHOT, getHttpSearchUrl, mergeAppLogs, nextAppLogRecoveryCursor, parseEnvironment, preferredAppRun, reduceAppEvent, workspaceKey } from "./app-utils";
+import { EMPTY_APP_SNAPSHOT, getHttpSearchUrl, mergeAppLogs, nextAppLogRecoveryCursor, parseEnvironment, selectedAppRun, preferredAppRun, reduceAppEvent, workspaceKey } from "./app-utils";
 
 const workspace = { projectId: "project", rootKind: "project" as const, rootPath: "C:/project", repoCommonDir: "C:/project/.git", relativeCwd: "web" };
 const launch = { command: { kind: "executable" as const, executable: "node", args: ["server.js"] }, adapter: "generic" as const, env: {}, port: { kind: "none" as const }, previewUrl: "", readiness: { kind: "process" as const }, startupTimeoutMs: 10000 };
@@ -12,12 +12,12 @@ describe("app event ordering", () => {
   it("accepts the initial catalog arriving after a newer run without losing either", () => {
     const stopped = makeRun("run", "stopped");
     const withRun = reduceAppEvent(EMPTY_APP_SNAPSHOT, { kind: "run", revision: 12, run: stopped });
-    const state = reduceAppEvent(withRun, { kind: "catalog", snapshot: { revision: 10, apps: [app], runs: [makeRun()], errors: [] } });
+    const state = reduceAppEvent(withRun, { kind: "catalog", snapshot: { revision: 10, apps: [app], runs: [makeRun()], errors: [], workspaceErrors: {} } });
     expect(state.apps).toEqual([app]); expect(state.runs).toEqual([stopped]); expect(state.revision).toBe(12);
   });
   it("does not resurrect an app from a late catalog response", () => {
-    const deleted = reduceAppEvent(EMPTY_APP_SNAPSHOT, { kind: "catalog", snapshot: { revision: 20, apps: [], runs: [], errors: [] } });
-    expect(reduceAppEvent(deleted, { kind: "catalog", snapshot: { revision: 10, apps: [app], runs: [], errors: [] } })).toBe(deleted);
+    const deleted = reduceAppEvent(EMPTY_APP_SNAPSHOT, { kind: "catalog", snapshot: { revision: 20, apps: [], runs: [], errors: [], workspaceErrors: {} } });
+    expect(reduceAppEvent(deleted, { kind: "catalog", snapshot: { revision: 10, apps: [app], runs: [], errors: [], workspaceErrors: {} } })).toBe(deleted);
   });
   it("orders each runtime independently and rejects a stale transition", () => {
     let state = reduceAppEvent(EMPTY_APP_SNAPSHOT, { kind: "run", revision: 12, run: makeRun("a", "stopped") });
@@ -49,6 +49,11 @@ describe("app log recovery", () => {
   });
 });
 describe("explicit app workspace selection", () => {
+  it("ignores a retained selection from a different workspace when reopening the saved target", () => {
+    const own = makeRun("own"); const other = { ...makeRun("other"), workspace: { ...workspace, rootPath: "C:/other" } };
+    expect(selectedAppRun([other, own], workspace, "other")?.runId).toBe("own");
+    expect(selectedAppRun([other], workspace, "other")).toBeNull();
+  });
   it("never chooses another worktree's running instance for the saved binding", () => {
     const other = { ...makeRun("other"), workspace: { ...workspace, rootKind: "worktree" as const, rootPath: "C:/worktree" } };
     expect(preferredAppRun(app, [other])).toBeUndefined();
