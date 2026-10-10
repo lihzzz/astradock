@@ -51,13 +51,16 @@ export function ToolResultSelection({ children, messages }: { children: ReactNod
     finally { setCopying(false); }
   };
   return <Context value={value}>
-    <div className="relative flex min-h-0 flex-1 flex-col">
-      <div className="absolute end-4 top-14 z-20 flex items-center gap-1 rounded-lg border border-border/50 bg-background/95 p-1 text-xs shadow-sm">
-        {!active ? <Button size="sm" variant="ghost" onClick={() => setActive(true)}><CheckSquare className="h-3.5 w-3.5" />{t("Select tool results")}</Button> : <>
-          <span className="px-1" role="status">{t("Selected")}: {selected.size}</span>
-          <Button size="sm" variant="ghost" disabled={!selected.size || copying} onClick={() => void copy()}><Copy className="h-3.5 w-3.5" />{t("Copy Markdown")}</Button>
-          <Button size="icon" variant="ghost" aria-label={t("Exit selection")} onClick={clear}><X className="h-3.5 w-3.5" /></Button>
-        </>}
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col pt-[56px]">
+      {/* Reserve a row below the floating header, including when the actions wrap. */}
+      <div className="z-20 flex shrink-0 justify-end px-4">
+        <div role="group" aria-label={t("Select tool results")} className="flex min-w-0 flex-wrap items-center justify-end gap-1 rounded-lg border border-border/50 bg-background/95 p-1 text-xs shadow-sm">
+          {!active ? <Button size="sm" variant="ghost" onClick={() => setActive(true)}><CheckSquare className="h-3.5 w-3.5" />{t("Select tool results")}</Button> : <>
+            <span className="whitespace-nowrap px-1" role="status">{t("Selected")}: {selected.size}</span>
+            <Button size="sm" variant="ghost" disabled={!selected.size || copying} onClick={() => void copy()}><Copy className="h-3.5 w-3.5" />{t("Copy Markdown")}</Button>
+            <Button size="icon" variant="ghost" aria-label={t("Exit selection")} onClick={clear}><X className="h-3.5 w-3.5" /></Button>
+          </>}
+        </div>
       </div>
       {children}
     </div>

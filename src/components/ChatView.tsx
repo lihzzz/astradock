@@ -65,7 +65,8 @@ function RowEntrance({ animate, children }: { animate: boolean; children: ReactN
     </motion.div>
   );
 }
-const CHAT_TOP_PADDING_PX = 56;
+// Header clearance is reserved above the in-flow tool selection toolbar.
+const CHAT_TOP_PADDING_PX = 12;
 const CHAT_BOTTOM_PADDING_PX = 144;
 const CHAT_EXTRA_BOTTOM_PADDING_PX = 280;
 const CHAT_COMPOSER_CLEARANCE_PX = 24;
