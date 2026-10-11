@@ -93,6 +93,8 @@ interface ACPSessionEntry {
   utilitySessionIds?: Set<string>;
   /** Text accumulator buffers for utility sessions, keyed by ACP sessionId */
   utilityTextBuffers?: Map<string, string>;
+  /** Refusal reason for a utility session that attempted a tool call. */
+  utilityErrors?: Map<string, string>;
   /** Last actionable stderr error line observed from the ACP agent process */
   lastStderrError?: string;
 }
@@ -439,6 +441,12 @@ async function createAcpConnection(
       // Utility session events: accumulate text, skip renderer forwarding
       if (entry?.utilitySessionIds?.has(acpSessionId)) {
         const eventKind = (update as { sessionUpdate: string }).sessionUpdate;
+        if (eventKind === "tool_call" || eventKind === "tool_call_update") {
+          if (!entry.utilityErrors) entry.utilityErrors = new Map();
+          entry.utilityErrors.set(acpSessionId, "ACP utility sessions cannot execute tools");
+          void entry.connection.cancel({ sessionId: acpSessionId }).catch(() => {});
+          return;
+        }
         if (eventKind === "agent_message_chunk") {
           const text = (update as { content?: { text?: string } }).content?.text ?? "";
           if (text && entry.utilityTextBuffers) {
@@ -523,13 +531,21 @@ async function createAcpConnection(
       });
     },
 
-    async readTextFile(params: { path?: string; uri?: string; line?: number | null; limit?: number | null }) {
+    async readTextFile(params: { path?: string; uri?: string; line?: number | null; limit?: number | null; sessionId?: string }) {
+      const utilityEntry = acpSessions.get(internalId);
+      if (params.sessionId && utilityEntry?.utilitySessionIds?.has(params.sessionId)) {
+        throw new Error("ACP utility sessions cannot access files");
+      }
       const { filePath, content } = await acpReadTextFile(params);
       log("ACP_FS", `readTextFile path=${filePath} line=${params.line ?? ""} limit=${params.limit ?? ""}`);
       log("ACP_FS", `readTextFile result len=${content.length}`);
       return { content };
     },
-    async writeTextFile(params: { path?: string; uri?: string; content: string }) {
+    async writeTextFile(params: { path?: string; uri?: string; content: string; sessionId?: string }) {
+      const utilityEntry = acpSessions.get(internalId);
+      if (params.sessionId && utilityEntry?.utilitySessionIds?.has(params.sessionId)) {
+        throw new Error("ACP utility sessions cannot access files");
+      }
       const { filePath } = await acpWriteTextFile(params);
       log("ACP_FS", `writeTextFile path=${filePath} len=${params.content.length}`);
       return {};

@@ -141,6 +141,8 @@ interface GlobalSettingsState {
   ambientVolume: number;
   /** Soft tick sound while the active session streams output */
   streamTickEnabled: boolean;
+  /** Show a model-generated next-message hint after a turn completes. */
+  composerPredictionsEnabled: boolean;
   islandLayout: boolean;
   islandShine: boolean;
   /** The native macOS background material (liquid-glass or vibrancy) — never "off" */
@@ -182,6 +184,7 @@ interface SettingsActions {
   setAmbientSound: (mode: AmbientSoundMode) => void;
   setAmbientVolume: (volume: number) => void;
   setStreamTickEnabled: (on: boolean) => void;
+  setComposerPredictionsEnabled: (on: boolean) => void;
   setIslandLayout: (enabled: boolean) => void;
   setIslandShine: (enabled: boolean) => void;
   setMacBackgroundEffect: (effect: MacBackgroundEffect) => void;
@@ -373,6 +376,7 @@ function readLegacyGlobalSettings(): GlobalSettingsState {
     ambientSound: "off",
     ambientVolume: 0.3,
     streamTickEnabled: false,
+    composerPredictionsEnabled: true,
     islandLayout: readLegacyBool("harnss-island-layout", true),
     islandShine: readLegacyBool("harnss-island-shine", true),
     macNativeBackgroundEffect: "liquid-glass",
@@ -535,6 +539,7 @@ export const useSettingsStore = create<SettingsStore>()(
       ambientSound: "off" as AmbientSoundMode,
       ambientVolume: 0.3,
       streamTickEnabled: false,
+      composerPredictionsEnabled: true,
       islandLayout: true,
       islandShine: true,
       macNativeBackgroundEffect: "liquid-glass",
@@ -594,6 +599,8 @@ export const useSettingsStore = create<SettingsStore>()(
         set({ ambientVolume: Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 0.3 }),
 
       setStreamTickEnabled: (on) => set({ streamTickEnabled: on }),
+
+      setComposerPredictionsEnabled: (on) => set({ composerPredictionsEnabled: on }),
 
       setIslandLayout: (enabled) => set({ islandLayout: enabled }),
 
@@ -779,6 +786,7 @@ export const useSettingsStore = create<SettingsStore>()(
         ambientSound: state.ambientSound,
         ambientVolume: state.ambientVolume,
         streamTickEnabled: state.streamTickEnabled,
+        composerPredictionsEnabled: state.composerPredictionsEnabled,
         islandLayout: state.islandLayout,
         islandShine: state.islandShine,
         macNativeBackgroundEffect: state.macNativeBackgroundEffect,

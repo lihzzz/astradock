@@ -6,6 +6,7 @@ import { applyBackgroundEffectClasses } from "@shared/lib/background-effect-clas
 import type { AppEvent, ProjectAppsApi } from "@shared/types/project-apps";
 import type { TasksApi, TaskSnapshot } from "@shared/types/tasks";
 import type { ProjectAppAgentPermissionEvent } from "@shared/types/project-app-agent";
+import type { ComposerPredictionRequest } from "@shared/types/composer-prediction";
 
 interface PreloadDocument {
   addEventListener: (type: string, listener: () => void, options: { once: boolean }) => void;
@@ -446,6 +447,10 @@ contextBridge.exposeInMainWorld("claude", {
       ipcRenderer.on("settings:changed", listener);
       return () => ipcRenderer.removeListener("settings:changed", listener);
     },
+  },
+  composerPrediction: {
+    request: (request: ComposerPredictionRequest) => ipcRenderer.invoke("composer-prediction:request", request),
+    cancel: (requestId: string) => ipcRenderer.invoke("composer-prediction:cancel", requestId),
   },
   skills: {
     list: () => ipcRenderer.invoke("skills:list"),

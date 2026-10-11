@@ -44,6 +44,14 @@ export type {
 } from "./session";
 
 export type {
+  ComposerPredictionContext,
+  ComposerPredictionRequest,
+  ComposerPredictionResult,
+  ComposerPredictionStatus,
+  ComposerPredictionTurn,
+} from "@shared/types/composer-prediction";
+
+export type {
   ConversationRef,
   AttentionKind,
   AttentionStatus,

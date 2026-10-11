@@ -12,6 +12,7 @@ export async function acpUtilityPrompt(
   internalId: string,
   prompt: string,
   timeoutMs = 15000,
+  signal?: AbortSignal,
 ): Promise<string> {
   const entry = acpSessions.get(internalId);
   if (!entry) {
@@ -31,12 +32,21 @@ export async function acpUtilityPrompt(
 
   if (!entry.utilityTextBuffers) entry.utilityTextBuffers = new Map();
   entry.utilityTextBuffers.set(utilitySessionId, "");
+  if (!entry.utilityErrors) entry.utilityErrors = new Map();
+  entry.utilityErrors.delete(utilitySessionId);
 
   let timedOut = false;
+  let cancelled = false;
+  const cancel = () => {
+    cancelled = true;
+    conn.cancel({ sessionId: utilitySessionId }).catch(() => {});
+  };
   const timeoutHandle = setTimeout(() => {
     timedOut = true;
-    conn.cancel({ sessionId: utilitySessionId }).catch(() => {});
+    cancel();
   }, timeoutMs);
+  if (signal?.aborted) cancel();
+  else signal?.addEventListener("abort", cancel, { once: true });
 
   try {
     await conn.prompt({
@@ -49,12 +59,16 @@ export async function acpUtilityPrompt(
     if (timedOut) {
       throw new Error("ACP utility prompt timed out");
     }
+    if (cancelled) throw new Error("ACP utility prompt cancelled");
+    const utilityError = entry.utilityErrors.get(utilitySessionId);
+    if (utilityError) throw new Error(utilityError);
 
     const result = entry.utilityTextBuffers.get(utilitySessionId) ?? "";
     log("ACP_UTILITY", `Utility session ${utilitySessionId.slice(0, 12)} result len=${result.length}`);
     return result;
   } catch (err) {
     clearTimeout(timeoutHandle);
+    signal?.removeEventListener("abort", cancel);
     reportError("ACP_UTILITY_ERR", err, { internalId });
     throw err;
   } finally {
@@ -62,5 +76,7 @@ export async function acpUtilityPrompt(
     // concurrent utility prompt may still be active on the same connection
     entry.utilitySessionIds?.delete(utilitySessionId);
     entry.utilityTextBuffers?.delete(utilitySessionId);
+    entry.utilityErrors?.delete(utilitySessionId);
+    signal?.removeEventListener("abort", cancel);
   }
 }

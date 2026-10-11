@@ -327,6 +327,14 @@ function SplitChatPaneInner({
               onManageACPs={onManageACPs}
               inputHistory={inputHistory}
               inputHistorySessionId={sessionId}
+              predictionContext={{
+                sessionId,
+                engine: paneController.paneEngine ?? session?.engine,
+                model: paneState.sessionInfo?.model ?? paneController.paneModel ?? session?.model,
+                cwd: paneState.sessionInfo?.cwd ?? projectPath,
+                messages: paneState.messages,
+                active: isActiveSessionPane,
+              }}
             />
           </div>
         </div>

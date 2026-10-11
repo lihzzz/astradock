@@ -141,6 +141,11 @@ export interface InputBarProps {
   inputHistory?: string[];
   /** Session identity used to reset keyboard history navigation when switching sessions. */
   inputHistorySessionId?: string | null;
+  /** One-shot ghost draft generated after the previous turn. */
+  predictionText?: string | null;
+  onPredictionAccepted?: () => void;
+  onPredictionDismissed?: () => void;
+  onDraftStateChange?: (hasDraft: boolean) => void;
 }
 
 export const InputBar = memo(function InputBar({
@@ -185,6 +190,10 @@ export const InputBar = memo(function InputBar({
   transferClaudeModels,
   inputHistory,
   inputHistorySessionId,
+  predictionText,
+  onPredictionAccepted,
+  onPredictionDismissed,
+  onDraftStateChange,
 }: InputBarProps) {
   const { t } = useI18n();
   // ── Core state ──
@@ -346,12 +355,14 @@ export const InputBar = memo(function InputBar({
       hasContentRef.current = false;
       setHasContent(false);
       setAttachments([]);
+      onPredictionDismissed?.();
+      onDraftStateChange?.(false);
       historyIndexRef.current = inputHistoryRef.current.length;
       historyDraftRef.current = null;
       mention.closeMentions();
       command.setShowCommands(false);
     },
-    [mention.closeMentions, command.setShowCommands],
+    [command.setShowCommands, mention.closeMentions, onDraftStateChange, onPredictionDismissed],
   );
 
   // ── Image attachments ──
@@ -359,6 +370,7 @@ export const InputBar = memo(function InputBar({
   const addImageFiles = useCallback(async (files: FileList | globalThis.File[]) => {
     const validFiles = Array.from(files).filter(isAcceptedImage);
     if (validFiles.length === 0) return;
+    onPredictionDismissed?.();
 
     const newAttachments: ImageAttachment[] = [];
     for (const file of validFiles) {
@@ -371,7 +383,7 @@ export const InputBar = memo(function InputBar({
       });
     }
     setAttachments((prev) => [...prev, ...newAttachments]);
-  }, []);
+  }, [onPredictionDismissed]);
 
   const removeAttachment = useCallback((id: string) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
@@ -581,10 +593,11 @@ export const InputBar = memo(function InputBar({
       const nextHasContent = hasMeaningfulText(text);
       hasContentRef.current = nextHasContent;
       setHasContent(nextHasContent);
+      onDraftStateChange?.(nextHasContent);
       mention.closeMentions();
       command.setShowCommands(false);
     },
-    [command.setShowCommands, mention.closeMentions],
+    [command.setShowCommands, mention.closeMentions, onDraftStateChange],
   );
 
   const isCaretAtBoundary = useCallback(
@@ -730,6 +743,24 @@ export const InputBar = memo(function InputBar({
       }
     }
 
+    // Picker navigation has priority over the ghost draft. Accepting a
+    // prediction only fills the composer; it never sends automatically.
+    if (
+      e.key === "Tab" &&
+      predictionText &&
+      !hasContentRef.current &&
+      attachments.length === 0 &&
+      !(grabbedElements?.length) &&
+      !isSending &&
+      !isProcessing &&
+      !isAwaitingAcpOptions
+    ) {
+      e.preventDefault();
+      setComposerText(predictionText);
+      onPredictionAccepted?.();
+      return;
+    }
+
     if (e.key === "ArrowUp" && navigateInputHistory("up")) {
       e.preventDefault();
       return;
@@ -759,6 +790,8 @@ export const InputBar = memo(function InputBar({
     (e: React.FormEvent<HTMLDivElement>) => {
       const el = editableRef.current;
       if (!el) return;
+
+      onPredictionDismissed?.();
 
       // Any direct edit starts a new draft for history navigation.
       historyIndexRef.current = inputHistoryRef.current.length;
@@ -801,6 +834,7 @@ export const InputBar = memo(function InputBar({
         hasContentRef.current = true;
         setHasContent(true);
       }
+      onDraftStateChange?.(hasContentRef.current);
 
       // Detect @ and / triggers
       const sel = window.getSelection();
@@ -819,13 +853,14 @@ export const InputBar = memo(function InputBar({
       // Slash command detection
       command.detectCommandTrigger(sanitizedText);
     },
-    [mention, command],
+    [command, mention, onDraftStateChange, onPredictionDismissed],
   );
 
   // ── Paste / drag-drop handlers ──
 
   const handlePaste = useCallback(
     (e: React.ClipboardEvent<HTMLDivElement>) => {
+      onPredictionDismissed?.();
       const items = e.clipboardData?.items;
       if (items) {
         const imageFiles: globalThis.File[] = [];
@@ -849,7 +884,7 @@ export const InputBar = memo(function InputBar({
       }
       insertTextAtCursor(editableRef.current, text);
     },
-    [addImageFiles],
+    [addImageFiles, onPredictionDismissed],
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -912,6 +947,18 @@ export const InputBar = memo(function InputBar({
       (!grabbedElements || grabbedElements.length === 0)) ||
       isSending);
 
+  const showPrediction = Boolean(
+    predictionText &&
+      !hasContent &&
+      attachments.length === 0 &&
+      !(grabbedElements?.length) &&
+      !isProcessing &&
+      !isSending &&
+      !isAwaitingAcpOptions &&
+      !mention.showMentions &&
+      !command.showCommands,
+  );
+
   return (
     <div data-usage-chat className={`mx-auto w-full px-4 pb-4 ${BOTTOM_CHAT_MAX_WIDTH_CLASS}`}>
       <input
@@ -973,7 +1020,16 @@ export const InputBar = memo(function InputBar({
           className="relative px-5 pt-4 pb-2.5"
           onClick={() => editableRef.current?.focus()}
         >
-          {!hasContent && (
+          {showPrediction && (
+            <div
+              className="pointer-events-none absolute inset-0 flex items-start gap-2 px-5 pt-4 pb-2.5 text-sm text-muted-foreground/55 select-none"
+              aria-hidden="true"
+            >
+              <span className="min-w-0 whitespace-pre-wrap wrap-break-word italic">{predictionText}</span>
+              <kbd className="mt-0.5 shrink-0 rounded border border-border/40 bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium not-italic text-muted-foreground/70">Tab</kbd>
+            </div>
+          )}
+          {!hasContent && !showPrediction && (
             <div className="pointer-events-none absolute inset-0 flex items-start px-5 pt-4 pb-2.5 text-sm text-muted-foreground/35 select-none">
               {placeholderText}
             </div>

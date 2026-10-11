@@ -14,6 +14,7 @@ import { listModelsWithConfigured } from "@shared/lib/codex-helpers";
 interface CodexUtilityPromptOptions {
   timeoutMs?: number;
   model?: string;
+  signal?: AbortSignal;
 }
 
 function pickModelId(
@@ -42,9 +43,23 @@ export async function codexUtilityPrompt(
 
   let rpc: CodexRpcClient | null = null;
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  let cancelledByCaller = false;
+  const abortFromCaller = () => {
+    cancelledByCaller = true;
+    try {
+      rpc?.destroy();
+    } catch {
+      // ignore cleanup errors
+    }
+  };
+
+  if (options?.signal?.aborted) abortFromCaller();
+  else options?.signal?.addEventListener("abort", abortFromCaller, { once: true });
 
   try {
+    if (cancelledByCaller) throw new Error("Codex utility prompt cancelled");
     const codexPath = await getCodexBinaryPath();
+    if (cancelledByCaller) throw new Error("Codex utility prompt cancelled");
     const proc = spawnExecutable(codexPath, ["app-server"], {
       stdio: ["pipe", "pipe", "pipe"],
       cwd,
@@ -88,6 +103,16 @@ export async function codexUtilityPrompt(
 
     rpc.onNotification = (msg) => {
       if (!settle || !fail) return;
+
+      if (msg.method === "item/started" || msg.method === "item/completed") {
+        const params = msg.params as { item?: { type?: string } };
+        const itemType = params.item?.type;
+        if (itemType && !["agentMessage", "reasoning", "plan"].includes(itemType)) {
+          fail(new Error(`Codex prediction refused tool item: ${itemType}`));
+          rpc?.destroy();
+          return;
+        }
+      }
 
       if (msg.method === "turn/started") {
         const params = msg.params as { turn?: { id?: string } };
@@ -140,6 +165,11 @@ export async function codexUtilityPrompt(
         settle(text);
       }
     };
+    rpc.onServerRequest = (msg) => {
+      // A prediction request is never allowed to ask for approval or user input.
+      rpc?.respondToServerError(msg.id, -32001, "Prediction utility sessions cannot execute tools or request input");
+      fail?.(new Error(`Codex utility requested unsupported input: ${msg.method}`));
+    };
 
     timeoutHandle = setTimeout(() => {
       if (!fail) return;
@@ -167,6 +197,9 @@ export async function codexUtilityPrompt(
 
     const threadParams: Record<string, unknown> = {
       cwd,
+      ephemeral: true,
+      approvalPolicy: "never",
+      sandbox: "read-only",
       experimentalRawEvents: false,
       persistExtendedHistory: false,
     };
@@ -194,10 +227,12 @@ export async function codexUtilityPrompt(
     log("CODEX_UTILITY", `${logLabel} completed elapsed_ms=${elapsed} output_len=${output.length}`);
     return output;
   } catch (err) {
+    if (cancelledByCaller) throw new Error("Codex utility prompt cancelled");
     const message = reportError("CODEX_UTILITY_ERR", err, { logLabel });
     throw new Error(message);
   } finally {
     if (timeoutHandle) clearTimeout(timeoutHandle);
+    options?.signal?.removeEventListener("abort", abortFromCaller);
     if (rpc) {
       try {
         rpc.destroy();

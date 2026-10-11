@@ -1753,6 +1753,14 @@ export function AppLayout() {
                   transferBusy={isTransferring}
                   transferDisabled={manager.messages.length === 0}
                   transferClaudeModels={manager.cachedClaudeModels}
+                  predictionContext={{
+                    sessionId: manager.activeSessionId,
+                    engine: manager.activeEngine,
+                    model: manager.sessionInfo?.model ?? activePaneCtrl?.paneModel ?? settings.model,
+                    cwd: manager.sessionInfo?.cwd ?? activeProjectPath,
+                    messages: manager.messages,
+                    active: true,
+                  }}
                 />
               </div>
               </>

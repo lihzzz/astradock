@@ -1,6 +1,7 @@
 import { memo, useState, useCallback, useEffect } from "react";
-import { MessageSquare, Code, Mic, Languages } from "lucide-react";
+import { MessageSquare, Code, Mic, Languages, Sparkles } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import { SettingRow, SettingsSelect, SettingsHeader, SettingsSection } from "@/components/settings/shared";
 import type { AppSettings, PreferredEditor, VoiceDictationMode } from "@/types";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -21,6 +22,8 @@ export const GeneralSettings = memo(function GeneralSettings({
   const { t } = useI18n();
   const language = useSettingsStore((s) => s.language);
   const setLanguage = useSettingsStore((s) => s.setLanguage);
+  const composerPredictionsEnabled = useSettingsStore((s) => s.composerPredictionsEnabled);
+  const setComposerPredictionsEnabled = useSettingsStore((s) => s.setComposerPredictionsEnabled);
   // Local optimistic state — synced from props once loaded
   const [chatLimit, setChatLimit] = useState(10);
   const [preferredEditor, setPreferredEditor] = useState<PreferredEditor>("auto");
@@ -91,6 +94,19 @@ export const GeneralSettings = memo(function GeneralSettings({
                 value={String(chatLimit)}
                 onValueChange={(v) => handleChatLimitChange(Number(v))}
                 options={[5, 10, 15, 20, 25, 30, 50, 100].map((n) => ({ value: String(n), label: String(n) }))}
+              />
+            </SettingRow>
+          </SettingsSection>
+
+          <SettingsSection icon={Sparkles} label={t("settingsComposerPredictionsSection")}>
+            <SettingRow
+              label={t("settingsComposerPredictions")}
+              description={t("settingsComposerPredictionsDescription")}
+            >
+              <Switch
+                checked={composerPredictionsEnabled}
+                onCheckedChange={setComposerPredictionsEnabled}
+                aria-label={t("settingsComposerPredictions")}
               />
             </SettingRow>
           </SettingsSection>

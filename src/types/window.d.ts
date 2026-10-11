@@ -33,6 +33,7 @@ import type { ProjectAppsApi } from "@shared/types/project-apps";
 import type { TasksApi } from "@shared/types/tasks";
 import type { SessionMeta as SessionListItem } from "@shared/lib/session-persistence";
 import type { HistoryApi, OperationResult, QuickCaptureApi, SessionBatchApi, SessionResumeSource, ShortcutStatus } from "@shared/types/productivity";
+import type { ComposerPredictionCancelResult, ComposerPredictionRequest, ComposerPredictionResult } from "@shared/types/composer-prediction";
 
 /** Standard IPC result envelope — most IPC calls return this shape. */
 interface IpcResult {
@@ -406,6 +407,10 @@ declare global {
         set: (patch: Partial<AppSettings>) => Promise<IpcResult>;
         /** Subscribe to settings changes pushed from the main process. */
         onChanged: (callback: (settings: AppSettings) => void) => () => void;
+      };
+      composerPrediction: {
+        request: (request: ComposerPredictionRequest) => Promise<ComposerPredictionResult>;
+        cancel: (requestId: string) => Promise<ComposerPredictionCancelResult>;
       };
       skills: {
         list: () => Promise<SkillsListResult>;
