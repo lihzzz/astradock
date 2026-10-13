@@ -34,11 +34,7 @@ async function oneShotSdkQuery(
   try {
     const query = await getSDK();
     const cliPath = await getClaudeBinaryPath();
-    if (cliPath) {
-      log("SDK_CLI_PATH", `${logLabel} path=${cliPath}`);
-    } else {
-      log("SDK_CLI_PATH", `${logLabel} unresolved; relying on SDK fallback`);
-    }
+    log("SDK_CLI_PATH", `${logLabel} path=${cliPath}`);
     let eventCount = 0;
     let lastEventType = "none";
     let lastResultSubtype = "none";

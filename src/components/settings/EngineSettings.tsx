@@ -3,6 +3,7 @@ import { RefreshCw, Server } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { SettingRow, SettingsSelect, SettingsHeader, SettingsSection } from "@/components/settings/shared";
+import { EngineBinaryScanner, ENGINE_BINARY_STRINGS } from "@/components/settings/EngineBinaryScanner";
 import type { AppSettings } from "@/types";
 import type { ComputerUseRuntimeStatus } from "@shared/types/computer-use";
 import { useI18n } from "@/lib/i18n";
@@ -19,10 +20,11 @@ export const EngineSettings = memo(function EngineSettings({
   appSettings,
   onUpdateAppSettings,
 }: EngineSettingsProps) {
-  const { t } = useI18n();
-  const [claudeBinarySource, setClaudeBinarySource] = useState<"auto" | "managed" | "custom">("auto");
+  const { t, language } = useI18n();
+  const binaryStrings = ENGINE_BINARY_STRINGS[language];
+  const [claudeBinarySource, setClaudeBinarySource] = useState<"auto" | "custom">("auto");
   const [claudeCustomBinaryPath, setClaudeCustomBinaryPath] = useState("");
-  const [codexBinarySource, setCodexBinarySource] = useState<"auto" | "managed" | "custom">("auto");
+  const [codexBinarySource, setCodexBinarySource] = useState<"auto" | "custom">("auto");
   const [codexCustomBinaryPath, setCodexCustomBinaryPath] = useState("");
   const [opencodeCustomBinaryPath, setOpencodeCustomBinaryPath] = useState("");
   const [computerUseEnabled, setComputerUseEnabled] = useState(false);
@@ -34,9 +36,9 @@ export const EngineSettings = memo(function EngineSettings({
 
   useEffect(() => {
     if (appSettings) {
-      setClaudeBinarySource(appSettings.claudeBinarySource || "auto");
+      setClaudeBinarySource(appSettings.claudeBinarySource === "custom" ? "custom" : "auto");
       setClaudeCustomBinaryPath(appSettings.claudeCustomBinaryPath || "");
-      setCodexBinarySource(appSettings.codexBinarySource || "auto");
+      setCodexBinarySource(appSettings.codexBinarySource === "custom" ? "custom" : "auto");
       setCodexCustomBinaryPath(appSettings.codexCustomBinaryPath || "");
       setOpencodeCustomBinaryPath(appSettings.opencodeCustomBinaryPath || "");
       setComputerUseEnabled(appSettings.computerUseEnabled || false);
@@ -76,7 +78,7 @@ export const EngineSettings = memo(function EngineSettings({
   }, []);
 
   const handleClaudeBinarySourceChange = useCallback(
-    async (source: "auto" | "managed" | "custom") => {
+    async (source: "auto" | "custom") => {
       setClaudeBinarySource(source);
       await onUpdateAppSettings({ claudeBinarySource: source });
     },
@@ -93,7 +95,7 @@ export const EngineSettings = memo(function EngineSettings({
   );
 
   const handleCodexBinarySourceChange = useCallback(
-    async (source: "auto" | "managed" | "custom") => {
+    async (source: "auto" | "custom") => {
       setCodexBinarySource(source);
       await onUpdateAppSettings({ codexBinarySource: source });
     },
@@ -117,6 +119,18 @@ export const EngineSettings = memo(function EngineSettings({
     },
     [onUpdateAppSettings],
   );
+
+  const handleClaudeInstallationSelect = useCallback(async (path: string) => {
+    await onUpdateAppSettings({ claudeBinarySource: "custom", claudeCustomBinaryPath: path });
+    setClaudeBinarySource("custom");
+    setClaudeCustomBinaryPath(path);
+  }, [onUpdateAppSettings]);
+
+  const handleCodexInstallationSelect = useCallback(async (path: string) => {
+    await onUpdateAppSettings({ codexBinarySource: "custom", codexCustomBinaryPath: path });
+    setCodexBinarySource("custom");
+    setCodexCustomBinaryPath(path);
+  }, [onUpdateAppSettings]);
 
   const handleComputerUseToggle = useCallback(
     async (checked: boolean) => {
@@ -161,16 +175,15 @@ export const EngineSettings = memo(function EngineSettings({
         <div className="px-6 py-2">
           <SettingsSection icon={Server} label="Claude Code" first>
             <SettingRow
-              label="Claude binary source"
-              description="Choose how AstraDock resolves the Claude executable."
+              label={binaryStrings.sourceLabel}
+              description={binaryStrings.sourceDescription}
             >
               <SettingsSelect
                 value={claudeBinarySource}
                 onValueChange={handleClaudeBinarySourceChange}
                 options={[
-                  { value: "auto", label: "Auto detect" },
-                  { value: "managed", label: "Managed install" },
-                  { value: "custom", label: "Custom path" },
+                  { value: "auto", label: binaryStrings.systemInstallation },
+                  { value: "custom", label: binaryStrings.customPath },
                 ]}
                 className="w-44"
               />
@@ -178,8 +191,8 @@ export const EngineSettings = memo(function EngineSettings({
 
             {claudeBinarySource === "custom" && (
               <SettingRow
-                label="Custom Claude path"
-                description="Absolute path to claude executable (claude or claude.exe)."
+                label={binaryStrings.claudePath}
+                description={binaryStrings.claudePathDescription}
               >
                 <input
                   type="text"
@@ -191,24 +204,29 @@ export const EngineSettings = memo(function EngineSettings({
                   }}
                   spellCheck={false}
                   className="h-8 w-80 rounded-md border border-foreground/10 bg-background px-2.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground hover:border-foreground/20 focus:border-foreground/30 focus:ring-1 focus:ring-foreground/20"
-                  placeholder="Absolute path to claude executable"
+                  placeholder={binaryStrings.claudePathDescription}
                 />
               </SettingRow>
             )}
+            <EngineBinaryScanner
+              engine="claude"
+              source={appSettings?.claudeBinarySource ?? "auto"}
+              customPath={appSettings?.claudeCustomBinaryPath ?? ""}
+              onSelectPath={handleClaudeInstallationSelect}
+            />
           </SettingsSection>
 
           <SettingsSection icon={Server} label="Codex">
             <SettingRow
-              label="Codex binary source"
-              description="Choose how AstraDock resolves the Codex executable."
+              label={binaryStrings.sourceLabel}
+              description={binaryStrings.sourceDescription}
             >
               <SettingsSelect
                 value={codexBinarySource}
                 onValueChange={handleCodexBinarySourceChange}
                 options={[
-                  { value: "auto", label: "Auto detect" },
-                  { value: "managed", label: "Managed download" },
-                  { value: "custom", label: "Custom path" },
+                  { value: "auto", label: binaryStrings.systemInstallation },
+                  { value: "custom", label: binaryStrings.customPath },
                 ]}
                 className="w-44"
               />
@@ -216,8 +234,8 @@ export const EngineSettings = memo(function EngineSettings({
 
             {codexBinarySource === "custom" && (
               <SettingRow
-                label="Custom Codex path"
-                description="Absolute path to codex executable (codex or codex.exe)."
+                label={binaryStrings.codexPath}
+                description={binaryStrings.codexPathDescription}
               >
                 <input
                   type="text"
@@ -229,10 +247,17 @@ export const EngineSettings = memo(function EngineSettings({
                   }}
                   spellCheck={false}
                   className="h-8 w-80 rounded-md border border-foreground/10 bg-background px-2.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground hover:border-foreground/20 focus:border-foreground/30 focus:ring-1 focus:ring-foreground/20"
-                  placeholder="Absolute path to codex executable"
+                  placeholder={binaryStrings.codexPathDescription}
                 />
               </SettingRow>
             )}
+
+            <EngineBinaryScanner
+              engine="codex"
+              source={appSettings?.codexBinarySource ?? "auto"}
+              customPath={appSettings?.codexCustomBinaryPath ?? ""}
+              onSelectPath={handleCodexInstallationSelect}
+            />
 
             <SettingRow
               label="Computer Use runtime"

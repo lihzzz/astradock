@@ -6,7 +6,7 @@ import type { ModelInfo, McpServerConfig, McpServerStatus } from "./mcp";
 import type { PermissionUpdate } from "./permissions";
 import type { GitRepoInfo, GitStatus, GitBranch, GitLogEntry } from "@shared/types/git";
 import type { InstalledAgent } from "@shared/types/registry";
-import type { AppSettings, MacBackgroundEffect, ThemeOption } from "@shared/types/settings";
+import type { AppSettings, EngineBinaryScanResult, MacBackgroundEffect, ThemeOption } from "@shared/types/settings";
 import type { MemoryDocument, MemoryFact, MemoryGoldenReport, MemoryProjectConfig, MemoryStatusResult } from "@shared/types/memory";
 import type { SkillsListResult } from "@shared/types/skills";
 import type { UsageRange, UsageReport } from "@shared/types/usage";
@@ -151,7 +151,8 @@ declare global {
         thinkingEnabled: boolean,
       ) => Promise<IpcResult>;
       version: () => Promise<{ version?: string | null; error?: string }>;
-      binaryStatus: () => Promise<{ installed: boolean; installing: boolean }>;
+      binaryStatus: () => Promise<{ installed: boolean }>;
+      scanBinaries: () => Promise<EngineBinaryScanResult>;
       computerUseStatus: () => Promise<import("@shared/types/computer-use").ComputerUseRuntimeStatus>;
       computerUseRequestPermissions: () => Promise<import("@shared/types/computer-use").ComputerUseRuntimeStatus["permissions"]>;
       projects: {
@@ -376,7 +377,8 @@ declare global {
           Promise<{ sessionId?: string; threadId?: string; goal?: import("@shared/types/codex").CodexThreadGoal | null; goalSupported?: boolean; error?: string }>;
         setModel: (sessionId: string, model: string) => Promise<{ error?: string }>;
         version: () => Promise<{ version?: string; error?: string }>;
-        binaryStatus: () => Promise<{ installed: boolean; downloading: boolean }>;
+        binaryStatus: () => Promise<{ installed: boolean }>;
+        scanBinaries: () => Promise<EngineBinaryScanResult>;
         computerUseStatus: () => Promise<import("@shared/types/codex").CodexComputerUseStatus>;
         onEvent: (callback: (data: CodexSessionEvent) => void) => () => void;
         onApprovalRequest: (callback: (data: CodexServerRequest) => void) => () => void;

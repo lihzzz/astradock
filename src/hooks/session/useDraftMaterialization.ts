@@ -251,7 +251,8 @@ export function useDraftMaterialization({
     try {
       const status = await window.claude.codex.binaryStatus();
       if (!status.installed) {
-        setCodexModelsLoadingMessage("Codex CLI not found. Downloading it now...");
+        setCodexModelsLoadingMessage("Codex CLI not found. Install Codex or scan/select its path in Settings → Engines.");
+        return;
       }
 
       const result = await window.claude.codex.listModels();

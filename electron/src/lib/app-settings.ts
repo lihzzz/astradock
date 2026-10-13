@@ -11,7 +11,7 @@
 import path from "path";
 import fs from "fs";
 import { getDataDir } from "./data-dir";
-import type { AppSettings, NotificationSettings } from "@shared/types/settings";
+import type { AppSettings, EngineBinarySource, NotificationSettings } from "@shared/types/settings";
 import type { MemorySettings } from "@shared/types/memory";
 import { GLOBAL_SHORTCUT_DEFAULTS, HISTORY_DEFAULTS, mergeGlobalShortcuts, mergeHistorySettings, parseQuickCaptureTarget } from "@shared/lib/productivity-settings";
 
@@ -68,6 +68,11 @@ const DEFAULTS: AppSettings = {
 
 let cached: AppSettings | null = null;
 
+/** Older installations stored "managed"; all unsupported values use the system installation. */
+function normalizeBinarySource(value: unknown): EngineBinarySource {
+  return value === "custom" ? "custom" : "auto";
+}
+
 function filePath(): string {
   return path.join(getDataDir(), "settings.json");
 }
@@ -92,6 +97,8 @@ export function getAppSettings(): AppSettings {
     cached = {
       ...DEFAULTS,
       ...parsed,
+      codexBinarySource: normalizeBinarySource(parsed.codexBinarySource),
+      claudeBinarySource: normalizeBinarySource(parsed.claudeBinarySource),
       globalShortcuts: mergeGlobalShortcuts(parsed.globalShortcuts),
       quickCaptureTarget: parseQuickCaptureTarget(parsed.quickCaptureTarget),
       history: mergeHistorySettings(parsed.history),
@@ -121,6 +128,8 @@ export function setAppSettings(patch: Partial<AppSettings>): AppSettings {
   const next = {
     ...current,
     ...patch,
+    codexBinarySource: normalizeBinarySource(patch.codexBinarySource ?? current.codexBinarySource),
+    claudeBinarySource: normalizeBinarySource(patch.claudeBinarySource ?? current.claudeBinarySource),
     globalShortcuts: mergeGlobalShortcuts(patch.globalShortcuts, current.globalShortcuts),
     quickCaptureTarget: "quickCaptureTarget" in patch ? parseQuickCaptureTarget(patch.quickCaptureTarget) : current.quickCaptureTarget,
     history: mergeHistorySettings(patch.history, current.history),

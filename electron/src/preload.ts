@@ -193,6 +193,7 @@ contextBridge.exposeInMainWorld("claude", {
     ipcRenderer.invoke("claude:set-thinking", { sessionId, thinkingEnabled }),
   version: () => ipcRenderer.invoke("claude:version"),
   binaryStatus: () => ipcRenderer.invoke("claude:binary-status"),
+  scanBinaries: () => ipcRenderer.invoke("claude:scan-binaries"),
   computerUseStatus: () => ipcRenderer.invoke("computer-use:status"),
   computerUseRequestPermissions: () => ipcRenderer.invoke("computer-use:request-permissions"),
   supportedModels: (sessionId: string) => ipcRenderer.invoke("claude:supported-models", sessionId),
@@ -404,6 +405,7 @@ contextBridge.exposeInMainWorld("claude", {
       ipcRenderer.invoke("codex:set-model", { sessionId, model }),
     version: () => ipcRenderer.invoke("codex:version"),
     binaryStatus: () => ipcRenderer.invoke("codex:binary-status"),
+    scanBinaries: () => ipcRenderer.invoke("codex:scan-binaries"),
     computerUseStatus: () => ipcRenderer.invoke("codex:computer-use-status"),
     onEvent: (callback: (data: unknown) => void) => {
       const listener = (_event: IpcRendererEvent, data: unknown) => callback(data);

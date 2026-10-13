@@ -5,7 +5,7 @@ import os from "os";
 import { log } from "../lib/logger";
 import { safeSend } from "../lib/safe-send";
 import { AsyncChannel } from "../lib/async-channel";
-import { getSDK, clientAppEnv, getCliPath } from "../lib/sdk";
+import { getSDK, clientAppEnv } from "../lib/sdk";
 import type { QueryHandle } from "../lib/sdk";
 import type { SDKUserMessage, PermissionMode } from "@anthropic-ai/claude-agent-sdk";
 import { getMcpAuthHeaders } from "../lib/mcp-oauth-flow";
@@ -14,7 +14,7 @@ import type { CachedModelInfo } from "../lib/claude-model-cache";
 import { reportError } from "../lib/error-utils";
 import { buildSdkMcpConfig } from "@shared/lib/mcp-config";
 import type { McpServerInput } from "@shared/lib/mcp-config";
-import { getClaudeBinaryMetadata, getClaudeBinaryPath, getClaudeBinaryStatus, getClaudeVersion } from "../lib/claude-binary";
+import { getClaudeBinaryPath, getClaudeBinaryStatus, getClaudeVersion, scanClaudeBinaries } from "../lib/claude-binary";
 import { captureEvent } from "../lib/posthog";
 import { withComputerUseMcpServer } from "../lib/computer-use-runtime";
 import { withHindsightMcpServers, registerMemorySession, unregisterMemorySession, beforeMemorySend, observeClaudeEvent, completeMemoryTurn } from "../lib/memory/service";
@@ -431,12 +431,8 @@ function buildThinkingConfig(): { type: "adaptive" } {
   return { type: "adaptive" };
 }
 
-function logSdkCliPath(context: string, cliPath?: string): void {
-  if (cliPath) {
-    log("SDK_CLI_PATH", `${context} path=${cliPath}`);
-    return;
-  }
-  log("SDK_CLI_PATH", `${context} unresolved; relying on SDK fallback`);
+function logSdkCliPath(context: string, cliPath: string): void {
+  log("SDK_CLI_PATH", `${context} path=${cliPath}`);
 }
 
 type ModelsRevalidationResult = { models: CachedModelInfo[]; updatedAt?: number; error?: string };
@@ -444,11 +440,12 @@ let modelsRevalidationPromise: Promise<ModelsRevalidationResult> | null = null;
 
 /** Read credential configuration without sending a user turn or retaining account details. */
 export async function hasConfiguredClaudeAccount(cwd: string): Promise<boolean> {
+  const cliPath = await getClaudeBinaryPath();
   const query = await getSDK();
   const channel = new AsyncChannel<SDKUserMessage>();
   const handle = query({ prompt: channel, options: {
     cwd, settingSources: ["user", "project", "local"],
-    pathToClaudeCodeExecutable: getClaudeBinaryMetadata({ installIfMissing: false, allowSdkFallback: true })?.path,
+    pathToClaudeCodeExecutable: cliPath,
     env: { ...process.env, ...clientAppEnv() },
   } });
   let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -471,98 +468,39 @@ async function revalidateClaudeModelsCache(cwd?: string): Promise<ModelsRevalida
 
   modelsRevalidationPromise = (async () => {
     const existing = getClaudeModelsCache();
+    const cliPath = await getClaudeBinaryPath();
     const query = await getSDK();
-    const binary = getClaudeBinaryMetadata({ installIfMissing: false, allowSdkFallback: true });
-    const sdkCliPath = getCliPath();
-    const selectedCliPath = binary?.path;
-
-    type RevalidationAttempt = {
-      cliPath?: string;
-      label: string;
-    };
-
-    const attempts: RevalidationAttempt[] = [{
-      cliPath: selectedCliPath,
-      label: binary ? `strategy=${binary.strategy}` : "strategy=unresolved",
-    }];
-
-    const shouldRetryWithBundledCli =
-      !!sdkCliPath &&
-      sdkCliPath !== selectedCliPath &&
-      binary?.source === "auto" &&
-      binary.strategy !== "custom" &&
-      binary.strategy !== "sdk-fallback";
-
-    if (shouldRetryWithBundledCli) {
-      attempts.push({
-        cliPath: sdkCliPath,
-        label: "strategy=bundled-retry",
-      });
-    }
-
-    let lastError = "";
-    for (const [index, attempt] of attempts.entries()) {
-      let queryHandle: QueryHandle | null = null;
-      const channel = new AsyncChannel<SDKUserMessage>();
-
-      try {
-        logSdkCliPath(`models-revalidate attempt=${index + 1} ${attempt.label}`, attempt.cliPath);
-        const version = attempt.cliPath ? await getClaudeVersion(attempt.cliPath) : null;
-        if (version) {
-          log("CLAUDE_VERSION", `models-revalidate attempt=${index + 1} ${attempt.label} version=${version}`);
-        }
-
-        const queryOptions: Record<string, unknown> = {
-          cwd: cwd?.trim() || os.homedir(),
-          includePartialMessages: true,
-          thinking: buildThinkingConfig(),
-          settingSources: ["user", "project", "local"],
-          pathToClaudeCodeExecutable: attempt.cliPath,
-          ...fileCheckpointOptions(),
-          stderr: (data: string) => {
-            const trimmed = data.trim();
-            if (!trimmed) return;
-            log("MODELS_CACHE_STDERR", `attempt=${index + 1} ${attempt.label} ${trimmed}`);
-          },
-        };
-
-        queryHandle = query({ prompt: channel, options: queryOptions });
-        if (!queryHandle.supportedModels) {
-          return { models: existing.models, updatedAt: existing.updatedAt };
-        }
-
-        const models = await queryHandle.supportedModels();
-        if (Array.isArray(models) && models.length > 0) {
-          const next = setClaudeModelsCache(models);
-          if (index > 0) {
-            log("MODELS_CACHE_REVALIDATE_FALLBACK", `Recovered via ${attempt.label}`);
-          }
-          return { models: next.models, updatedAt: next.updatedAt };
-        }
-
-        return { models: existing.models, updatedAt: existing.updatedAt };
-      } catch (err) {
-        lastError = reportError("MODELS_CACHE_REVALIDATE_ERR", err, {
-          engine: "claude",
-          attempt: index + 1,
-          cliStrategy: attempt.label,
-        });
-        if (index === attempts.length - 1) {
-          return { models: existing.models, updatedAt: existing.updatedAt, error: lastError };
-        }
-      } finally {
-        channel.close();
-        if (queryHandle) {
-          try {
-            queryHandle.close();
-          } catch {
-            // Ignore cleanup errors
-          }
-        }
+    const channel = new AsyncChannel<SDKUserMessage>();
+    let queryHandle: QueryHandle | null = null;
+    try {
+      logSdkCliPath("models-revalidate", cliPath);
+      const version = await getClaudeVersion(cliPath);
+      if (version) log("CLAUDE_VERSION", `models-revalidate version=${version}`);
+      queryHandle = query({ prompt: channel, options: {
+        cwd: cwd?.trim() || os.homedir(),
+        includePartialMessages: true,
+        thinking: buildThinkingConfig(),
+        settingSources: ["user", "project", "local"],
+        pathToClaudeCodeExecutable: cliPath,
+        ...fileCheckpointOptions(),
+        stderr: (data: string) => {
+          const trimmed = data.trim();
+          if (trimmed) log("MODELS_CACHE_STDERR", trimmed);
+        },
+      } });
+      if (!queryHandle.supportedModels) return { models: existing.models, updatedAt: existing.updatedAt };
+      const models = await queryHandle.supportedModels();
+      if (Array.isArray(models) && models.length > 0) {
+        const next = setClaudeModelsCache(models);
+        return { models: next.models, updatedAt: next.updatedAt };
+      }
+      return { models: existing.models, updatedAt: existing.updatedAt };
+    } finally {
+      channel.close();
+      if (queryHandle) {
+        try { queryHandle.close(); } catch { /* The subprocess may already be closed. */ }
       }
     }
-
-    return { models: existing.models, updatedAt: existing.updatedAt, error: lastError || "Failed to load Claude models" };
   })().catch((err) => {
     const message = reportError("MODELS_CACHE_REVALIDATE_ERR", err, { engine: "claude" });
     const existing = getClaudeModelsCache();
@@ -1093,6 +1031,14 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle("claude:binary-status", async () => {
     return getClaudeBinaryStatus();
+  });
+
+  ipcMain.handle("claude:scan-binaries", async () => {
+    try {
+      return await scanClaudeBinaries();
+    } catch (error) {
+      return { candidates: [], selectedPath: null, error: reportError("CLAUDE_BINARY_SCAN_ERR", error, { engine: "claude" }) };
+    }
   });
 
   ipcMain.handle("claude:mcp-reconnect", async (_event, { sessionId, serverName }: { sessionId: string; serverName: string }) => {

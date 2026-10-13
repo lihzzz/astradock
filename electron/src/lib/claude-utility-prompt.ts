@@ -21,7 +21,7 @@ export async function claudeUtilityPrompt(
   const timeoutMs = options?.timeoutMs ?? 9000;
   const model = options?.model?.trim() || undefined;
   const query = await getSDK();
-  const cliPath = await getClaudeBinaryPath({ installIfMissing: false, allowSdkFallback: true });
+  const cliPath = await getClaudeBinaryPath();
   const controller = new AbortController();
   let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
   let abortedByCaller = false;

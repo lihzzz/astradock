@@ -299,8 +299,8 @@ AstraDock provides the client and workspace. Model access uses your own agent ac
 
 | Agent | Integration | Setup |
 | --- | --- | --- |
-| Claude Code | Anthropic Claude Agent SDK | Select automatic detection, managed installation, or a custom executable in **Settings → Engines**, and configure Claude authentication. |
-| Codex | JSON-RPC app-server | Supports automatic detection, managed download, or a custom path. The app exposes ChatGPT and API key login flows. Features depend on the installed Codex version. |
+| Claude Code | Anthropic Claude Agent SDK | Uses your system installation by default. Scan installed executables or select a custom path in **Settings → Engines**, and configure Claude authentication. |
+| Codex | JSON-RPC app-server | Uses your system installation in its original location. Scan installed executables or select a custom path in **Settings → Engines**. The app exposes ChatGPT and API key login flows. Features depend on the installed Codex version. |
 | OpenCode | ACP, launched with `opencode acp` | Install and configure OpenCode first. AstraDock uses `PATH` unless an absolute executable path is set in engine settings. |
 | Other ACP agents | Agent Client Protocol | Browse **Settings → ACP Agents → Agent Store**, or define the command, arguments, and environment variables in **My Agents**. Runtime and authentication requirements are agent-specific. |
 

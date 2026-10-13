@@ -12,7 +12,7 @@ import crypto from "crypto";
 import { log } from "../lib/logger";
 import { safeSend } from "../lib/safe-send";
 import { CodexRpcClient } from "../lib/codex-rpc";
-import { getCodexBinaryPath, getCodexBinaryStatus, getCodexHome, getCodexVersion } from "../lib/codex-binary";
+import { getCodexBinaryPath, getCodexBinaryStatus, getCodexHome, getCodexVersion, scanCodexBinaries } from "../lib/codex-binary";
 import { getAppSetting } from "../lib/app-settings";
 import { reportError } from "../lib/error-utils";
 import { captureEvent } from "../lib/posthog";
@@ -1150,6 +1150,14 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
   // ─── codex:binary-status ───
   ipcMain.handle("codex:binary-status", async () => {
     return getCodexBinaryStatus();
+  });
+
+  ipcMain.handle("codex:scan-binaries", async () => {
+    try {
+      return await scanCodexBinaries();
+    } catch (error) {
+      return { candidates: [], selectedPath: null, error: reportError("CODEX_BINARY_SCAN_ERR", error, { engine: "codex" }) };
+    }
   });
 
   // ─── codex:computer-use-status ───

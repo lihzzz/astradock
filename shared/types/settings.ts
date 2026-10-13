@@ -21,8 +21,21 @@ export type DensityOption = "compact" | "comfortable" | "loose";
 /** UI motion level. "auto" follows the OS prefers-reduced-motion setting. */
 export type MotionLevelOption = "auto" | "full" | "reduced";
 export type MacBackgroundEffect = "liquid-glass" | "vibrancy" | "off";
-export type CodexBinarySource = "auto" | "managed" | "custom";
-export type ClaudeBinarySource = "auto" | "managed" | "custom";
+export type EngineBinarySource = "auto" | "custom";
+export type CodexBinarySource = EngineBinarySource;
+export type ClaudeBinarySource = EngineBinarySource;
+
+/** Installed executables stay in their original directories with their helpers. */
+export interface EngineBinaryCandidate {
+  path: string;
+  version: string | null;
+}
+
+export interface EngineBinaryScanResult {
+  candidates: EngineBinaryCandidate[];
+  selectedPath: string | null;
+  error?: string;
+}
 import type { MemorySettings } from "./memory";
 import type { GlobalShortcutSettings, QuickCaptureTarget } from "./productivity";
 

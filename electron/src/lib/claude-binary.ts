@@ -1,33 +1,21 @@
-import fs from "fs";
 import os from "os";
 import path from "path";
-import { spawn } from "child_process";
+import type { ClaudeBinarySource, EngineBinaryScanResult } from "@shared/types/settings";
 import { getAppSetting } from "./app-settings";
-import { extractErrorMessage, reportError } from "./error-utils";
+import { reportError } from "./error-utils";
 import { log } from "./logger";
-import { getCliPath } from "./sdk";
 import { findExecutable, execFileExecutableSync } from "./command-launch";
+import { discoverSystemExecutables, scanSystemExecutables, scanExecutableVersions } from "./binary-discovery";
 
-export type ClaudeBinarySource = "auto" | "managed" | "custom";
-export type ClaudeBinaryResolutionStrategy = "custom" | "env" | "known" | "path" | "sdk-fallback";
-
-interface ResolveClaudeBinaryOptions {
-  installIfMissing?: boolean;
-  allowSdkFallback?: boolean;
-}
+export type { ClaudeBinarySource } from "@shared/types/settings";
+export type ClaudeBinaryResolutionStrategy = "custom" | "env" | "known" | "path";
 
 interface ClaudeBinaryResolution {
   strategy: ClaudeBinaryResolutionStrategy;
   path: string;
 }
 
-let cachedPath: string | null = null;
-let cachedSource: ClaudeBinarySource | null = null;
-let installInFlight: Promise<string> | null = null;
-
-const CLAUDE_INSTALL_SH = "https://claude.ai/install.sh";
-const CLAUDE_INSTALL_PS1 = "https://claude.ai/install.ps1";
-const CLAUDE_INSTALL_CMD = "https://claude.ai/install.cmd";
+const CLAUDE_NOT_FOUND = "Claude executable not found. Install Claude Code on your system or choose a custom executable path in Settings.";
 
 function getSource(): ClaudeBinarySource {
   return getAppSetting("claudeBinarySource");
@@ -37,24 +25,9 @@ function getCustomPath(): string {
   return getAppSetting("claudeCustomBinaryPath")?.trim() || "";
 }
 
-function isExecutable(filePath: string): boolean {
-  try {
-    fs.accessSync(filePath, fs.constants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function normalizeExecutablePath(candidate: string): string | null {
-  const trimmed = candidate.trim();
-  if (!trimmed) return null;
-  return findExecutable(trimmed);
-}
-
-function getEnvOverride(): string | null {
-  const envPath = process.env.CLAUDE_CODE_CLI_PATH || process.env.CLAUDE_CLI_PATH;
-  return envPath ? normalizeExecutablePath(envPath) : null;
+function getEnvironmentPaths(): string[] {
+  return [process.env.CLAUDE_CODE_CLI_PATH, process.env.CLAUDE_CLI_PATH]
+    .filter((candidate): candidate is string => !!candidate?.trim());
 }
 
 function getKnownPaths(): string[] {
@@ -63,212 +36,46 @@ function getKnownPaths(): string[] {
 
 function resolveFromCustom(): ClaudeBinaryResolution {
   const customPath = getCustomPath();
-  if (!customPath) {
-    throw new Error("Claude custom binary path is not set");
-  }
-  const resolved = normalizeExecutablePath(customPath);
-  if (!resolved) {
-    throw new Error(`Configured Claude binary path is not executable: ${customPath}`);
-  }
+  if (!customPath) throw new Error("Claude custom binary path is not set. Choose a custom executable path in Settings.");
+  const resolved = findExecutable(customPath);
+  if (!resolved) throw new Error(`Configured Claude binary path is not executable: ${customPath}. Choose an existing executable in Settings.`);
   return { strategy: "custom", path: resolved };
 }
 
-function resolveFromEnv(): ClaudeBinaryResolution | null {
-  const envPath = getEnvOverride();
-  return envPath ? { strategy: "env", path: envPath } : null;
-}
-
-function resolveFromKnownPaths(): ClaudeBinaryResolution | null {
-  for (const knownPath of getKnownPaths()) {
-    const resolved = normalizeExecutablePath(knownPath);
-    if (resolved) return { strategy: "known", path: resolved };
+function resolveFromPaths(candidates: string[], strategy: "env" | "known"): ClaudeBinaryResolution | null {
+  for (const candidate of candidates) {
+    const resolved = findExecutable(candidate);
+    if (resolved) return { strategy, path: resolved };
   }
   return null;
 }
 
-function resolveFromPathLookup(): ClaudeBinaryResolution | null {
-  const found = findExecutable("claude");
+function resolveClaudeBinarySync(): ClaudeBinaryResolution | null {
+  if (getSource() === "custom") return resolveFromCustom();
+  const preferred = resolveFromPaths(getEnvironmentPaths(), "env") ?? resolveFromPaths(getKnownPaths(), "known");
+  if (preferred) return preferred;
+  const found = discoverSystemExecutables("claude")[0];
   return found ? { strategy: "path", path: found } : null;
 }
 
-function resolveSdkFallback(): ClaudeBinaryResolution | null {
-  const cliPath = getCliPath();
-  return cliPath ? { strategy: "sdk-fallback", path: cliPath } : null;
-}
-
-function resolveClaudeBinarySync(options?: ResolveClaudeBinaryOptions): ClaudeBinaryResolution | null {
-  const source = getSource();
-  const allowSdkFallback = options?.allowSdkFallback ?? true;
-
-  if (source === "custom") {
-    return resolveFromCustom();
-  }
-
-  const resolution =
-    resolveFromEnv() ??
-    resolveFromKnownPaths() ??
-    resolveFromPathLookup();
-
-  if (resolution) return resolution;
-  if (allowSdkFallback && source === "auto") {
-    return resolveSdkFallback();
-  }
-  return null;
-}
-
-async function runInstaller(command: string, args: string[], label: string): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(command, args, {
-      stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env },
-      windowsHide: true,
-    });
-
-    let stderr = "";
-    let stdout = "";
-
-    child.stdout.on("data", (chunk: Buffer | string) => {
-      const text = chunk.toString();
-      stdout += text;
-      const trimmed = text.trim();
-      if (trimmed) log("CLAUDE_BINARY_INSTALL_STDOUT", `${label} ${trimmed}`);
-    });
-
-    child.stderr.on("data", (chunk: Buffer | string) => {
-      const text = chunk.toString();
-      stderr += text;
-      const trimmed = text.trim();
-      if (trimmed) log("CLAUDE_BINARY_INSTALL_STDERR", `${label} ${trimmed}`);
-    });
-
-    child.on("error", (err) => {
-      reject(new Error(`${label} failed to start: ${extractErrorMessage(err)}`));
-    });
-
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-      const detail = stderr.trim() || stdout.trim() || `exit code ${code ?? "unknown"}`;
-      reject(new Error(`${label} failed: ${detail}`));
-    });
-  });
-}
-
-async function installClaudeBinary(): Promise<string> {
-  log("CLAUDE_BINARY_INSTALL_START", `platform=${process.platform}`);
-  try {
-    if (process.platform === "win32") {
-      try {
-        await runInstaller(
-          "powershell",
-          ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", `irm ${CLAUDE_INSTALL_PS1} | iex`],
-          "powershell",
-        );
-      } catch (err) {
-        reportError("CLAUDE_BINARY_INSTALL_ERR", err, { installer: "powershell" });
-        await runInstaller(
-          "cmd",
-          ["/c", `curl -fsSL ${CLAUDE_INSTALL_CMD} -o install.cmd && install.cmd && del install.cmd`],
-          "cmd",
-        );
-      }
-    } else {
-      await runInstaller(
-        "bash",
-        ["-lc", `curl -fsSL ${CLAUDE_INSTALL_SH} | bash`],
-        process.platform,
-      );
-    }
-
-    const resolution = resolveClaudeBinarySync({ allowSdkFallback: false });
-    if (!resolution) {
-      throw new Error("Claude install completed but no executable was found on the system");
-    }
-    log("CLAUDE_BINARY_SELECTED", `strategy=${resolution.strategy} path=${resolution.path}`);
-    return resolution.path;
-  } catch (err) {
-    reportError("CLAUDE_BINARY_INSTALL_ERR", err);
-    throw err;
-  }
-}
-
 export function isClaudeInstalled(): boolean {
-  return resolveClaudeBinarySync({ installIfMissing: false, allowSdkFallback: false }) != null;
-}
-
-export async function getClaudeBinaryPath(options?: ResolveClaudeBinaryOptions): Promise<string> {
-  const source = getSource();
-  if (cachedSource !== source) {
-    cachedPath = null;
-  }
-
-  if (cachedPath && isExecutable(cachedPath)) {
-    return cachedPath;
-  }
-
-  const installIfMissing = options?.installIfMissing ?? true;
-  const allowSdkFallback = options?.allowSdkFallback ?? true;
-
-  const resolution = resolveClaudeBinarySync({ installIfMissing, allowSdkFallback });
-  if (resolution) {
-    cachedPath = resolution.path;
-    cachedSource = source;
-    log("CLAUDE_BINARY_SELECTED", `strategy=${resolution.strategy} path=${resolution.path}`);
-    return resolution.path;
-  }
-
-  if (!installIfMissing || source === "custom") {
-    throw new Error("Claude executable not found");
-  }
-
-  if (!installInFlight) {
-    installInFlight = installClaudeBinary()
-      .then((binaryPath) => {
-        cachedPath = binaryPath;
-        cachedSource = source;
-        return binaryPath;
-      })
-      .finally(() => {
-        installInFlight = null;
-      });
-  }
-
   try {
-    const installedPath = await installInFlight;
-    if (installedPath) return installedPath;
-  } catch (err) {
-    if (allowSdkFallback && source === "auto") {
-      const fallback = resolveSdkFallback();
-      if (fallback) {
-        cachedPath = fallback.path;
-        cachedSource = source;
-        log("CLAUDE_BINARY_FALLBACK_SDK", `path=${fallback.path}`);
-        return fallback.path;
-      }
-    }
-    throw err;
+    return resolveClaudeBinarySync() != null;
+  } catch {
+    return false;
   }
-
-  if (allowSdkFallback && source === "auto") {
-    const fallback = resolveSdkFallback();
-    if (fallback) {
-      cachedPath = fallback.path;
-      cachedSource = source;
-      log("CLAUDE_BINARY_FALLBACK_SDK", `path=${fallback.path}`);
-      return fallback.path;
-    }
-  }
-
-  throw new Error("Claude executable not found");
 }
 
-export function getClaudeBinaryStatus(): { installed: boolean; installing: boolean } {
-  return {
-    installed: isClaudeInstalled(),
-    installing: installInFlight != null,
-  };
+/** Resolve on every call so changed custom paths and system installs take effect immediately. */
+export async function getClaudeBinaryPath(): Promise<string> {
+  const resolution = resolveClaudeBinarySync();
+  if (!resolution) throw new Error(CLAUDE_NOT_FOUND);
+  log("CLAUDE_BINARY_SELECTED", `strategy=${resolution.strategy} path=${resolution.path}`);
+  return resolution.path;
+}
+
+export function getClaudeBinaryStatus(): { installed: boolean } {
+  return { installed: isClaudeInstalled() };
 }
 
 function readClaudeVersion(binaryPath: string): string | null {
@@ -279,28 +86,49 @@ function readClaudeVersion(binaryPath: string): string | null {
   return output || null;
 }
 
-export function getClaudeBinaryMetadata(options?: ResolveClaudeBinaryOptions): {
+export function getClaudeBinaryMetadata(): {
   path: string;
   strategy: ClaudeBinaryResolutionStrategy;
   source: ClaudeBinarySource;
 } | null {
-  const source = getSource();
-  const resolution = resolveClaudeBinarySync(options);
+  const resolution = resolveClaudeBinarySync();
   if (!resolution) return null;
-  return {
-    path: resolution.path,
-    strategy: resolution.strategy,
-    source,
-  };
+  return { ...resolution, source: getSource() };
 }
 
 export async function getClaudeVersion(binaryPath?: string): Promise<string | null> {
   try {
-    if (binaryPath) return readClaudeVersion(binaryPath);
-    const resolution = resolveClaudeBinarySync({ installIfMissing: false, allowSdkFallback: true });
-    if (!resolution) return null;
-    return readClaudeVersion(resolution.path);
+    const selectedPath = binaryPath || resolveClaudeBinarySync()?.path;
+    return selectedPath ? readClaudeVersion(selectedPath) : null;
   } catch {
     return null;
+  }
+}
+
+/** Scan existing installations only; never downloads or changes the selected source. */
+export async function scanClaudeBinaries(): Promise<EngineBinaryScanResult> {
+  try {
+    const paths = await scanSystemExecutables("claude", {
+      extraPaths: [
+        ...(getSource() === "custom" ? [getCustomPath()] : []),
+        ...getEnvironmentPaths(),
+        ...getKnownPaths(),
+      ].filter(Boolean),
+    });
+    const candidates = await scanExecutableVersions(paths);
+    let selectedPath: string | null = null;
+    let error: string | undefined;
+    try {
+      const selected = resolveClaudeBinarySync()?.path;
+      const pathKey = (binaryPath: string) => process.platform === "win32"
+        ? path.win32.resolve(binaryPath).toLowerCase()
+        : path.resolve(binaryPath);
+      selectedPath = candidates.find((candidate) => selected !== undefined && pathKey(candidate.path) === pathKey(selected))?.path ?? null;
+    } catch (selectionError) {
+      error = reportError("CLAUDE_BINARY_SELECTION_ERR", selectionError);
+    }
+    return { candidates, selectedPath, ...(error ? { error } : {}) };
+  } catch (error) {
+    return { candidates: [], selectedPath: null, error: reportError("CLAUDE_BINARY_SCAN_ERR", error) };
   }
 }

@@ -593,10 +593,11 @@ The Browser Panel supports a "grab element" feature that attaches DOM elements f
 
 ### Binary Management
 
-Claude CLI and Codex binaries can be managed downloads or user-provided custom paths:
-- `electron/src/lib/claude-binary.ts` — detects Claude CLI binary: checks `AppSettings.claudeBinaryPath` first, then standard install locations, then managed download path
-- `electron/src/lib/codex-binary.ts` — same pattern for Codex binary
-- Users can configure custom binary paths in Settings → Advanced
+Claude CLI and Codex use existing system installations or user-provided custom paths; the app never installs or copies their runtimes:
+- `electron/src/lib/claude-binary.ts` — resolves the configured custom path or detects installed Claude executables. No automatic SDK CLI fallback.
+- `electron/src/lib/codex-binary.ts` — prioritizes the installed Codex Desktop runtime in its original directory and excludes old isolated app-managed copies from automatic detection.
+- `electron/src/lib/binary-discovery.ts` — discovers all PATH matches and common install locations; manual scans asynchronously refresh persisted Windows PATH and validate versions.
+- Users can scan installations or configure custom paths in Settings → Engines. Legacy `managed` settings normalize to `auto`.
 
 ## Reference Documentation
 
