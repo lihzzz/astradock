@@ -63,7 +63,7 @@ export class ProjectAppRuntimeManager {
     this.dependencies.assertStartAllowed(entry.run.appId, entry.run.workspace.rootPath, entry.run.configRevision);
   }
   async start(app: Extract<ProjectApp, { kind: "managed" }>, binding: WorkspaceBinding, assertAuthorized: () => void = () => {}): Promise<AppRun> {
-    if (this.quitting) throw new ProductivityError("SHUTTING_DOWN", "Harnss is shutting down");
+    if (this.quitting) throw new ProductivityError("SHUTTING_DOWN", "AstraDock is shutting down");
     const runId = randomUUID();
     const env = cleanAppEnvironment(app.launch.env);
     const secrets = Object.entries(env).filter(([key]) => /TOKEN|SECRET|PASSWORD|API_?KEY|PRIVATE_?KEY|CREDENTIAL/i.test(key)).flatMap(([, value]) => value ? [value] : []);

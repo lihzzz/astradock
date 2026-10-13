@@ -1,22 +1,22 @@
 <p align="center">
-  <img src="build/icon.png" width="88" alt="Harnss logo" />
+  <img src="build/icon.png" width="88" alt="AstraDock logo" />
 </p>
 
-# Harnss
+# AstraDock
 
-**把 AI 编程助手、项目上下文和开发工具放进同一个桌面工作区。**
+**把 AI 编程代理、任务交付和开发工具放进同一个桌面工作台。**
 
-**A desktop workspace for AI coding agents, project context, and development tools.**
+**A desktop development workbench for AI coding agents, task delivery, and project tools.**
 
-[简体中文](#zh-cn) · [English](#en) · [Issues](https://github.com/lihzzz/harnss/issues) · [Builds](https://github.com/lihzzz/harnss/actions) · [MIT](LICENSE)
+[简体中文](#zh-cn) · [English](#en) · [Issues](https://github.com/lihzzz/astradock/issues) · [Builds](https://github.com/lihzzz/astradock/actions) · [MIT](LICENSE)
 
 <a id="zh-cn"></a>
 
 ## 简体中文
 
-Harnss 是基于 Electron 与 React 的 AI 编程桌面客户端，面向 macOS、Windows 和 Linux。你可以在一个窗口里运行 Claude Code、Codex、OpenCode 及其他 ACP 兼容代理，管理多个项目和会话，查看工具调用与代码变更，并使用终端、浏览器和 Git 面板完成开发工作。
+AstraDock（原 Harnss）是基于 Electron 与 React 的 AI 编程桌面工作台，面向 macOS、Windows 和 Linux。你可以在一个窗口里运行 Claude Code、Codex、OpenCode 及其他 ACP 兼容代理，管理项目、会话与任务交付，审查代码变更、在引擎间接力，并使用终端、浏览器、Git 和项目应用预览完成开发工作。
 
-本说明对应 [lihzzz/harnss](https://github.com/lihzzz/harnss) 的 **`hy_dev` 开发分支**，版本号见 [package.json](package.json)。快捷输入、批量会话操作、多语种语音和语义搜索已接入，但仍有真实代理、录音质量、性能及跨平台安装包验收未完成；具体证据见[实施与验证记录](docs/productivity-enhancements/implementation-status.md)。
+本说明对应 [lihzzz/astradock](https://github.com/lihzzz/astradock) 的 **`hy_dev` 开发分支**，版本号见 [package.json](package.json)。任务工作台、工作流中心、项目应用，以及快捷输入、批量会话操作、多语种语音和语义搜索已接入当前代码；真实代理、录音质量、性能及跨平台安装包仍有验收未完成，不代表全部功能已在发行版验证通过。已有验收证据与限制见[实施与验证记录](docs/productivity-enhancements/implementation-status.md)。
 
 [开始使用](#zh-start) · [引擎与可选功能](#zh-config) · [开发与打包](#zh-dev) · [数据与隐私](#zh-data) · [常见问题](#zh-help)
 
@@ -28,6 +28,9 @@ Harnss 是基于 Electron 与 React 的 AI 编程桌面客户端，面向 macOS�
 | 项目与工作区 | 用 Spaces 组织项目，切换 Git worktree，分屏查看会话，自定义工具面板布局，归档和恢复历史会话。 |
 | 可读的执行过程 | 查看流式回复、思考内容、工具卡片、命令输出、逐词差异和每轮文件变更；支持 Markdown、Mermaid 和数学公式。 |
 | 集成开发工具 | 多标签终端与浏览器、网页元素上下文、项目文件浏览、Git 暂存与提交、分支切换和 worktree 管理。 |
+| 任务工作台 | 定义目标与验收标准，选择代理执行，保存文件或笔记交付物，逐项验收后接受结果或要求修改。 |
+| 工作流中心 | 在 Inbox 处理权限、阻塞和完成事项；用 Review 查看代码快照并留下反馈，通过 Handoff 交给 Claude 或 Codex 审查、修复或继续。 |
+| 项目应用 | 从 Apps 管理项目启动命令、端口、运行状态、日志与浏览器预览，将应用上下文带入代理会话。 |
 | 历史检索 | 跨项目和 Space 搜索会话，按引擎、日期及归档状态过滤；查看活动热力图和时间线，跳回原始消息。可选本地语义与混合检索。 |
 | 快捷输入与整理 | 系统快捷键唤醒、语音输入、剪贴板分析；会话多选、批量归档、删除和 Markdown 导出，以及工具结果复制。 |
 | 扩展与记忆 | 按项目配置 MCP，浏览 ACP Agent Store 和本机 Skills；可选 Hindsight 长期记忆与 Cua Driver 桌面操作。 |
@@ -49,8 +52,8 @@ Harnss 是基于 Electron 与 React 的 AI 编程桌面客户端，面向 macOS�
 - 原生模块编译环境：安装和打包使用 `scripts/rebuild-native.cjs`。Windows x64 / ARM64 优先使用 `node-pty` 随包提供的预编译文件，并跳过 macOS 专用模块；预编译缺失或指定源码构建时才需要 Python 与 Visual Studio C++ Build Tools。macOS 使用 Xcode Command Line Tools，Linux 使用 Python 与 C/C++ 构建工具。
 
 ```bash
-git clone --branch hy_dev https://github.com/lihzzz/harnss.git
-cd harnss
+git clone --branch hy_dev https://github.com/lihzzz/astradock.git
+cd astradock
 pnpm install
 pnpm dev
 ```
@@ -59,7 +62,7 @@ pnpm dev
 
 `pnpm dev` 同时启动 Vite、Electron 主进程构建监听和桌面窗口。开发服务固定使用 `http://localhost:5173`；端口需可用。
 
-如果希望使用安装包，请查看[本仓库 Releases](https://github.com/lihzzz/harnss/releases) 的具体资产和说明。要体验本说明中的开发分支功能，请使用对应分支源码构建。
+如果希望使用安装包，请查看[本仓库 Releases](https://github.com/lihzzz/astradock/releases) 的具体资产和说明。要体验本说明中的开发分支功能，请使用对应分支源码构建。
 
 #### 第一次使用
 
@@ -67,13 +70,20 @@ pnpm dev
 2. 选择 Claude Code、Codex、OpenCode 或已配置的 ACP 代理，完成该代理要求的登录或 API 配置。
 3. 新建会话并发送任务，在工具卡片中查看执行过程，按所选权限模式处理操作请求。
 4. 打开所需的终端、浏览器、文件或 Git 面板；需要并行处理时，创建其他会话或使用分屏。
-5. 在设置中按需启用历史语义搜索、全局快捷键、长期记忆或桌面操作。
+5. 从侧栏的 **工作流中心（Workflow center）** 打开任务、待处理事项、代码审查与交接；从 **应用（Apps）** 管理项目服务和预览。
+6. 在设置中按需启用历史语义搜索、全局快捷键、长期记忆或桌面操作。
 
-Harnss 提供客户端和工作区；模型访问使用你自己的代理账号或 API 配置。
+AstraDock 提供客户端和工作区；模型访问使用你自己的代理账号或 API 配置。
 
 <a id="zh-config"></a>
 
 ### 引擎与可选功能
+
+#### 任务、审查与项目应用
+
+- **工作流中心 → 任务（Tasks）**：选择项目工作区，填写目标和验收标准，再准备代理会话。代理运行结束后可添加文件或笔记交付物；完成状态由人工验收决定。
+- **工作流中心 → Inbox / Review / Handoff**：集中处理需要关注的会话；对当前 Git 工作树生成快照、选择差异行并添加反馈，将任务摘要交给 Claude 或 Codex 审查、修复或继续。
+- **侧栏 → 应用（Apps）**：添加网站或项目应用，发现项目脚本并配置启动命令、端口与就绪检查，查看日志、打开预览或创建携带应用上下文的会话。自动端口适配支持 Vite 与 Next.js；通用命令可配置固定端口。
 
 #### 选择运行引擎
 
@@ -177,7 +187,9 @@ public/                 静态资源
 
 ### 数据与隐私
 
-应用数据主要保存在 `{userData}/openacpui-data/`，其中 `{userData}` 是 Electron 的用户数据目录，`openacpui-data` 名称为兼容历史版本保留。会话位于 `sessions/`，主进程设置位于 `settings.json`，历史派生索引位于 `history/`，Hindsight 使用 `hindsight/`；部分界面偏好保存在 renderer 的 `localStorage`。
+品牌更名为 AstraDock 后，为继续读取已有会话和设置，Electron 的 `{userData}` 仍使用原 **Harnss** 用户数据目录。`openacpui-data`、`harnss-*` 的 `localStorage` 键和记忆库标识，以及 `.harnss/worktree.json` 配置路径也保留兼容名称。
+
+应用数据主要保存在 `{userData}/openacpui-data/`。会话位于 `sessions/`，主进程设置位于 `settings.json`，历史派生索引位于 `history/`，Hindsight 使用 `hindsight/`；部分界面偏好保存在 renderer 的 `localStorage`。
 
 - 本地用量面板展示消息数量、活跃时长、代理运行时长及工具使用排行。它与向外部发送使用统计的开关独立。
 - 历史语义检索和 Whisper 在模型下载后于本机执行；代理请求和 MCP 服务按各自的配置联网。
@@ -198,7 +210,7 @@ public/                 静态资源
 | 已有 CLI 登录但会话仍要求认证 | 确认应用实际使用的可执行文件和认证环境，在对应引擎的登录流程中完成配置。 |
 | 历史结果不完整 | 查看索引覆盖率与错误，在会话历史设置中重建索引；语义模型准备完成前可先使用关键词搜索。 |
 | 语音或长期记忆首次启动较慢 | 查看模型下载和服务状态；长期记忆还需检查 `uv`、端口与模型连接。 |
-| 快捷键无响应 | 确认已启用并保存、Harnss 仍在运行，以及快捷键状态没有注册冲突。 |
+| 快捷键无响应 | 确认已启用并保存、AstraDock 仍在运行，以及快捷键状态没有注册冲突。 |
 
 ### 参与贡献
 
@@ -212,9 +224,9 @@ public/                 静态资源
 
 ## English
 
-Harnss is an Electron and React desktop client for AI coding workflows on macOS, Windows, and Linux. Run Claude Code, Codex, OpenCode, and other ACP-compatible agents in one window, manage projects and conversations, inspect tool calls and code changes, and work with integrated terminal, browser, and Git panels.
+AstraDock (formerly Harnss) is an Electron and React desktop development workbench for macOS, Windows, and Linux. Run Claude Code, Codex, OpenCode, and other ACP-compatible agents in one window, manage projects, conversations, and task delivery, review changes, hand work between engines, and use integrated terminals, browsers, Git, and project app previews.
 
-This README describes the **`hy_dev` development branch** of [lihzzz/harnss](https://github.com/lihzzz/harnss). See [package.json](package.json) for the version. Quick capture, batch session operations, multilingual dictation, and semantic search are wired into the app, with live-agent, recording-quality, performance, and cross-platform package validation still outstanding. The [implementation and validation record](docs/productivity-enhancements/implementation-status.md) documents the available evidence.
+This README describes the **`hy_dev` development branch** of [lihzzz/astradock](https://github.com/lihzzz/astradock). See [package.json](package.json) for the version. Task Workbench, Workflow center, Project Apps, quick capture, batch session operations, multilingual dictation, and semantic search are wired into the current code. Live-agent, recording-quality, performance, and cross-platform package validation remains incomplete; these features are not all verified in released builds. The [implementation and validation record](docs/productivity-enhancements/implementation-status.md) documents the available evidence and limits.
 
 [Getting started](#en-start) · [Engines and optional features](#en-config) · [Development and packaging](#en-dev) · [Data and privacy](#en-data) · [Troubleshooting](#en-help)
 
@@ -226,6 +238,9 @@ This README describes the **`hy_dev` development branch** of [lihzzz/harnss](htt
 | Projects and workspaces | Organize projects in Spaces, switch Git worktrees, use split chat panes, arrange tool panels, and archive or reopen conversations. |
 | Inspectable execution | Read streamed responses, thinking blocks, tool cards, command output, word-level diffs, and per-turn file changes, with Markdown, Mermaid, and math rendering. |
 | Development tools | Use tabbed terminals and browsers, attach webpage element context, browse project files, stage and commit changes, switch branches, and manage worktrees. |
+| Task Workbench | Define objectives and acceptance criteria, select an agent, collect file or note deliverables, and accept results or request changes after reviewing each criterion. |
+| Workflow center | Handle permissions, blockers, and completed work in Inbox, review code snapshots and leave feedback in Review, and hand work to Claude or Codex for review, fixes, or continuation. |
+| Project Apps | Manage project launch commands, ports, runtime status, logs, and browser previews through Apps, and bring app context into agent conversations. |
 | Conversation history | Search across projects and Spaces, filter by engine, date, or archive status, explore an activity heatmap and timeline, and return to the original message. Local semantic and hybrid search are optional. |
 | Capture and organize | Wake the app with global shortcuts, dictate, analyze clipboard text, select multiple sessions, batch archive/delete/export to Markdown, and copy tool results. |
 | Extensions and memory | Configure MCP per project, browse the ACP Agent Store and local Skills, and optionally enable Hindsight memory or Cua Driver desktop tools. |
@@ -247,8 +262,8 @@ Prepare the following:
 - Native build tools: installation and packaging use `scripts/rebuild-native.cjs`. Windows x64 / ARM64 uses the bundled `node-pty` prebuilds and skips macOS-only modules; Python and Visual Studio C++ Build Tools are needed only when prebuilds are missing or a source build is requested. Use Xcode Command Line Tools on macOS, or Python and C/C++ build tools on Linux.
 
 ```bash
-git clone --branch hy_dev https://github.com/lihzzz/harnss.git
-cd harnss
+git clone --branch hy_dev https://github.com/lihzzz/astradock.git
+cd astradock
 pnpm install
 pnpm dev
 ```
@@ -257,7 +272,7 @@ For an existing checkout, switch to `hy_dev` before installing dependencies and 
 
 `pnpm dev` starts Vite, the Electron build watcher, and the desktop window together. The development server uses `http://localhost:5173`; that port must be available.
 
-For packaged builds, check the assets and notes on [this repository's Releases page](https://github.com/lihzzz/harnss/releases). Build the matching branch from source to use the development features described here.
+For packaged builds, check the assets and notes on [this repository's Releases page](https://github.com/lihzzz/astradock/releases). Build the matching branch from source to use the development features described here.
 
 #### First session
 
@@ -265,13 +280,20 @@ For packaged builds, check the assets and notes on [this repository's Releases p
 2. Select Claude Code, Codex, OpenCode, or a configured ACP agent and complete its login or API setup.
 3. Start a conversation, send a task, and follow execution in the tool cards. Respond to operation requests according to your chosen permission mode.
 4. Open terminal, browser, file, or Git panels as needed. Create more conversations or use split panes for parallel work.
-5. Enable semantic history search, global shortcuts, long-term memory, or desktop tools in settings when needed.
+5. Open **Workflow center** from the sidebar for tasks, Inbox, Review, and Handoff. Open **Apps** to manage project services and previews.
+6. Enable semantic history search, global shortcuts, long-term memory, or desktop tools in settings when needed.
 
-Harnss provides the client and workspace. Model access uses your own agent accounts or API configuration.
+AstraDock provides the client and workspace. Model access uses your own agent accounts or API configuration.
 
 <a id="en-config"></a>
 
 ### Engines and optional features
+
+#### Tasks, review, and project apps
+
+- **Workflow center → Tasks**: choose a project workspace, define the objective and acceptance criteria, and prepare an agent conversation. Attach file or note deliverables after execution; a task completes through human review.
+- **Workflow center → Inbox / Review / Handoff**: handle conversations that need attention, capture the current Git working tree, select diff lines and add feedback, then send a task brief to Claude or Codex for review, fixes, or continuation.
+- **Sidebar → Apps**: save websites or project apps, discover project scripts, configure launch commands, ports, and readiness checks, inspect logs, open previews, or start a conversation with app context. Automatic port selection supports Vite and Next.js adapters; generic commands can use fixed ports.
 
 #### Choose an engine
 
@@ -279,7 +301,7 @@ Harnss provides the client and workspace. Model access uses your own agent accou
 | --- | --- | --- |
 | Claude Code | Anthropic Claude Agent SDK | Select automatic detection, managed installation, or a custom executable in **Settings → Engines**, and configure Claude authentication. |
 | Codex | JSON-RPC app-server | Supports automatic detection, managed download, or a custom path. The app exposes ChatGPT and API key login flows. Features depend on the installed Codex version. |
-| OpenCode | ACP, launched with `opencode acp` | Install and configure OpenCode first. Harnss uses `PATH` unless an absolute executable path is set in engine settings. |
+| OpenCode | ACP, launched with `opencode acp` | Install and configure OpenCode first. AstraDock uses `PATH` unless an absolute executable path is set in engine settings. |
 | Other ACP agents | Agent Client Protocol | Browse **Settings → ACP Agents → Agent Store**, or define the command, arguments, and environment variables in **My Agents**. Runtime and authentication requirements are agent-specific. |
 
 #### MCP and Skills
@@ -291,7 +313,7 @@ Manage MCP servers in the **MCP Servers** panel on the project's right-hand tool
 #### History, quick capture, and dictation
 
 - **History**: find saved content through sidebar search or the history panel. **Settings → Conversation history** enables local semantic search and provides pause, rebuild, and cache-clearing controls. Semantic search is off by default and downloads a multilingual model when enabled. Clearing its cache preserves conversations and keyword search.
-- **Global shortcuts**: enable and save them in **Settings → General**. The suggested wake binding is `CommandOrControl+Shift+Space`; dictation and clipboard analysis start unassigned. Harnss must remain running, and registration conflicts appear in settings.
+- **Global shortcuts**: enable and save them in **Settings → General**. The suggested wake binding is `CommandOrControl+Shift+Space`; dictation and clipboard analysis start unassigned. AstraDock must remain running, and registration conflicts appear in settings.
 - **Clipboard analysis**: the dedicated shortcut sends copied text to a new conversation using the selected project and agent. Choose a destination on first use.
 - **Dictation**: select native dictation or Whisper in General settings. Native dictation integration is for macOS. Whisper uses a pinned multilingual `whisper-tiny` model and transcribes locally after the initial download. Windows users can also use system voice typing with `Win+H`.
 
@@ -375,7 +397,9 @@ public/                 Static assets
 
 ### Data and privacy
 
-Most application data lives in `{userData}/openacpui-data/`, where `{userData}` is Electron's user data directory. The `openacpui-data` name is retained for compatibility. Conversations live in `sessions/`, main-process settings in `settings.json`, the derived history index in `history/`, and Hindsight data in `hindsight/`. Some interface preferences use renderer `localStorage`.
+After the AstraDock rename, Electron's `{userData}` continues to use the original **Harnss** user data directory to preserve existing conversations and settings. The `openacpui-data` directory, `harnss-*` localStorage keys and memory bank identifiers, and `.harnss/worktree.json` configuration path also retain their compatibility names.
+
+Most application data lives in `{userData}/openacpui-data/`. Conversations live in `sessions/`, main-process settings in `settings.json`, the derived history index in `history/`, and Hindsight data in `hindsight/`. Some interface preferences use renderer `localStorage`.
 
 - The local usage dashboard shows message counts, active time, agent runtime, and tool rankings. It operates independently of the external usage-reporting toggle.
 - Semantic history search and Whisper inference run locally after model downloads. Agent requests and MCP servers use the network according to their configuration.
@@ -396,7 +420,7 @@ Development logs are in the repository's `logs/main-*.log`; packaged application
 | CLI login exists but the session asks for authentication | Confirm which executable and authentication environment the app uses, then complete the corresponding engine's login flow. |
 | Incomplete history results | Inspect index coverage and errors, then rebuild in Conversation history settings. Use keyword search while the semantic model prepares. |
 | Slow first launch of dictation or memory | Check model downloads and service status. For memory, also check `uv`, the port, and model connectivity. |
-| Shortcut does nothing | Verify that shortcuts are enabled and saved, Harnss is running, and registration status reports no conflict. |
+| Shortcut does nothing | Verify that shortcuts are enabled and saved, AstraDock is running, and registration status reports no conflict. |
 
 ### Contributing
 
@@ -408,6 +432,6 @@ Include the operating system, architecture, app version, agent, reproduction ste
 
 ## 许可与致谢 / License and acknowledgements
 
-Harnss 使用 [MIT 许可证](LICENSE)，保留上游版权声明。第三方素材另见 [Lucide 图标许可](licenses/lucide-waypoints-ISC.txt) 和 [ModelTrace 许可](shared/lib/fingerprint/LICENSE-ModelTrace.txt)。
+AstraDock 使用 [MIT 许可证](LICENSE)，保留上游版权声明。第三方素材另见 [Lucide 图标许可](licenses/lucide-waypoints-ISC.txt) 和 [ModelTrace 许可](shared/lib/fingerprint/LICENSE-ModelTrace.txt)。
 
-Harnss is licensed under [MIT](LICENSE) and retains the upstream copyright notice. See the [Lucide icon license](licenses/lucide-waypoints-ISC.txt) and [ModelTrace license](shared/lib/fingerprint/LICENSE-ModelTrace.txt) for those third-party materials.
+AstraDock is licensed under [MIT](LICENSE) and retains the upstream copyright notice. See the [Lucide icon license](licenses/lucide-waypoints-ISC.txt) and [ModelTrace license](shared/lib/fingerprint/LICENSE-ModelTrace.txt) for those third-party materials.

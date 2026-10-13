@@ -106,7 +106,7 @@ async function afterPackHook(context) {
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
   appId: "com.harnss.app",
-  productName: "Harnss",
+  productName: "AstraDock",
 
   directories: {
     output: "release/${version}",
@@ -115,7 +115,7 @@ module.exports = {
 
   // --- ASAR packing ---
   asar: true,
-  extraResources: [{ from: "build/icon.png", to: "harnss-tray.png" }],
+  extraResources: [{ from: "build/icon.png", to: "astradock-tray.png" }],
   asarUnpack: [
     "node_modules/onnxruntime-node/**",
     "node_modules/node-pty/**",
@@ -175,7 +175,7 @@ module.exports = {
     entitlements: "build/entitlements.mac.plist",
     entitlementsInherit: "build/entitlements.mac.plist",
     extendInfo: {
-      NSMicrophoneUsageDescription: "Harnss uses the microphone for voice dictation to transcribe speech into text.",
+      NSMicrophoneUsageDescription: "AstraDock uses the microphone for voice dictation to transcribe speech into text.",
     },
   },
 

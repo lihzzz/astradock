@@ -149,7 +149,7 @@ async function runFingerprintProbe({ model, effort }: CodexFingerprintProbeReque
 
   try {
     await rpc.request<CodexInitializeResponse>("initialize", {
-      clientInfo: { name: "Harnss", title: "Harnss", version: app.getVersion() },
+      clientInfo: { name: "AstraDock", title: "AstraDock", version: app.getVersion() },
       capabilities: { experimentalApi: true },
     });
     rpc.notify("initialized", {});

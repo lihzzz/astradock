@@ -61,7 +61,7 @@ export class ProjectAppsStore {
           port: item.port === null ? null : appNumber(item.port, "port", 1, 65535), url: typeof item.url === "string" ? item.url : null,
           startedAt: appNumber(item.startedAt, "startedAt", 0, Number.MAX_SAFE_INTEGER), endedAt: interrupted ? Date.now() : typeof item.endedAt === "number" ? item.endedAt : null,
           exitCode: typeof item.exitCode === "number" ? item.exitCode : null, cleanupPending: false,
-          error: interrupted ? { code: "INTERRUPTED", message: "Harnss exited before this run was confirmed stopped. An external process may still occupy its port.", retryable: true }
+          error: interrupted ? { code: "INTERRUPTED", message: "AstraDock exited before this run was confirmed stopped. An external process may still occupy its port.", retryable: true }
             : item.error !== null && typeof item.error === "object" && "message" in item.error && typeof item.error.message === "string"
               ? { code: "PREVIOUS_RUN_FAILED", message: item.error.message, retryable: true } : null };
         runs.push(run);

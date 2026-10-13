@@ -8,7 +8,7 @@ async function main(): Promise<void> {
   const endpoint = new URL(process.env.HARNSS_PROJECT_APPS_URL ?? "");
   const token = process.env.HARNSS_PROJECT_APPS_TOKEN;
   if (endpoint.protocol !== "http:" || endpoint.hostname !== "127.0.0.1" || endpoint.pathname !== "/call" || !token) {
-    throw new Error("Invalid Harnss application bridge configuration.");
+    throw new Error("Invalid AstraDock application bridge configuration.");
   }
   const server = new Server({ name: "harnss-apps", version: "1.0.0" }, { capabilities: { tools: {} } });
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: PROJECT_APP_AGENT_TOOLS }));

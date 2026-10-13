@@ -24,12 +24,12 @@ export const AdvancedSettings = memo(function AdvancedSettings({
   const { t } = useI18n();
   const backgroundProcessLimit = useSettingsStore((s) => s.backgroundProcessLimit);
   const setBackgroundProcessLimit = useSettingsStore((s) => s.setBackgroundProcessLimit);
-  const [codexClientName, setCodexClientName] = useState("Harnss");
+  const [codexClientName, setCodexClientName] = useState("AstraDock");
   const [showDevFillInChatTitleBar, setShowDevFillInChatTitleBar] = useState(false);
 
   useEffect(() => {
     if (appSettings) {
-      setCodexClientName(appSettings.codexClientName || "Harnss");
+      setCodexClientName(appSettings.codexClientName || "AstraDock");
       setShowDevFillInChatTitleBar(!!appSettings.showDevFillInChatTitleBar);
     }
   }, [appSettings]);
@@ -78,7 +78,7 @@ export const AdvancedSettings = memo(function AdvancedSettings({
                 }}
                 spellCheck={false}
                 className="h-8 w-40 rounded-md border border-foreground/10 bg-background px-2.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground hover:border-foreground/20 focus:border-foreground/30 focus:ring-1 focus:ring-foreground/20"
-                placeholder="Harnss"
+                placeholder="AstraDock"
               />
             </SettingRow>
 

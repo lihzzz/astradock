@@ -30,7 +30,7 @@ export class TaskService {
     for (const run of loaded.runs) {
       if (!isActiveTaskRun(run.status)) continue;
       run.status = "interrupted";
-      run.error = "Harnss restarted. Inspect the conversation and files before preparing a new attempt; no work was automatically replayed.";
+      run.error = "AstraDock restarted. Inspect the conversation and files before preparing a new attempt; no work was automatically replayed.";
       run.updatedAt = Date.now(); changed = true;
       const task = loaded.tasks.find((entry) => entry.id === run.taskId && entry.latestRunId === run.id);
       if (task) { task.status = "interrupted"; task.revision++; task.updatedAt = run.updatedAt; }

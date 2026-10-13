@@ -86,10 +86,10 @@ export async function getSDK(): Promise<SDKQueryFn> {
  * Environment variables that identify the app to the Claude backend.
  * The SDK reads CLAUDE_AGENT_SDK_CLIENT_APP and includes it in the User-Agent header,
  * letting Anthropic distinguish sessions from CLI / other clients.
- * Uses the custom client name from settings (defaults to "Harnss").
+ * Uses the custom client name from settings (defaults to "AstraDock").
  */
 export function clientAppEnv(): Record<string, string> {
-  const clientName = getAppSetting("codexClientName") || "Harnss";
+  const clientName = getAppSetting("codexClientName") || "AstraDock";
   return { CLAUDE_AGENT_SDK_CLIENT_APP: `${clientName}/${app.getVersion()}` };
 }
 

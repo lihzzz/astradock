@@ -1,3 +1,4 @@
+import "./lib/app-profile";
 import { execSync } from "child_process";
 import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, powerMonitor, screen, session, shell, systemPreferences, Tray, webContents } from "electron";
 import path from "path";
@@ -150,18 +151,18 @@ function showMainWindow(): void {
 
 function updateRecoveryEntry(): void {
   const template: Electron.MenuItemConstructorOptions[] = [
-    { label: "Show Harnss", click: showMainWindow },
-    { label: "Quit Harnss", click: () => app.quit() },
+    { label: "Show AstraDock", click: showMainWindow },
+    { label: "Quit AstraDock", click: () => app.quit() },
   ];
   if (process.platform === "darwin") { app.dock?.setMenu(Menu.buildFromTemplate(template)); return; }
   if (!getAppSettings().globalShortcuts.enabled) { tray?.destroy(); tray = null; return; }
   if (tray) return;
   try {
-    const iconPath = app.isPackaged ? path.join(process.resourcesPath, "harnss-tray.png") : path.join(__dirname, "../../build/icon.png");
+    const iconPath = app.isPackaged ? path.join(process.resourcesPath, "astradock-tray.png") : path.join(__dirname, "../../build/icon.png");
     const icon = nativeImage.createFromPath(iconPath);
     if (icon.isEmpty()) throw new Error("Tray icon is unavailable");
     tray = new Tray(icon.resize({ width: 20, height: 20 }));
-    tray.setToolTip("Harnss");
+    tray.setToolTip("AstraDock");
     tray.setContextMenu(Menu.buildFromTemplate(template));
     tray.on("double-click", showMainWindow);
   } catch (error) { reportError("SHORTCUTS:TRAY_ERR", error); tray = null; }
@@ -182,8 +183,8 @@ app.on("before-quit", (event) => {
       reportError("PROJECT_APPS:QUIT", error);
       const chinese = app.getLocale().startsWith("zh");
       const response = await dialog.showMessageBox({
-        type: "error", title: "Harnss",
-        message: chinese ? "部分应用未能停止，Harnss 暂时保留运行。" : "Some applications could not be stopped. Harnss is still running.",
+        type: "error", title: "AstraDock",
+        message: chinese ? "部分应用未能停止，AstraDock 暂时保留运行。" : "Some applications could not be stopped. AstraDock is still running.",
         detail: error instanceof Error ? error.message : String(error),
         buttons: chinese ? ["重试", "取消退出", "强制退出"] : ["Retry", "Cancel quit", "Force quit"],
         defaultId: 0, cancelId: 1, noLink: true,
@@ -570,7 +571,7 @@ function openDevToolsWindow(): void {
         devToolsWindow = new BrowserWindow({
           width: 1000,
           height: 700,
-          title: "Harnss DevTools",
+          title: "AstraDock DevTools",
           webPreferences: {
             contextIsolation: true,
             nodeIntegration: false,

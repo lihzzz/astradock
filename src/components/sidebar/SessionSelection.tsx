@@ -62,7 +62,7 @@ export function SessionSelection({ children, sessions, scopeLabel }: { children:
     if (!selected.length) return;
     if (action === "delete") {
       const running = selected.filter((session) => session.isProcessing).length;
-      const confirmation = `${t("Permanently delete selected conversations?")}\n${t("Selected")}: ${selected.length}\n${t("Running")}: ${running}\n${t("Scope")}: ${scopeLabel}\n${t("This removes Harnss history. Agent CLI history and long-term memory are managed separately.")}`;
+      const confirmation = `${t("Permanently delete selected conversations?")}\n${t("Selected")}: ${selected.length}\n${t("Running")}: ${running}\n${t("Scope")}: ${scopeLabel}\n${t("This removes AstraDock history. Agent CLI history and long-term memory are managed separately.")}`;
       if (!window.confirm(confirmation)) return;
     }
     setBusy(true);

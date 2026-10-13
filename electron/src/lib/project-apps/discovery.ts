@@ -28,7 +28,7 @@ export async function discoverApps(workspace: WorkspaceBinding, cwd: string): Pr
   if (managers.size > 1) warnings.push("Multiple package managers detected; choose the command appropriate for this project.");
   const candidates: AppDiscoveryCandidate[] = [];
   for (const manager of managers) {
-    if (!findExecutable(manager, { cwd })) warnings.push(`${manager} is not installed or is not on Harnss's PATH.`);
+    if (!findExecutable(manager, { cwd })) warnings.push(`${manager} is not installed or is not on AstraDock's PATH.`);
     for (const [script, command] of Object.entries(scripts)) {
       if (typeof command !== "string" || script.startsWith("-") || /[\r\n]/.test(script)) continue;
       // Only direct framework commands receive adapter parameters. Wrappers and

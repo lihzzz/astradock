@@ -1,17 +1,17 @@
 {
-  "name": "harnss",
+  "name": "astradock",
   "version": "0.3.0",
-  "productName": "Harnss",
-  "description": "Harness your AI coding agents — one desktop app for Claude Code, Codex, and any ACP agent",
+  "productName": "AstraDock",
+  "description": "A desktop development workbench for Claude Code, Codex, and ACP agents, with tasks, tools, and project context.",
   "author": {
     "name": "Dejan Zegarac",
     "email": "dejanzegarac3@gmail.com"
   },
   "license": "MIT",
-  "homepage": "https://github.com/OpenSource03/harnss",
+  "homepage": "https://github.com/lihzzz/astradock",
   "repository": {
     "type": "git",
-    "url": "https://github.com/OpenSource03/harnss.git"
+    "url": "https://github.com/lihzzz/astradock.git"
   },
   "main": "electron/dist/main.js",
   "scripts": {

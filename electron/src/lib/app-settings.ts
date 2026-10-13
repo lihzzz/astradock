@@ -49,7 +49,7 @@ const DEFAULTS: AppSettings = {
   preferredEditor: "auto",
   voiceDictation: "native",
   notifications: NOTIFICATION_DEFAULTS,
-  codexClientName: "Harnss",
+  codexClientName: "AstraDock",
   codexBinarySource: "auto",
   codexComputerUseEnabled: false,
   computerUseEnabled: false,

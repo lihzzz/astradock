@@ -19,7 +19,7 @@ export const TASKS_EN = {
   tasksSelect: "Select a task to inspect its attempts and deliverables.", tasksAttempt: "Attempt", tasksReadOnly: "Previous attempts and accepted results are retained read-only.",
   tasksLaunchUnavailable: "The selected project or agent is unavailable.", tasksDraftConflict: "Send or clear your unsent text and attachments first. They have been preserved.",
   tasksDraftFailed: "The execution draft could not be inserted. Its task record was interrupted; existing text was preserved.",
-  tasksChatUnavailable: "This conversation has not been saved or is no longer available.", tasksRunEndedHint: "If interrupted or failed, inspect the conversation and files before retrying. Harnss does not automatically replay work.",
+  tasksChatUnavailable: "This conversation has not been saved or is no longer available.", tasksRunEndedHint: "If interrupted or failed, inspect the conversation and files before retrying. AstraDock does not automatically replay work.",
   tasksLoadWorkspaces: "Loading workspaces…", tasksNoWorkspaces: "No valid workspace is available.", tasksRecords: "records",
 };
 export const TASKS_ZH: Record<keyof typeof TASKS_EN, string> = {
@@ -43,6 +43,6 @@ export const TASKS_ZH: Record<keyof typeof TASKS_EN, string> = {
   tasksSelect: "选择任务，查看执行记录与成果。", tasksAttempt: "执行尝试", tasksReadOnly: "历史尝试及已验收成果保持只读。",
   tasksLaunchUnavailable: "所选项目或 Agent 不可用。", tasksDraftConflict: "请先发送或清空未发送的文字与附件，现有输入已保留。",
   tasksDraftFailed: "未能填入执行草稿。该任务尝试已中断，原有输入未被覆盖。",
-  tasksChatUnavailable: "关联会话尚未保存或已不可用。", tasksRunEndedHint: "中断或失败后，请先检查会话和文件再重试。Harnss 不会自动重放工作。",
+  tasksChatUnavailable: "关联会话尚未保存或已不可用。", tasksRunEndedHint: "中断或失败后，请先检查会话和文件再重试。AstraDock 不会自动重放工作。",
   tasksLoadWorkspaces: "正在加载工作区…", tasksNoWorkspaces: "没有有效工作区。", tasksRecords: "条记录",
 };

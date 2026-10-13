@@ -146,7 +146,7 @@ export const MemorySettings = memo(function MemorySettings({ appSettings, onUpda
   }, [editingText]);
 
   const invalidateFact = useCallback(async (fact: MemoryFact) => {
-    const result = await window.claude.memory.updateMemory(fact.bankId, fact.id, { state: "invalidated", reason: "Invalidated from Harnss memory browser" });
+    const result = await window.claude.memory.updateMemory(fact.bankId, fact.id, { state: "invalidated", reason: "Invalidated from AstraDock memory browser" });
     if (result.error) setMessage(result.error);
     else setFacts((current) => current.filter((item) => !(item.id === fact.id && item.bankId === fact.bankId)));
   }, []);

@@ -23,7 +23,7 @@ export function ProjectAppManifest({ mode, initialContent, projects, activeSpace
   };
   const download = () => {
     const url = URL.createObjectURL(new Blob([content], { type: "application/json" }));
-    const anchor = document.createElement("a"); anchor.href = url; anchor.download = "harnss-apps.json"; anchor.click();
+    const anchor = document.createElement("a"); anchor.href = url; anchor.download = "astradock-apps.json"; anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   return <Dialog open onOpenChange={(open) => { if (!open && !busy) onClose(); }}><AppDialogContent className="sm:max-w-2xl"><DialogHeader><DialogTitle>{t(mode === "import" ? "appsImport" : "appsExport")}</DialogTitle><DialogDescription>{t(mode === "import" ? "appsImportHint" : "appsExportHint")}</DialogDescription></DialogHeader>
