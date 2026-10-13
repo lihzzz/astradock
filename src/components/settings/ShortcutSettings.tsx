@@ -37,7 +37,7 @@ export const ShortcutSettings = memo(function ShortcutSettings({ appSettings, on
     finally { setBusy(false); }
   }
   return <SettingsSection icon={Keyboard} label={t("Global shortcuts")}>
-    <SettingRow label={t("Enable global shortcuts")} description={t("Use Harnss while another app is in front. Harnss must remain running.")}>
+    <SettingRow label={t("Enable global shortcuts")} description={t("Use AstraDock while another app is in front. AstraDock must remain running.")}>
       <Switch aria-label={t("Enable global shortcuts")} checked={draft.enabled} disabled={busy || !appSettings} onCheckedChange={(enabled) => setDraft({ ...draft, enabled })} />
     </SettingRow>
     {actions.map(({ action, label }) => <div key={action} className="py-2">
@@ -48,7 +48,7 @@ export const ShortcutSettings = memo(function ShortcutSettings({ appSettings, on
       <p className="text-xs text-muted-foreground" role="status">{status.find((item) => item.action === action)?.error?.message ?? (status.find((item) => item.action === action)?.registered ? t("Active") : t("Inactive"))}</p>
     </div>)}
     <p className="py-2 text-xs text-muted-foreground">{t("Example: CommandOrControl+Shift+Space. Leave a shortcut blank to unassign it.")}</p>
-    <SettingRow label={t("Keep running when closing the window")} description={t("Reopen from the Dock or system tray. Choose Quit to stop Harnss.")}>
+    <SettingRow label={t("Keep running when closing the window")} description={t("Reopen from the Dock or system tray. Choose Quit to stop AstraDock.")}>
       <Switch aria-label={t("Keep running when closing the window")} checked={draft.keepAliveOnClose} disabled={busy || !appSettings} onCheckedChange={(keepAliveOnClose) => setDraft({ ...draft, keepAliveOnClose })} />
     </SettingRow>
     {error && <p role="alert" className="py-2 text-sm text-destructive">{error}</p>}

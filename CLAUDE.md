@@ -1,6 +1,10 @@
-# Harnss
+# AstraDock
 
-Open-source desktop client for the Agent Client Protocol. Uses the `@anthropic-ai/claude-agent-sdk` to programmatically manage Claude sessions via `query()`. Supports multiple concurrent sessions with persistent chat history, project workspaces, background agents, tool permissions, and context compaction.
+Open-source, multi-engine desktop development workspace for Claude Code, Codex, and ACP agents. Combines persistent and concurrent agent sessions, project workspaces, Git/worktrees, terminal/browser/file tools, task deliverables and acceptance, cross-engine review and handoff, project app runtimes, searchable history, and optional Hindsight memory.
+
+## Naming and data compatibility
+
+AstraDock is the public product name; `astradock` is the package and repository name. Keep `com.harnss.app`, the `Harnss` user-data directory, `openacpui-data`, `harnss-*` storage/theme keys, `.harnss/worktree.json`, memory bank/profile IDs, and `harnss_apps`/`harnss_cua` protocol identifiers for upgrade and data compatibility. `electron/src/lib/app-profile.ts` must be the first import in `main.ts`, before modules that read data paths; it preserves the legacy profile while respecting `--user-data-dir` overrides.
 
 ## Tech Stack
 
@@ -611,7 +615,7 @@ Always search the web when needed for up-to-date API references, Electron APIs, 
 **Release notes format**:
 - Start with `## What's New` (for feature releases) or `## Changes` (for smaller releases)
 - Group changes under `### Emoji Section Title` headers (e.g., `### 🌳 Git Worktree Management`)
-- End with `---` separator and `**Full Changelog**: https://github.com/OpenSource03/harnss/compare/v{prev}...v{current}`
+- End with `---` separator and `**Full Changelog**: https://github.com/lihzzz/astradock/compare/v{prev}...v{current}`
 - Use `gh release create` with tag, then `gh release edit` to set title + notes
 - **Write for users, not developers** — describe what the user *experiences*, never mention internal names, library names, or implementation details. "Long conversations are dramatically faster" not "replaced content-visibility with @tanstack/react-virtual". Full guidance in `.claude/skills/release/references/release-notes-template.md`.
 
@@ -635,7 +639,7 @@ Always search the web when needed for up-to-date API references, Electron APIs, 
 Types shared between electron and renderer live in `shared/types/`. Both tsconfigs include this directory via `@shared/*` path alias.
 
 - **`shared/types/codex-protocol/`** — auto-generated from `codex app-server generate-ts`. Contains v1, v2, and serde_json type families. Used by both electron Codex handlers and renderer hooks.
-- **`shared/types/codex.ts`** — re-exports with `Codex`-prefixed aliases (e.g., `CodexThreadItem`, `CodexSessionEvent`) plus Harnss-specific wrappers (`CodexApprovalRequest`, `CodexRequestUserInputRequest`).
+- **`shared/types/codex.ts`** — re-exports with `Codex`-prefixed aliases (e.g., `CodexThreadItem`, `CodexSessionEvent`) plus AstraDock-specific wrappers (`CodexApprovalRequest`, `CodexRequestUserInputRequest`).
 - **`shared/types/engine.ts`** — `EngineId`, `AppPermissionBehavior`, `SlashCommand`, `RespondPermissionFn`. No React or renderer dependencies.
 - **`src/types/engine-hook.ts`** — `EngineHookState`, `BackgroundSessionSnapshot`. React-dependent engine types that live in the renderer layer.
 - **`src/types/agents.ts`** — `BackgroundAgent`, `BackgroundAgentActivity`, `BackgroundAgentUsage`. Renderer-only types for tracking background Task agents (status, activity log, live usage metrics, progress summary, current tool).

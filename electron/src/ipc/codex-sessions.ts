@@ -117,7 +117,7 @@ export async function hasConfiguredCodexAccount(cwd: string): Promise<boolean> {
 }
 
 function getAppServerClientInfo(): { name: string; title: string; version: string } {
-  const clientName = getAppSetting("codexClientName") || "Harnss";
+  const clientName = getAppSetting("codexClientName") || "AstraDock";
   return {
     name: clientName,
     title: clientName,
@@ -130,7 +130,7 @@ function getCodexAppServerArgs(sessionId?: string): string[] {
   const computerUse = getComputerUseMcpServer();
   if (computerUse) {
     args.push("--enable", "computer_use");
-    // Codex app-server supports -c overrides, so Harnss can inject the
+    // Codex app-server supports -c overrides, so AstraDock can inject the
     // runtime without mutating the user's ~/.codex/config.toml.
     args.push(...getCodexMcpServerOverrides(computerUse));
   }

@@ -90,7 +90,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Harnss-mac
+          name: AstraDock-mac
           path: |
             release/**/*.dmg
             release/**/*.zip
@@ -147,7 +147,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Harnss-win
+          name: AstraDock-win
           path: |
             release/**/*.exe
             release/**/*.yml
@@ -246,7 +246,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Harnss-linux
+          name: AstraDock-linux
           path: |
             release/**/*.AppImage
             release/**/*.deb

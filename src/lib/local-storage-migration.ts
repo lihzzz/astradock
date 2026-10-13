@@ -35,6 +35,6 @@ export function migrateLocalStorage(): void {
 
   if (migrated > 0) {
     // eslint-disable-next-line no-console
-    console.log(`[Harnss] Migrated ${migrated} localStorage keys from openacpui-* → harnss-*`);
+    console.log(`[AstraDock] Migrated ${migrated} localStorage keys from openacpui-* → harnss-*`);
   }
 }

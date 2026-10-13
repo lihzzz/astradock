@@ -157,7 +157,7 @@ export const EngineSettings = memo(function EngineSettings({
           <SettingsSection icon={Server} label="Claude Code" first>
             <SettingRow
               label="Claude binary source"
-              description="Choose how Harnss resolves the Claude executable."
+              description="Choose how AstraDock resolves the Claude executable."
             >
               <SettingsSelect
                 value={claudeBinarySource}
@@ -195,7 +195,7 @@ export const EngineSettings = memo(function EngineSettings({
           <SettingsSection icon={Server} label="Codex">
             <SettingRow
               label="Codex binary source"
-              description="Choose how Harnss resolves the Codex executable."
+              description="Choose how AstraDock resolves the Codex executable."
             >
               <SettingsSelect
                 value={codexBinarySource}
