@@ -2,7 +2,7 @@ import { getMemoryClient } from "../lib/memory/client";
 import { assertMainRenderer } from "../lib/productivity-ipc";
 import { readProjects } from "./projects";
 import { projectBankId } from "../lib/memory/bank-router";
-import { invalidateMemoryCache, retainProjectMemory } from "../lib/memory/service";
+import { getMemoryRecallState, setSkipNextMemoryRecall, invalidateMemoryCache, retainProjectMemory } from "../lib/memory/service";
 import { BrowserWindow, ipcMain } from "electron";
 import type { MemoryProjectConfig } from "@shared/types/memory";
 import { getAppSettings, setAppSettings } from "../lib/app-settings";
@@ -42,6 +42,14 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     if (typeof id !== "string" || !readProjects().some((entry) => entry.id === id)) throw new Error("Project unavailable");
     return id;
   };
+  handle("memory:session-recall", (_event, id: unknown) => {
+    if (typeof id !== "string") throw new Error("Session ID required");
+    return { state: getMemoryRecallState(id) };
+  });
+  handle("memory:skip-next-recall", (_event, data: { sessionId?: unknown; skip?: unknown }) => {
+    if (typeof data?.sessionId !== "string" || typeof data.skip !== "boolean") throw new Error("Session and skip flag required");
+    setSkipNextMemoryRecall(data.sessionId, data.skip); return { ok: true };
+  });
   handle("memory:get-document", async (_event, data: { bankId?: unknown; documentId?: unknown }) => {
     if (typeof data?.bankId !== "string" || typeof data.documentId !== "string") throw new Error("Document identifiers required");
     const client = await getMemoryClient();

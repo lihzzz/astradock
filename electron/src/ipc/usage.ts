@@ -5,23 +5,25 @@ import { getDataDir } from "../lib/data-dir";
 import { UsageHistory } from "../lib/usage-history";
 import { flushUsage, getUsageTracker, startUsageTracking } from "../lib/usage";
 import { log } from "../lib/logger";
+import { reportError } from "../lib/error-utils";
+import { getTokenUsage } from "../lib/token-usage";
 
 export function register(getMainWindow: () => BrowserWindow | null): void {
   let history: UsageHistory | undefined;
   ipcMain.handle("usage:get", async (event, range: unknown) => {
     if (event.sender !== getMainWindow()?.webContents) return { error: "Unknown usage client" };
-    if (range !== 7 && range !== 30 && range !== 90) return { error: "Invalid usage range" };
+    if (range !== 1 && range !== 7 && range !== 30 && range !== 90) return { error: "Invalid usage range" };
     try {
       await flushUsage();
       history ??= new UsageHistory(path.join(getDataDir(), "sessions"));
       const result = await history.read();
       const tracker = getUsageTracker();
       tracker.checkpoint();
-      const data = buildUsageReport(result.sessions, tracker.data, range);
+      const data = buildUsageReport(result.sessions, tracker.data, range, getTokenUsage());
       data.incompleteHistory = result.incomplete;
       return { data };
     } catch (error) {
-      log("USAGE_READ_ERR", error);
+      reportError("USAGE_READ_ERR", error);
       return { error: "Could not read local usage statistics" };
     }
   });

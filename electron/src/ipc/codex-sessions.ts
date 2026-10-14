@@ -25,6 +25,7 @@ import {
 import { getHindsightCodexMcpOverrides, registerMemorySession, unregisterMemorySession, beforeMemorySend, observeCodexNotification, completeMemoryTurn } from "../lib/memory/service";
 import { cancelProjectAppAgentPermissions, registerProjectAppAgentSession, revokeProjectAppAgentSession, getProjectAppMcpServer } from "../lib/project-apps/agent-bridge";
 import { beginUsageTurn, endUsageTurn, stopUsageSession } from "../lib/usage";
+import { createCodexTokenObserver } from "../lib/token-usage";
 import { observeCodexTaskEvent } from "../lib/tasks/engine-events";
 import { taskRuntimeEvents } from "../lib/tasks/runtime-events";
 import { getSessionRepository } from "../lib/session-service";
@@ -62,6 +63,7 @@ interface CodexSession {
   eventCounter: number;
   cwd: string;
   model?: string;
+  fingerprintSettings: { model: string; effort: string | null; provider: string } | null;
   /** Approval policy for the session — passed to turn/start and lazy thread/start */
   approvalPolicy?: string;
   /** Sandbox policy for the session — passed to lazy thread/start */
@@ -99,6 +101,13 @@ export async function stopForDeletion(sessionId: string): Promise<void> {
 /** Expose the currently selected model for utility prompts (title/commit generation). */
 export function getCodexSessionModel(internalId: string): string | undefined {
   return codexSessions.get(internalId)?.model;
+}
+
+/** Read-only hints for a private fingerprint fork; never sends a turn to the user's session. */
+export function getCodexFingerprintTarget(internalId: string) {
+  const session = codexSessions.get(internalId);
+  if (!session?.threadId || !session.fingerprintSettings) return null;
+  return { threadId: session.threadId, cwd: session.cwd, ...session.fingerprintSettings };
 }
 
 /** Check the target project's account configuration before dispatching clipboard text. */
@@ -333,6 +342,7 @@ async function ensureCodexThread(session: CodexSession): Promise<string> {
     if (session.sandbox) threadParams.sandbox = session.sandbox;
     const threadResult = await session.rpc.request<CodexThreadStartResponse>("thread/start", threadParams);
     session.threadId = threadResult.thread.id;
+    session.fingerprintSettings = { model: threadResult.model, effort: threadResult.reasoningEffort, provider: threadResult.modelProvider };
     log("codex", ` Thread lazily started: session=${shortId(session.internalId, 12)} thread=${shortId(session.threadId, 12)}`);
     return session.threadId;
   })();
@@ -413,7 +423,9 @@ function setupCodexHandlers(
   session: CodexSession,
   internalId: string,
   getMainWindow: () => BrowserWindow | null,
+  resumed: boolean,
 ): void {
+  const tokenObserver = createCodexTokenObserver(resumed);
   rpc.onStderr = (text) => {
     log("codex", `[stderr:${internalId.slice(0, 8)}] ${text.slice(0, 500)}`);
   };
@@ -459,6 +471,7 @@ function setupCodexHandlers(
     }
 
     observeCodexTaskEvent(internalId, notification.method, notification.params);
+    tokenObserver.observe(notification.method, notification.params, session.threadId);
 
     // Track active turn from turn events
     if (notification.method === "turn/started") {
@@ -566,6 +579,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
           eventCounter: 0,
           cwd: options.cwd,
           model: undefined,
+          fingerprintSettings: null,
           approvalPolicy: options.approvalPolicy,
           sandbox: options.sandbox,
           goalSupport: "unknown",
@@ -575,7 +589,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
           runtimeLease,
         };
         codexSessions.set(internalId, session);
-        setupCodexHandlers(rpc, session, internalId, getMainWindow);
+        setupCodexHandlers(rpc, session, internalId, getMainWindow, false);
 
         // ── Initialize handshake ──
         const initResult = await rpc.request<CodexInitializeResponse>("initialize", {
@@ -639,6 +653,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
         const threadResult = await rpc.request<CodexThreadStartResponse>("thread/start", threadParams);
         assertCodexSessionActive(session);
         session.threadId = threadResult.thread.id;
+        session.fingerprintSettings = { model: threadResult.model, effort: threadResult.reasoningEffort, provider: threadResult.modelProvider };
         log("codex",` Thread started: ${session.threadId}`);
 
         void captureEvent("session_created", { engine: "codex", model: selectedModel });
@@ -716,6 +731,13 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
 
         const result = await session.rpc.request<CodexTurnStartResponse>("turn/start", turnParams);
         session.activeTurnId = result.turn.id;
+        if (session.fingerprintSettings) {
+          session.fingerprintSettings = {
+            ...session.fingerprintSettings,
+            model: data.collaborationMode?.settings.model ?? session.model ?? session.fingerprintSettings.model,
+            effort: data.collaborationMode ? data.collaborationMode.settings.reasoning_effort : data.effort ?? session.fingerprintSettings.effort,
+          };
+        }
         log(
           "codex",
           ` Send accepted: session=${shortId(data.sessionId, 12)} turn=${shortId(result.turn.id, 12)}`,
@@ -1071,11 +1093,12 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
         const session: CodexSession = {
           rpc,
           internalId,
-          threadId: null,
+          threadId: data.threadId,
           activeTurnId: null,
           eventCounter: 0,
           cwd: data.cwd,
           model: data.model,
+          fingerprintSettings: null,
           approvalPolicy: data.approvalPolicy,
           sandbox: data.sandbox,
           goalSupport: "unknown",
@@ -1085,7 +1108,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
           runtimeLease,
         };
         codexSessions.set(internalId, session);
-        setupCodexHandlers(rpc, session, internalId, getMainWindow);
+        setupCodexHandlers(rpc, session, internalId, getMainWindow, true);
 
         // Initialize
         await rpc.request<CodexInitializeResponse>("initialize", {
@@ -1106,6 +1129,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
         const threadResult = await rpc.request<CodexThreadResumeResponse>("thread/resume", threadParams);
         assertCodexSessionActive(session);
         session.threadId = threadResult.thread.id;
+        session.fingerprintSettings = { model: threadResult.model, effort: threadResult.reasoningEffort, provider: threadResult.modelProvider };
         log("codex",` Thread resumed: ${session.threadId}`);
         const goal = await refreshGoal(session, getMainWindow);
         assertCodexSessionActive(session);

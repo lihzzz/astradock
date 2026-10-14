@@ -21,7 +21,8 @@ describe("usage history", () => {
       { id: "codex-plan-update-1", role: "tool_call", toolName: "TodoWrite", timestamp },
       { id: "tool", role: "tool_call", toolName: "Bash", toolInput: { command: "git status --short" }, timestamp },
     ] });
-    const report = buildUsageReport([session], { version: 1, trackingStartedAt: timestamp, active: [], agent: [] }, 7, timestamp);
+    const report = buildUsageReport([session], { version: 1, trackingStartedAt: timestamp, active: [], agent: [] }, 7,
+      { version: 1, trackingStartedAt: timestamp, entries: [] }, timestamp);
     expect(report.days.at(-1)).toMatchObject({ userMessages: 1, assistantMessages: 1, activeMs: 0, agentMs: 0 });
     expect(report.days[0].activeMs).toBeNull();
     expect(report.tools).toEqual([{ name: "Bash", count: 1 }]);
@@ -34,7 +35,8 @@ describe("usage history", () => {
     const message = { id: "m1", role: "user", content: "hello", timestamp };
     const old = summarizeUsageSession({ id: "old", projectId: "p", conversationId: "stable", messages: [message] }, 1);
     const current = summarizeUsageSession({ id: "new", projectId: "p", conversationId: "stable", messages: [message, { ...message, id: "m2" }] }, 2);
-    const report = buildUsageReport([old, current], { version: 1, trackingStartedAt: timestamp, active: [], agent: [] }, 7, timestamp);
+    const report = buildUsageReport([old, current], { version: 1, trackingStartedAt: timestamp, active: [], agent: [] }, 7,
+      { version: 1, trackingStartedAt: timestamp, entries: [] }, timestamp);
     expect(report.days.at(-1)?.userMessages).toBe(2);
   });
 
@@ -42,7 +44,8 @@ describe("usage history", () => {
     process.env.TZ = "America/New_York";
     const start = new Date(2026, 2, 8).getTime();
     const end = new Date(2026, 2, 9).getTime();
-    const report = buildUsageReport([], { version: 1, trackingStartedAt: start, active: [[start, end]], agent: [[start, end]] }, 7, end);
+    const report = buildUsageReport([], { version: 1, trackingStartedAt: start, active: [[start, end]], agent: [[start, end]] }, 7,
+      { version: 1, trackingStartedAt: start, entries: [] }, end);
     expect(report.days.at(-2)).toMatchObject({ date: "2026-03-08", activeMs: 23 * 3_600_000, agentMs: 23 * 3_600_000 });
     expect(report.days.at(-1)?.activeMs).toBe(0);
   });

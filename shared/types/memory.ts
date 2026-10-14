@@ -87,7 +87,14 @@ export interface MemoryGoldenReport {
   generatedAt: string;
 }
 
+export interface MemoryRecallState {
+  items: MemoryRecallItem[];
+  usedAt: number | null;
+  skipNext: boolean;
+}
+
 export interface MemoryRecallItem {
+  bankId?: string;
   text: string;
   type?: string;
   context?: string | null;

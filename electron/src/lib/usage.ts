@@ -6,6 +6,8 @@ import { writeTextAtomically } from "./atomic-file";
 import { UsageTracker } from "./usage-tracker";
 import { USAGE_SAMPLE_MS } from "@shared/lib/usage";
 import { log } from "./logger";
+import { flushTokenUsage, getTokenUsage } from "./token-usage";
+import { reportError } from "./error-utils";
 
 let tracker: UsageTracker | undefined;
 let loadError: unknown;
@@ -55,7 +57,7 @@ export function stopUsageSession(sessionId: string): void {
   getUsageTracker().stopSession(sessionId);
 }
 
-export function flushUsage(): Promise<void> {
+function flushUsageTimings(): Promise<void> {
   const current = getUsageTracker();
   if (loadError) return Promise.reject(loadError);
   current.checkpoint();
@@ -68,8 +70,15 @@ export function flushUsage(): Promise<void> {
   return writeQueue;
 }
 
+export function flushUsage(): Promise<void> {
+  return Promise.all([flushUsageTimings(), flushTokenUsage()]).then(() => undefined);
+}
+
 export function startUsageTracking(): void {
+  if (timer) return;
   getUsageTracker();
+  try { getTokenUsage(); }
+  catch (error) { reportError("TOKEN_USAGE_LOAD_ERR", error); }
   void flushUsage().catch((error) => log("USAGE_SAVE_ERR", error));
   timer = setInterval(() => {
     void flushUsage().catch((error) => log("USAGE_SAVE_ERR", error));
@@ -79,5 +88,6 @@ export function startUsageTracking(): void {
 
 export function shutdownUsage(): Promise<void> {
   clearInterval(timer);
+  timer = undefined;
   return flushUsage();
 }

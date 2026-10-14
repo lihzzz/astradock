@@ -105,6 +105,7 @@ export async function recallMemory(
   });
   return response.results
     .map((result) => ({
+      bankId,
       text: typeof result.text === "string" ? result.text : "",
       type: typeof result.type === "string" ? result.type : undefined,
       context: result.context,

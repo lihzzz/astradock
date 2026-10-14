@@ -113,7 +113,7 @@ MCP 服务器在项目右侧工具栏的 **MCP Servers** 面板管理。支持 `
 
 **设置 → 引擎 → Computer Use runtime** 可为新会话提供独立的 Cua Driver MCP 桌面工具。默认关闭，可使用随应用提供的原生运行时或指定外部 `cua-driver`。启用后查看运行状态并按系统提示授予必要权限；已有会话需重新启动以加载工具。
 
-Codex 模型指纹探测会发起三次短模型请求，与本地 ModelTrace 数据比较。它用于诊断，结果是统计参考，不能单独证明后端模型身份。
+Codex 模型指纹探测支持新会话和当前会话两种目标；当前会话通过临时分支继承模型、provider 和推理强度。默认发起三次短模型请求，超时样本最多补测一次，与本地 ModelTrace 数据比较。面板区分服务端模型名称和统计候选，未收录模型不作降级判断，失败探测保留上次有效结果。它用于诊断，不能单独证明后端模型身份。
 
 <a id="zh-dev"></a>
 
@@ -323,7 +323,7 @@ Manage MCP servers in the **MCP Servers** panel on the project's right-hand tool
 
 **Settings → Engines → Computer Use runtime** adds independent Cua Driver MCP desktop tools to newly started sessions. It is off by default and can use the bundled native runtime or an external `cua-driver` executable. Check runtime status and grant the required operating-system permissions after enabling it. Restart existing sessions to load the tools.
 
-The Codex fingerprint probe makes three short model requests and compares the responses with a local ModelTrace reference bank. Results are statistical diagnostics, not proof of the backend model's identity.
+The Codex fingerprint probe can test fresh sessions or the current session. Current-session probes use temporary forks with the session's model, provider, and reasoning effort. It makes three short model requests and replaces timed-out samples once, comparing the responses with a local ModelTrace reference bank. The panel distinguishes the server's model label from statistical candidates, leaves unlisted models unclassified, and retains the last valid result after a failed probe. Results are statistical diagnostics, not proof of the backend model's identity.
 
 <a id="en-dev"></a>
 

@@ -1,0 +1,4202 @@
+{
+  "source": {
+    "repository": "https://github.com/kiyoakii/is-gpt-nerfed",
+    "commit": "ff0d7c0c8fdc8713273b6570b1ada1838eaad84c",
+    "scorer": "tests/fixtures/fingerprint-core.mjs",
+    "bank": "plugin/assets/modeltrace/unified_bank.json",
+    "reference": "tests/fixtures/reference_subset.jsonl",
+    "copyright": "Copyright (c) 2026 xqy2006",
+    "license": "MIT; see shared/lib/fingerprint/LICENSE-ModelTrace.txt",
+    "description": "Golden outputs from the pinned upstream JavaScript scorer, generated with its bank and reference outputs. Local bank and reference data were checked structurally identical."
+  },
+  "cases": [
+    {
+      "sampleIndexes": [
+        0
+      ],
+      "prediction": "gpt-5.4",
+      "usedOutputs": 1,
+      "calibration": {
+        "queries": "1",
+        "beta": 7.277579699216447,
+        "cv_accuracy": 0.953125
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999948608524222
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 0.000005139147578171192
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.4",
+          "probability": 0.9773310769463053,
+          "score": 2.164030687917422,
+          "profileSimilarity": 0.5441510643919931,
+          "conditionalProbability": 0.9773360996207544
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 0.022133818903772615,
+          "score": 1.6435666165959477,
+          "profileSimilarity": 0.5445603065339073,
+          "conditionalProbability": 0.022133932653318998
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 0.0005284147460850431,
+          "score": 1.1303492201484824,
+          "profileSimilarity": 0.538347650112621,
+          "conditionalProbability": 0.0005284174617003614
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 0.000004980753736538298,
+          "score": 0.4894355593186047,
+          "profileSimilarity": 0.531424531897826,
+          "conditionalProbability": 0.9691789661177116
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 0.0000012368883054599906,
+          "score": 0.298028182795374,
+          "profileSimilarity": 0.5389956067939496,
+          "conditionalProbability": 0.000001236894662044197
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 1.8305288155198065e-7,
+          "score": 0.03549873327281375,
+          "profileSimilarity": 0.5311758563868032,
+          "conditionalProbability": 1.8305382229258808e-7
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 1.1376636410808102e-7,
+          "score": -0.029856534990781503,
+          "profileSimilarity": 0.5290569886656569,
+          "conditionalProbability": 0.02213720512547836
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 6.552592095898795e-8,
+          "score": -0.10566485676644727,
+          "profileSimilarity": 0.5325439889996113,
+          "conditionalProbability": 6.552625770809653e-8
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 3.684662786721009e-8,
+          "score": -0.1847683119319049,
+          "profileSimilarity": 0.531999299666549,
+          "conditionalProbability": 3.68468172284416e-8
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 2.794252354304356e-8,
+          "score": -0.22277743671524391,
+          "profileSimilarity": 0.5303014048453523,
+          "conditionalProbability": 2.7942667144533735e-8
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 2.4533842600843e-8,
+          "score": -0.24065373352951347,
+          "profileSimilarity": 0.5224761534711342,
+          "conditionalProbability": 0.004773912838201382
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 1.9933907247372725e-8,
+          "score": -0.2691840059649966,
+          "profileSimilarity": 0.5275056176442222,
+          "conditionalProbability": 0.0038788353407174132
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 9.73001725785113e-11,
+          "score": -1.0005228438259817,
+          "profileSimilarity": 0.49529290650245095,
+          "conditionalProbability": 0.00001893313455169084
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 3.7234367777787536e-11,
+          "score": -1.1325129563073792,
+          "profileSimilarity": 0.48854997908168174,
+          "conditionalProbability": 0.000007245241980584977
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 1.6252890879205155e-11,
+          "score": -1.2464191505122866,
+          "profileSimilarity": 0.5049125498966238,
+          "conditionalProbability": 0.000003162565509548741
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 8.940245362700234e-12,
+          "score": -1.3285491695041094,
+          "profileSimilarity": 0.5019223081399573,
+          "conditionalProbability": 0.0000017396358494693576
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        1
+      ],
+      "prediction": "gpt-5.4",
+      "usedOutputs": 1,
+      "calibration": {
+        "queries": "1",
+        "beta": 7.277579699216447,
+        "cv_accuracy": 0.953125
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.999999901306994
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 9.869300582670257e-8
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.4",
+          "probability": 0.9999973461452326,
+          "score": 2.7530674460208937,
+          "profileSimilarity": 0.5603247722778353,
+          "conditionalProbability": 0.9999974448379865
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 0.0000023185200840159474,
+          "score": 0.9702523683396596,
+          "profileSimilarity": 0.5510588158876368,
+          "conditionalProbability": 0.0000023185203128376867
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 1.5717787394095879e-7,
+          "score": 0.600444498353584,
+          "profileSimilarity": 0.54656040663399,
+          "conditionalProbability": 1.5717788945331716e-7
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 7.424463699536134e-8,
+          "score": 0.4973865307297701,
+          "profileSimilarity": 0.5461794442332943,
+          "conditionalProbability": 7.424464432278846e-8
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 6.704299378126455e-8,
+          "score": 0.4833665627659803,
+          "profileSimilarity": 0.5428832324221311,
+          "conditionalProbability": 0.6793084598009606
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 2.8922271276125077e-8,
+          "score": 0.3678443402909092,
+          "profileSimilarity": 0.5428513309651656,
+          "conditionalProbability": 0.2930528970503785
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 3.761937678923805e-9,
+          "score": 0.0875756451715416,
+          "profileSimilarity": 0.5439639665242884,
+          "conditionalProbability": 3.76193805020078e-9
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 2.531498537484459e-9,
+          "score": 0.03314508632230831,
+          "profileSimilarity": 0.541320376993242,
+          "conditionalProbability": 0.0256502324179849
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 1.0630245229644052e-9,
+          "score": -0.08608318762152736,
+          "profileSimilarity": 0.5430391593383523,
+          "conditionalProbability": 1.0630246278775011e-9
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 3.908506116356999e-10,
+          "score": -0.2235668112242008,
+          "profileSimilarity": 0.5447577682960335,
+          "conditionalProbability": 3.9085065020992546e-10
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 1.816381452986288e-10,
+          "score": -0.3288640330904492,
+          "profileSimilarity": 0.5200451712592704,
+          "conditionalProbability": 0.001840435842207214
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 1.3291395107004227e-11,
+          "score": -0.6881730014536238,
+          "profileSimilarity": 0.5247307279051175,
+          "conditionalProbability": 0.00013467413415640524
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 3.353649174845651e-12,
+          "score": -0.8773935719487297,
+          "profileSimilarity": 0.5315935057196128,
+          "conditionalProbability": 3.353649505827402e-12
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 9.092348609960269e-13,
+          "score": -1.0567390354250896,
+          "profileSimilarity": 0.5199671728870485,
+          "conditionalProbability": 0.000009212758831082462
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 2.3985561324160245e-13,
+          "score": -1.2398447323745139,
+          "profileSimilarity": 0.49716552212939324,
+          "conditionalProbability": 0.0000024303202768266145
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 1.6360094861197101e-13,
+          "score": -1.2924181048565129,
+          "profileSimilarity": 0.4888895460891741,
+          "conditionalProbability": 0.0000016576752044541218
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        2
+      ],
+      "prediction": "gpt-5.4",
+      "usedOutputs": 1,
+      "calibration": {
+        "queries": "1",
+        "beta": 7.277579699216447,
+        "cv_accuracy": 0.953125
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999974233633332
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 0.0000025766366665965702
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.4",
+          "probability": 0.9999542040681006,
+          "score": 2.1559699127635588,
+          "profileSimilarity": 0.5910183286691203,
+          "conditionalProbability": 0.9999567805934068
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 0.00001915259922517756,
+          "score": 0.663299715560111,
+          "profileSimilarity": 0.5846712695351302,
+          "conditionalProbability": 0.000019152648574594146
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 0.000013510851106119185,
+          "score": 0.6153517297746863,
+          "profileSimilarity": 0.5797485307331275,
+          "conditionalProbability": 0.000013510885918763245
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 0.000005998393663444843,
+          "score": 0.503775976412224,
+          "profileSimilarity": 0.5780287414085487,
+          "conditionalProbability": 0.000005998409119165722
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 0.000002526423272480745,
+          "score": 0.3849607699604912,
+          "profileSimilarity": 0.5694127795825304,
+          "conditionalProbability": 0.9805120392926213
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 0.00000239114732539127,
+          "score": 0.37739901519479013,
+          "profileSimilarity": 0.5770545240238423,
+          "conditionalProbability": 0.000002391153486525019
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 0.0000018678546963375057,
+          "score": 0.3434615301608539,
+          "profileSimilarity": 0.5782376737107384,
+          "conditionalProbability": 0.0000018678595091328054
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 2.653865165878761e-7,
+          "score": 0.07532863512786124,
+          "profileSimilarity": 0.5726144737822401,
+          "conditionalProbability": 2.6538720039426756e-7
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 3.3062699574805e-8,
+          "score": -0.21086288137692855,
+          "profileSimilarity": 0.5748983988975853,
+          "conditionalProbability": 3.306278476558853e-8
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 2.1934172205705503e-8,
+          "score": -0.2672497527623365,
+          "profileSimilarity": 0.568628821104709,
+          "conditionalProbability": 0.008512714458371009
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 1.5739906750958203e-8,
+          "score": -0.31284821962517384,
+          "profileSimilarity": 0.5495939384021169,
+          "conditionalProbability": 0.006108702462791831
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 1.0051912661904743e-8,
+          "score": -0.3744671102667266,
+          "profileSimilarity": 0.5451486810584305,
+          "conditionalProbability": 0.0039011758204862156
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 1.7698040406711736e-9,
+          "score": -0.6131308108140928,
+          "profileSimilarity": 0.5306364805099939,
+          "conditionalProbability": 0.000686865968964446
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 6.86145412215944e-10,
+          "score": -0.7433299389160181,
+          "profileSimilarity": 0.5415682048860498,
+          "conditionalProbability": 0.0002662949810157985
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 2.5841572261186877e-11,
+          "score": -1.1939062553378044,
+          "profileSimilarity": 0.545624278293003,
+          "conditionalProbability": 0.000010029187504857063
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 5.611472108817038e-12,
+          "score": -1.4037523158554954,
+          "profileSimilarity": 0.5112096620132845,
+          "conditionalProbability": 0.000002177828244689665
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        3
+      ],
+      "prediction": "gpt-5.5",
+      "usedOutputs": 1,
+      "calibration": {
+        "queries": "1",
+        "beta": 7.277579699216447,
+        "cv_accuracy": 0.953125
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999999792593227
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 2.0740677357769085e-8
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.5",
+          "probability": 0.9999975249441614,
+          "score": 2.7968000524754926,
+          "profileSimilarity": 0.5461592276677765,
+          "conditionalProbability": 0.9999975456847877
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 0.0000023087540679068375,
+          "score": 1.0134049396990665,
+          "profileSimilarity": 0.5334321087934737,
+          "conditionalProbability": 0.0000023087541157919613
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 8.608907260307442e-8,
+          "score": 0.5614578719647237,
+          "profileSimilarity": 0.5312360138382977,
+          "conditionalProbability": 8.608907438862012e-8
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 4.1089868242844105e-8,
+          "score": 0.4598278050428917,
+          "profileSimilarity": 0.5314715537848048,
+          "conditionalProbability": 4.108986909507582e-8
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 1.9865360638213735e-8,
+          "score": 0.35996163210863824,
+          "profileSimilarity": 0.5265707925507928,
+          "conditionalProbability": 0.9577971006222961
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 1.1796012930055645e-8,
+          "score": 0.28834222318348346,
+          "profileSimilarity": 0.529462485955617,
+          "conditionalProbability": 1.1796013174712948e-8
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 3.3669500229812023e-9,
+          "score": 0.1160659524959816,
+          "profileSimilarity": 0.5257683222230165,
+          "conditionalProbability": 3.3669500928140275e-9
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 3.205933728757931e-9,
+          "score": 0.10933240701300702,
+          "profileSimilarity": 0.5276233650399873,
+          "conditionalProbability": 3.2059337952511692e-9
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 6.84091005534798e-10,
+          "score": -0.10291778714389833,
+          "profileSimilarity": 0.5189765602254819,
+          "conditionalProbability": 0.03298305999049495
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 1.510263742385789e-10,
+          "score": -0.3104918069197066,
+          "profileSimilarity": 0.5211798357524196,
+          "conditionalProbability": 0.007281651010399964
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 3.234800967065539e-11,
+          "score": -0.5222245607870628,
+          "profileSimilarity": 0.49916892988155026,
+          "conditionalProbability": 0.0015596409467571418
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 1.3255749787967388e-11,
+          "score": -0.6448094209322476,
+          "profileSimilarity": 0.5221436539111426,
+          "conditionalProbability": 1.3255750062900622e-11
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 3.6119604356607733e-12,
+          "score": -0.8234650697043244,
+          "profileSimilarity": 0.5255284123906552,
+          "conditionalProbability": 0.00017414862462569467
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 3.4805935582644607e-12,
+          "score": -0.8285557511508719,
+          "profileSimilarity": 0.49026958499358364,
+          "conditionalProbability": 0.00016781484510970868
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 7.139215439477213e-13,
+          "score": -1.046235957008141,
+          "profileSimilarity": 0.5111396060933103,
+          "conditionalProbability": 0.000034421322487826036
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 4.4854573445004505e-14,
+          "score": -1.4264925303370335,
+          "profileSimilarity": 0.5057930120267629,
+          "conditionalProbability": 0.0000021626378286147336
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        4
+      ],
+      "prediction": "gpt-5.5",
+      "usedOutputs": 1,
+      "calibration": {
+        "queries": "1",
+        "beta": 7.277579699216447,
+        "cv_accuracy": 0.953125
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999987236706902
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 0.000001276329309573977
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.5",
+          "probability": 0.999996949351914,
+          "score": 2.6220840463834367,
+          "profileSimilarity": 0.5723364665117603,
+          "conditionalProbability": 0.9999982256789591
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 0.0000012590696373179715,
+          "score": 0.755373545963793,
+          "profileSimilarity": 0.5587121692769632,
+          "conditionalProbability": 0.9864771010690286
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 7.680429518533031e-7,
+          "score": 0.6874549925328259,
+          "profileSimilarity": 0.5601701109709754,
+          "conditionalProbability": 7.680439321302848e-7
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 6.319414597938669e-7,
+          "score": 0.660653651484117,
+          "profileSimilarity": 0.5575148797933567,
+          "conditionalProbability": 6.319422663603035e-7
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 1.9194473150936826e-7,
+          "score": 0.4969193691636452,
+          "profileSimilarity": 0.5568567607246111,
+          "conditionalProbability": 1.9194497649436764e-7
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 1.5023108245798547e-7,
+          "score": 0.4632498216481894,
+          "profileSimilarity": 0.5552411414548044,
+          "conditionalProbability": 1.50231274202564e-7
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 1.8440702252022352e-8,
+          "score": 0.17502015676003677,
+          "profileSimilarity": 0.5572047030896017,
+          "conditionalProbability": 1.844072578846117e-8
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 1.7174640520081917e-8,
+          "score": 0.16524679858981645,
+          "profileSimilarity": 0.5574691684234376,
+          "conditionalProbability": 0.013456276833299865
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 1.0949177185613013e-8,
+          "score": 0.1033897505731894,
+          "profileSimilarity": 0.5554769527764845,
+          "conditionalProbability": 1.0949191160386609e-8
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 2.768670964159243e-9,
+          "score": -0.0855325228569496,
+          "profileSimilarity": 0.5538823863446436,
+          "conditionalProbability": 2.768674497899654e-9
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 5.0443191365679536e-11,
+          "score": -0.6358906190400806,
+          "profileSimilarity": 0.5362035216498178,
+          "conditionalProbability": 0.000039522081791349645
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 2.0700449501675375e-11,
+          "score": -0.7582791604711944,
+          "profileSimilarity": 0.5151803460768822,
+          "conditionalProbability": 0.000016218737081721433
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 8.12139250458909e-12,
+          "score": -0.8868457751397223,
+          "profileSimilarity": 0.532928993373009,
+          "conditionalProbability": 0.000006363085485594553
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 5.328170929517649e-12,
+          "score": -0.944762504810115,
+          "profileSimilarity": 0.5332343596326283,
+          "conditionalProbability": 0.000004174605166198156
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 3.4210737370265525e-13,
+          "score": -1.3220360985825372,
+          "profileSimilarity": 0.5025469493094687,
+          "conditionalProbability": 2.680400513695376e-7
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 9.642424813282249e-14,
+          "score": -1.4960454521984503,
+          "profileSimilarity": 0.5273351428431702,
+          "conditionalProbability": 7.554809515814358e-8
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        5
+      ],
+      "prediction": "gpt-5.5",
+      "usedOutputs": 1,
+      "calibration": {
+        "queries": "1",
+        "beta": 7.277579699216447,
+        "cv_accuracy": 0.953125
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999991764207631
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 8.235792374903436e-7
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.5",
+          "probability": 0.9964013294405609,
+          "score": 2.072590800239627,
+          "profileSimilarity": 0.6636421820506948,
+          "conditionalProbability": 0.9964021500566833
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 0.0034806177777768647,
+          "score": 1.2952801350112944,
+          "profileSimilarity": 0.6571759524986645,
+          "conditionalProbability": 0.003480620644343759
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 0.00004567288053439008,
+          "score": 0.6998266243022212,
+          "profileSimilarity": 0.647744583953334,
+          "conditionalProbability": 0.00004567291814965715
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 0.000034539217070850494,
+          "score": 0.6614334627837706,
+          "profileSimilarity": 0.6460195092579,
+          "conditionalProbability": 0.00003453924551665596
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 0.000019567342108275598,
+          "score": 0.5833534593973436,
+          "profileSimilarity": 0.646478017820598,
+          "conditionalProbability": 0.00001956735822354555
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 0.000014112607050631537,
+          "score": 0.5384493214661878,
+          "profileSimilarity": 0.6483293601936824,
+          "conditionalProbability": 0.000014112618673491255
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 0.0000024919359816114907,
+          "score": 0.3001821123665604,
+          "profileSimilarity": 0.644820576059723,
+          "conditionalProbability": 0.000002491938033919915
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 8.452196795331635e-7,
+          "score": 0.15161367816809312,
+          "profileSimilarity": 0.6470809720853508,
+          "conditionalProbability": 8.452203756391155e-7
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 7.554517672567572e-7,
+          "score": 0.1361853851829847,
+          "profileSimilarity": 0.642673097604189,
+          "conditionalProbability": 0.9172787909986801
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 4.406199683307828e-8,
+          "score": -0.25429034903893466,
+          "profileSimilarity": 0.6406268224263972,
+          "conditionalProbability": 0.05350061636734122
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 1.655489514694036e-8,
+          "score": -0.3888015277844209,
+          "profileSimilarity": 0.6238890695920798,
+          "conditionalProbability": 0.02010115650485235
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 6.719735346614419e-9,
+          "score": -0.5126934126980491,
+          "profileSimilarity": 0.6188328258147879,
+          "conditionalProbability": 0.008159184982723909
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 7.665693488054874e-10,
+          "score": -0.8109902326119215,
+          "profileSimilarity": 0.593310572588092,
+          "conditionalProbability": 0.0009307778947189345
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 1.7017748795950776e-11,
+          "score": -1.3341955398684402,
+          "profileSimilarity": 0.56877694964218,
+          "conditionalProbability": 0.000020663159075996386
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 5.541425567565274e-12,
+          "score": -1.4883683696125396,
+          "profileSimilarity": 0.6087355911295986,
+          "conditionalProbability": 0.000006728466813286132
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 1.7143837842728257e-12,
+          "score": -1.6495755473037765,
+          "profileSimilarity": 0.5957403713484667,
+          "conditionalProbability": 0.000002081625794133654
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        6
+      ],
+      "prediction": "gpt-5.6-sol",
+      "usedOutputs": 1,
+      "calibration": {
+        "queries": "1",
+        "beta": 7.277579699216447,
+        "cv_accuracy": 0.953125
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999996320406723
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 3.6795932836917006e-7
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 0.9996607575095885,
+          "score": 2.1097142980850108,
+          "profileSimilarity": 0.550958695463062,
+          "conditionalProbability": 0.999661125344224
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 0.00016867242490055197,
+          "score": 0.9160189904142154,
+          "profileSimilarity": 0.5405019041050172,
+          "conditionalProbability": 0.00016867248696516687
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 0.00008662668715018497,
+          "score": 0.8244568758786193,
+          "profileSimilarity": 0.5405099172817706,
+          "conditionalProbability": 0.00008662671902529427
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 0.000024315743892483928,
+          "score": 0.6498818181054438,
+          "profileSimilarity": 0.5373855174226447,
+          "conditionalProbability": 0.000024315752839691994
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 0.000022712469977108912,
+          "score": 0.6405092068354684,
+          "profileSimilarity": 0.5388880498564947,
+          "conditionalProbability": 0.00002271247833437717
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 0.000014570842260038464,
+          "score": 0.5795147960783391,
+          "profileSimilarity": 0.5358872966366748,
+          "conditionalProbability": 0.000014570847621517758
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 0.000012026531685675992,
+          "score": 0.5531451441739557,
+          "profileSimilarity": 0.5374692933860745,
+          "conditionalProbability": 0.000012026536110952134
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 0.000009949831217666196,
+          "score": 0.5270980786872113,
+          "profileSimilarity": 0.5395751250929184,
+          "conditionalProbability": 0.000009949834878800747
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 3.4035811184304717e-7,
+          "score": 0.06330205404367084,
+          "profileSimilarity": 0.5301924270866698,
+          "conditionalProbability": 0.9249884038856847
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 2.462322878831748e-8,
+          "score": -0.29757452648027777,
+          "profileSimilarity": 0.5213221505088595,
+          "conditionalProbability": 0.06691834365893078
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 1.6951858219077866e-9,
+          "score": -0.6652651603751867,
+          "profileSimilarity": 0.5256210243382724,
+          "conditionalProbability": 0.004606992379894288
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 7.448128373380269e-10,
+          "score": -0.7782717800856819,
+          "profileSimilarity": 0.5128001323036879,
+          "conditionalProbability": 0.0020241716404883836
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 4.945336263050646e-10,
+          "score": -0.8345429346900044,
+          "profileSimilarity": 0.4951154786411782,
+          "conditionalProbability": 0.0013439899145834503
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 3.6122546338998025e-11,
+          "score": -1.1940990006902794,
+          "profileSimilarity": 0.5084924442339035,
+          "conditionalProbability": 0.00009816994312685727
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 6.0678506520569185e-12,
+          "score": -1.4392234579471592,
+          "profileSimilarity": 0.4762352092917703,
+          "conditionalProbability": 0.0000164905471453875
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 1.2650552634389144e-12,
+          "score": -1.6546644020333467,
+          "profileSimilarity": 0.49672253637053254,
+          "conditionalProbability": 0.000003438030146010313
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        7
+      ],
+      "prediction": "gpt-5.6-sol",
+      "usedOutputs": 1,
+      "calibration": {
+        "queries": "1",
+        "beta": 7.277579699216447,
+        "cv_accuracy": 0.953125
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999863917195057
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 0.000013608280493617762
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 0.9996500231028362,
+          "score": 2.313562166464754,
+          "profileSimilarity": 0.6029984066021785,
+          "conditionalProbability": 0.9996636268058698
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 0.0003286453270066895,
+          "score": 1.2115225165493668,
+          "profileSimilarity": 0.596198393751519,
+          "conditionalProbability": 0.00032864979936534364
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 0.000013605826587595586,
+          "score": 0.7739483310484557,
+          "profileSimilarity": 0.5868906714781448,
+          "conditionalProbability": 0.9998196755259912
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 0.0000032384150323505015,
+          "score": 0.576710490542196,
+          "profileSimilarity": 0.5895962917051827,
+          "conditionalProbability": 0.000003238459102210334
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 0.000001919820881505684,
+          "score": 0.504866257518165,
+          "profileSimilarity": 0.5873807747142787,
+          "conditionalProbability": 0.0000019198470073222657
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 0.0000010622099294741363,
+          "score": 0.4235369779666462,
+          "profileSimilarity": 0.587898456731912,
+          "conditionalProbability": 0.0000010622243845215088
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 0.0000010036734000417347,
+          "score": 0.4157480000719439,
+          "profileSimilarity": 0.5863291168377287,
+          "conditionalProbability": 0.0000010036870584967553
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 2.64006696555374e-7,
+          "score": 0.23224640542139552,
+          "profileSimilarity": 0.5834141615777522,
+          "conditionalProbability": 2.6401028928144394e-7
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 2.3516372277685222e-7,
+          "score": 0.21634929276687107,
+          "profileSimilarity": 0.5810082412158564,
+          "conditionalProbability": 2.3516692299430332e-7
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 1.902045309081218e-9,
+          "score": -0.4455949768512111,
+          "profileSimilarity": 0.5776078633948718,
+          "conditionalProbability": 0.00013977117167545677
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 4.30217303840363e-10,
+          "score": -0.6498379652152186,
+          "profileSimilarity": 0.5621253628115974,
+          "conditionalProbability": 0.00003161437655860588
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 7.991403786219404e-11,
+          "score": -0.8811427366014144,
+          "profileSimilarity": 0.5381156863362944,
+          "conditionalProbability": 0.000005872456692796232
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 1.4810424461252144e-11,
+          "score": -1.1127609821696351,
+          "profileSimilarity": 0.5510731257957909,
+          "conditionalProbability": 0.0000010883391526356459
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 1.249093292969883e-11,
+          "score": -1.1361655039857659,
+          "profileSimilarity": 0.5276599247883581,
+          "conditionalProbability": 9.17892083100215e-7
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 9.856000303660047e-12,
+          "score": -1.1687206373776968,
+          "profileSimilarity": 0.5502794835798912,
+          "conditionalProbability": 7.242649288631637e-7
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 4.5720136981809815e-12,
+          "score": -1.2742676361488514,
+          "profileSimilarity": 0.5535481842957055,
+          "conditionalProbability": 3.3597291739579007e-7
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        8
+      ],
+      "prediction": "gpt-5.6-sol",
+      "usedOutputs": 1,
+      "calibration": {
+        "queries": "1",
+        "beta": 7.277579699216447,
+        "cv_accuracy": 0.953125
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999999429838673
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 5.701613269247817e-8
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 0.9999805357472866,
+          "score": 2.4962345324195407,
+          "profileSimilarity": 0.5876233098124573,
+          "conditionalProbability": 0.9999805927623128
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 0.00001348105294014049,
+          "score": 0.9553093425505097,
+          "profileSimilarity": 0.5730168162404358,
+          "conditionalProbability": 0.000013481053708778038
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 0.000004456223046421501,
+          "score": 0.8032005779888669,
+          "profileSimilarity": 0.5726254116569353,
+          "conditionalProbability": 0.00000445622330049812
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 9.275354874835838e-7,
+          "score": 0.5875346773272814,
+          "profileSimilarity": 0.5697983476793685,
+          "conditionalProbability": 9.275355403680733e-7
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 2.573201658545056e-7,
+          "score": 0.41134836029701904,
+          "profileSimilarity": 0.5662272595007435,
+          "conditionalProbability": 2.573201805259072e-7
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 1.6827889603138648e-7,
+          "score": 0.3529912676579454,
+          "profileSimilarity": 0.5704477193322863,
+          "conditionalProbability": 1.682789056259989e-7
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 9.680342075143456e-8,
+          "score": 0.2770126608619221,
+          "profileSimilarity": 0.5686312631840831,
+          "conditionalProbability": 9.680342627079156e-8
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 3.425147261194179e-8,
+          "score": 0.1342519058875402,
+          "profileSimilarity": 0.5639334818523614,
+          "conditionalProbability": 0.6007330030025064
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 2.2620425595362478e-8,
+          "score": 0.07724445404417939,
+          "profileSimilarity": 0.5681640388704525,
+          "conditionalProbability": 0.39673728341709624
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 2.0022623907353795e-8,
+          "score": 0.06048195044362331,
+          "profileSimilarity": 0.5653687122633442,
+          "conditionalProbability": 2.002262504896644e-8
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 8.667132195982405e-11,
+          "score": -0.6873621512629546,
+          "profileSimilarity": 0.5244232774600203,
+          "conditionalProbability": 0.001520119269177619
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 3.542123738020793e-11,
+          "score": -0.8103166947455314,
+          "profileSimilarity": 0.5420442071154505,
+          "conditionalProbability": 0.0006212493851741169
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 1.7168340015944713e-11,
+          "score": -0.9098339250989974,
+          "profileSimilarity": 0.5407365639659145,
+          "conditionalProbability": 0.0003011137235235465
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 2.5220051328837272e-12,
+          "score": -1.173384830399356,
+          "profileSimilarity": 0.5350784299356495,
+          "conditionalProbability": 0.00004423318478098817
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 1.76598761010641e-12,
+          "score": -1.222349486390688,
+          "profileSimilarity": 0.509886623893806,
+          "conditionalProbability": 0.00003097347236143547
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 6.855930749385364e-13,
+          "score": -1.3523626415809016,
+          "profileSimilarity": 0.5282868273218968,
+          "conditionalProbability": 0.000012024545379749739
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        9
+      ],
+      "prediction": "gpt-5.6-terra",
+      "usedOutputs": 1,
+      "calibration": {
+        "queries": "1",
+        "beta": 7.277579699216447,
+        "cv_accuracy": 0.953125
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999998260975685
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 1.7390243123233274e-7
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 0.9999336522489793,
+          "score": 2.3034075995888106,
+          "profileSimilarity": 0.5596504572136545,
+          "conditionalProbability": 0.999933826139903
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 0.0000378517353570303,
+          "score": 0.9043480493367345,
+          "profileSimilarity": 0.5470230465391848,
+          "conditionalProbability": 0.000037851741939540256
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 0.000011178493851316886,
+          "score": 0.7367531706833969,
+          "profileSimilarity": 0.5413803856577863,
+          "conditionalProbability": 0.000011178495795284485
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 0.000008319194401322735,
+          "score": 0.6961591367666857,
+          "profileSimilarity": 0.5389824242264727,
+          "conditionalProbability": 0.000008319195848051121
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 0.000006979495396283781,
+          "score": 0.6720317744741227,
+          "profileSimilarity": 0.5403066456640153,
+          "conditionalProbability": 0.000006979496610035212
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 8.236593297139743e-7,
+          "score": 0.37839364489532445,
+          "profileSimilarity": 0.5388584952622284,
+          "conditionalProbability": 8.236594729503594e-7
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 7.343460309162105e-7,
+          "score": 0.3626223768280673,
+          "profileSimilarity": 0.5404144290425918,
+          "conditionalProbability": 7.343461586207929e-7
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 2.86924222656106e-7,
+          "score": 0.2334912316132864,
+          "profileSimilarity": 0.5398000779696286,
+          "conditionalProbability": 2.8692427255293465e-7
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 1.66205916383796e-7,
+          "score": 0.15846757111889354,
+          "profileSimilarity": 0.5316960282258241,
+          "conditionalProbability": 0.955742339000113
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 7.2940737654424746e-9,
+          "score": -0.27109354720163453,
+          "profileSimilarity": 0.5219421922670497,
+          "conditionalProbability": 0.041943483560029304
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 1.3418681564321653e-10,
+          "score": -0.8201201019081374,
+          "profileSimilarity": 0.5161624398860791,
+          "conditionalProbability": 0.0007716212745981891
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 1.2031554525780078e-10,
+          "score": -0.8351134300112047,
+          "profileSimilarity": 0.5103765540501953,
+          "conditionalProbability": 0.0006918566026087343
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 1.176786824684343e-10,
+          "score": -0.8381583922052684,
+          "profileSimilarity": 0.5282877605327823,
+          "conditionalProbability": 0.0006766937163242773
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 2.1892118729477466e-11,
+          "score": -1.0692559896445208,
+          "profileSimilarity": 0.4755212363340443,
+          "conditionalProbability": 0.00012588736439359902
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 5.673992770164141e-12,
+          "score": -1.2547893249440838,
+          "profileSimilarity": 0.4845230712050784,
+          "conditionalProbability": 0.00003262744936891489
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 2.693928225160385e-12,
+          "score": -1.3571437693904729,
+          "profileSimilarity": 0.5011016485873221,
+          "conditionalProbability": 0.000015491032563893894
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        10
+      ],
+      "prediction": "gpt-5.6-terra",
+      "usedOutputs": 1,
+      "calibration": {
+        "queries": "1",
+        "beta": 7.277579699216447,
+        "cv_accuracy": 0.953125
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999999954369087
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 4.563091403060614e-9
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 0.9999663529638839,
+          "score": 2.4445118351438637,
+          "profileSimilarity": 0.658215099466539,
+          "conditionalProbability": 0.9999663575268217
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 0.000018220601491555035,
+          "score": 0.9449852813444874,
+          "profileSimilarity": 0.6370770348981714,
+          "conditionalProbability": 0.000018220601574697305
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 0.00000794767479032194,
+          "score": 0.8309812399453937,
+          "profileSimilarity": 0.6363903897535867,
+          "conditionalProbability": 0.000007947674826587907
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 0.0000027234342048628115,
+          "score": 0.6838188876664867,
+          "profileSimilarity": 0.6334460112940649,
+          "conditionalProbability": 0.0000027234342172900905
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 0.000002288240788015129,
+          "score": 0.6598946767411793,
+          "profileSimilarity": 0.6336660667460181,
+          "conditionalProbability": 0.0000022882407984565808
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 0.0000021310180442824637,
+          "score": 0.6501134733961105,
+          "profileSimilarity": 0.6350602480387181,
+          "conditionalProbability": 0.000002131018054006494
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 2.692188757570685e-7,
+          "score": 0.36583896568806923,
+          "profileSimilarity": 0.634788124074072,
+          "conditionalProbability": 2.692188769855388e-7
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 6.228483009325107e-8,
+          "score": 0.16469973048382547,
+          "profileSimilarity": 0.6307301932897794,
+          "conditionalProbability": 6.228483037746244e-8
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 2.9031831900150086e-9,
+          "score": -0.25658182717880673,
+          "profileSimilarity": 0.6106738804733592,
+          "conditionalProbability": 0.6362316538449677
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 1.5434239746670233e-9,
+          "score": -0.3433970190783021,
+          "profileSimilarity": 0.6208031572313999,
+          "conditionalProbability": 0.33824086312007656
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 4.5236884073542865e-11,
+          "score": -0.8284272021969815,
+          "profileSimilarity": 0.6171170454206942,
+          "conditionalProbability": 0.009913648462794546
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 3.378874369788407e-11,
+          "score": -0.868520896134757,
+          "profileSimilarity": 0.597791343278003,
+          "conditionalProbability": 0.007404792215036687
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 1.8224126787160044e-11,
+          "score": -0.9533542311192011,
+          "profileSimilarity": 0.572404950461482,
+          "conditionalProbability": 0.003993811470648282
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 1.1513382784451444e-11,
+          "score": -1.0164571174709227,
+          "profileSimilarity": 0.5893301349407529,
+          "conditionalProbability": 0.0025231541004699233
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 6.976947930994045e-12,
+          "score": -1.0852847411977784,
+          "profileSimilarity": 0.5971557028111928,
+          "conditionalProbability": 0.001528995874663913
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 7.441531045492713e-13,
+          "score": -1.3928210560326661,
+          "profileSimilarity": 0.5524910521666747,
+          "conditionalProbability": 0.0001630809113422851
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        11
+      ],
+      "prediction": "gpt-5.6-terra",
+      "usedOutputs": 1,
+      "calibration": {
+        "queries": "1",
+        "beta": 7.277579699216447,
+        "cv_accuracy": 0.953125
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999986558316701
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 0.0000013441683297135985
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 0.9968829398186563,
+          "score": 2.0032798940683696,
+          "profileSimilarity": 0.5587038083751483,
+          "conditionalProbability": 0.9968842797989337
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 0.002508812456456776,
+          "score": 1.1809153056012638,
+          "profileSimilarity": 0.5492601721521493,
+          "conditionalProbability": 0.0025088158287275585
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 0.0004967870876482253,
+          "score": 0.9583958248199806,
+          "profileSimilarity": 0.5477915123540751,
+          "conditionalProbability": 0.0004967877554145928
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 0.000059575166419399174,
+          "score": 0.6669633966681936,
+          "profileSimilarity": 0.5459481788213458,
+          "conditionalProbability": 0.00005957524649855876
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 0.00002406083051551922,
+          "score": 0.54238165034197,
+          "profileSimilarity": 0.545556881102714,
+          "conditionalProbability": 0.000024060862857369065
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 0.000022748315092065537,
+          "score": 0.5346738477456181,
+          "profileSimilarity": 0.5467068159261143,
+          "conditionalProbability": 0.000022748345669671343
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 0.000003130663208972877,
+          "score": 0.2621593178088617,
+          "profileSimilarity": 0.5402548504280702,
+          "conditionalProbability": 0.0000031306674171168704
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 0.00000106803894686869,
+          "score": 0.1143875712356239,
+          "profileSimilarity": 0.5399789039880908,
+          "conditionalProbability": 0.7945723190013386
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 6.014936728896255e-7,
+          "score": 0.0354927334985813,
+          "profileSimilarity": 0.5426975550843892,
+          "conditionalProbability": 6.01494481399458e-7
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 2.343308285566054e-7,
+          "score": -0.09403963045977777,
+          "profileSimilarity": 0.5380586816757886,
+          "conditionalProbability": 0.1743314608569406
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 3.837855185569598e-8,
+          "score": -0.3426435936988338,
+          "profileSimilarity": 0.5300272379771007,
+          "conditionalProbability": 0.028551894139533313
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 2.3513802876667068e-9,
+          "score": -0.7263558114078963,
+          "profileSimilarity": 0.5191710247787031,
+          "conditionalProbability": 0.0017493198103899045
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 9.176314766929685e-10,
+          "score": -0.8556518083664453,
+          "profileSimilarity": 0.503298637442182,
+          "conditionalProbability": 0.0006826760134190097
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 1.1504558931183321e-10,
+          "score": -1.1409757039095267,
+          "profileSimilarity": 0.5151095035993445,
+          "conditionalProbability": 0.00008558867722790785
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 3.521000860259737e-11,
+          "score": -1.3036668938449183,
+          "profileSimilarity": 0.5164527849807243,
+          "conditionalProbability": 0.000026194642310981658
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 7.350703330927384e-13,
+          "score": -1.8353161001010654,
+          "profileSimilarity": 0.48131321346136213,
+          "conditionalProbability": 5.468588396583928e-7
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        12
+      ],
+      "prediction": "gpt-5.6-luna",
+      "usedOutputs": 1,
+      "calibration": {
+        "queries": "1",
+        "beta": 7.277579699216447,
+        "cv_accuracy": 0.953125
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999999998054705
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 1.9452938745589197e-10
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 0.9999973775353415,
+          "score": 2.7446372520322586,
+          "profileSimilarity": 0.563492405574304,
+          "conditionalProbability": 0.9999973777298704
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 0.0000010084341308331171,
+          "score": 0.8474255767411498,
+          "profileSimilarity": 0.5510594881503899,
+          "conditionalProbability": 0.0000010084341310292874
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 9.433678213895396e-7,
+          "score": 0.8382607468193674,
+          "profileSimilarity": 0.5501274187320939,
+          "conditionalProbability": 9.433678215730525e-7
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 6.009366193936213e-7,
+          "score": 0.7762941577441644,
+          "profileSimilarity": 0.5507678696812944,
+          "conditionalProbability": 6.009366195105212e-7
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 4.2569548749729215e-8,
+          "score": 0.4125262018824326,
+          "profileSimilarity": 0.549860408907681,
+          "conditionalProbability": 4.2569548758010246e-8
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 1.3672311035739453e-8,
+          "score": 0.2564624373972835,
+          "profileSimilarity": 0.5479119107414575,
+          "conditionalProbability": 1.3672311038399122e-8
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 1.2216103194725112e-8,
+          "score": 0.2409878311878431,
+          "profileSimilarity": 0.54592809410288,
+          "conditionalProbability": 1.2216103197101504e-8
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 1.0735942850639365e-9,
+          "score": -0.09315386863837216,
+          "profileSimilarity": 0.5452973833904653,
+          "conditionalProbability": 1.0735942852727822e-9
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 8.439445954191224e-11,
+          "score": -0.4426197342084658,
+          "profileSimilarity": 0.5322285124744806,
+          "conditionalProbability": 0.43383912654867135
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 4.4741724401391795e-11,
+          "score": -0.5298184022266316,
+          "profileSimilarity": 0.5079491925687933,
+          "conditionalProbability": 0.22999982155157217
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 2.6722767451835597e-11,
+          "score": -0.60063735629353,
+          "profileSimilarity": 0.5362412247658919,
+          "conditionalProbability": 0.13737136481702425
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 2.343002142407058e-11,
+          "score": -0.6187062410235771,
+          "profileSimilarity": 0.5417494550006159,
+          "conditionalProbability": 0.12044463682580174
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 7.41075056629805e-12,
+          "score": -0.7768750951348836,
+          "profileSimilarity": 0.5084892993563555,
+          "conditionalProbability": 0.038095789346884054
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 4.169226321631224e-12,
+          "score": -0.8559125313065066,
+          "profileSimilarity": 0.524188242970987,
+          "conditionalProbability": 0.021432372641262562
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 3.517717195127291e-12,
+          "score": -0.8792607097014,
+          "profileSimilarity": 0.5293524971037231,
+          "conditionalProbability": 0.018083217354112658
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 1.4272055362521e-13,
+          "score": -1.319610265271133,
+          "profileSimilarity": 0.5171159996190693,
+          "conditionalProbability": 0.0007336709146712898
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        13
+      ],
+      "prediction": "gpt-5.6-luna",
+      "usedOutputs": 1,
+      "calibration": {
+        "queries": "1",
+        "beta": 7.277579699216447,
+        "cv_accuracy": 0.953125
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999933673901179
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 0.00000663260988239041
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 0.9984873273608886,
+          "score": 2.1873001126308917,
+          "profileSimilarity": 0.6096455847140942,
+          "conditionalProbability": 0.9984939499817285
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 0.0012847845349340894,
+          "score": 1.272758368124599,
+          "profileSimilarity": 0.6010341440084924,
+          "conditionalProbability": 0.001284793056465212
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 0.0002151580887857371,
+          "score": 1.02721337577489,
+          "profileSimilarity": 0.5958391330531126,
+          "conditionalProbability": 0.00021515951585486818
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 0.000005910483870582461,
+          "score": 0.5332791968427387,
+          "profileSimilarity": 0.5934170526067175,
+          "conditionalProbability": 0.8911249079001021
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 0.000004605839442523501,
+          "score": 0.49900918275696304,
+          "profileSimilarity": 0.5929461595711807,
+          "conditionalProbability": 0.000004605869991462322
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 7.205607061163166e-7,
+          "score": 0.24410980264972532,
+          "profileSimilarity": 0.5859101495284045,
+          "conditionalProbability": 0.10863909062847288
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 5.364113581942316e-7,
+          "score": 0.2035567130807281,
+          "profileSimilarity": 0.5864471536557871,
+          "conditionalProbability": 5.364149160251045e-7
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 4.258414122996361e-7,
+          "score": 0.17183815688203194,
+          "profileSimilarity": 0.5902674764863881,
+          "conditionalProbability": 4.2584423675832903e-7
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 3.401650718973074e-7,
+          "score": 0.14097130151590498,
+          "profileSimilarity": 0.5876122018820003,
+          "conditionalProbability": 3.401673280944893e-7
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 1.8914822458124667e-7,
+          "score": 0.06032635293504657,
+          "profileSimilarity": 0.586622611015175,
+          "conditionalProbability": 1.8914947913595118e-7
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 7.042748585408321e-10,
+          "score": -0.7082145316522651,
+          "profileSimilarity": 0.5655564957321679,
+          "conditionalProbability": 0.00010618366993220618
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 4.795750536553962e-10,
+          "score": -0.7610161927819843,
+          "profileSimilarity": 0.5604099079635809,
+          "conditionalProbability": 0.00007230563264826848
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 3.105946671154216e-10,
+          "score": -0.8207079699816304,
+          "profileSimilarity": 0.5664016052687878,
+          "conditionalProbability": 0.000046828423896911373
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 6.588238658566948e-11,
+          "score": -1.033775730710386,
+          "profileSimilarity": 0.5333273348736842,
+          "conditionalProbability": 0.000009933101411646014
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 3.850872858458927e-12,
+          "score": -1.4239564513870182,
+          "profileSimilarity": 0.5481493918226514,
+          "conditionalProbability": 5.805969183688914e-7
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 1.1278528767698316e-12,
+          "score": -1.5926916866802354,
+          "profileSimilarity": 0.5112280344043557,
+          "conditionalProbability": 1.700466176616663e-7
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        14
+      ],
+      "prediction": "gpt-5.6-luna",
+      "usedOutputs": 1,
+      "calibration": {
+        "queries": "1",
+        "beta": 7.277579699216447,
+        "cv_accuracy": 0.953125
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999998193524988
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 1.806475012997922e-7
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 0.9999481141085566,
+          "score": 2.3270186826257593,
+          "profileSimilarity": 0.6418063876103408,
+          "conditionalProbability": 0.9999482947467173
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 0.00002258473863577207,
+          "score": 0.8569991546625498,
+          "profileSimilarity": 0.6197160304783413,
+          "conditionalProbability": 0.000022584742715649405
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 0.000017183896095893256,
+          "score": 0.8194452238066205,
+          "profileSimilarity": 0.6189883509146764,
+          "conditionalProbability": 0.00001718389920012171
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 0.000005078177400702928,
+          "score": 0.651941698691836,
+          "profileSimilarity": 0.6138386946379786,
+          "conditionalProbability": 0.000005078178318063152
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 0.000004861912658178961,
+          "score": 0.6459616190408992,
+          "profileSimilarity": 0.6191167490076109,
+          "conditionalProbability": 0.000004861913536471492
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 0.00000137530361403275,
+          "score": 0.4724482469037457,
+          "profileSimilarity": 0.6139289111069197,
+          "conditionalProbability": 0.0000013753038624779561
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 4.607411695029136e-7,
+          "score": 0.3221794198694614,
+          "profileSimilarity": 0.614723026137667,
+          "conditionalProbability": 4.607412527346696e-7
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 1.7400773617205854e-7,
+          "score": 0.18837989967990554,
+          "profileSimilarity": 0.6094532894166831,
+          "conditionalProbability": 0.9632446334438101
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 1.6047436818764016e-7,
+          "score": 0.1772545623726921,
+          "profileSimilarity": 0.6125450617304957,
+          "conditionalProbability": 1.60474397176939e-7
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 2.8652399987052228e-9,
+          "score": -0.37588017205622704,
+          "profileSimilarity": 0.5834800376835245,
+          "conditionalProbability": 0.01586094453612306
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 2.054527065556923e-9,
+          "score": -0.42158306320127137,
+          "profileSimilarity": 0.6044846283615053,
+          "conditionalProbability": 0.011373127503974428
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 1.6929960189263906e-9,
+          "score": -0.44817788447274226,
+          "profileSimilarity": 0.589184686103128,
+          "conditionalProbability": 0.009371820848586175
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 2.11171242780719e-11,
+          "score": -1.0505994206629443,
+          "profileSimilarity": 0.5552623071982965,
+          "conditionalProbability": 0.00011689685230147266
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 3.0695326539876496e-12,
+          "score": -1.3155994685029289,
+          "profileSimilarity": 0.5716775109802807,
+          "conditionalProbability": 0.000016991835657298297
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 1.6561905932404553e-12,
+          "score": -1.4003811134540645,
+          "profileSimilarity": 0.5304911675029094,
+          "conditionalProbability": 0.000009168079167017852
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 1.15919701983325e-12,
+          "score": -1.4494073853032907,
+          "profileSimilarity": 0.5610258606397497,
+          "conditionalProbability": 0.0000064169003805345375
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        15
+      ],
+      "prediction": "gpt-6-astra",
+      "usedOutputs": 1,
+      "calibration": {
+        "queries": "1",
+        "beta": 7.277579699216447,
+        "cv_accuracy": 0.953125
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999999781243851
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 2.1875614713137317e-8
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-6-astra",
+          "probability": 0.9999661480485188,
+          "score": 2.5256366631846365,
+          "profileSimilarity": 0.5422263826743516,
+          "conditionalProbability": 0.9999661699233936
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 0.00002741803305652717,
+          "score": 1.082261777313278,
+          "profileSimilarity": 0.5336109217473446,
+          "conditionalProbability": 0.000027418033656313516
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 0.0000042183649619182044,
+          "score": 0.8250672962033524,
+          "profileSimilarity": 0.5286223292544794,
+          "conditionalProbability": 0.000004218365054197534
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 0.000001474703562276611,
+          "score": 0.680652442397675,
+          "profileSimilarity": 0.5304829183004375,
+          "conditionalProbability": 0.0000014747035945366589
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 3.4859243455194585e-7,
+          "score": 0.4824672073354867,
+          "profileSimilarity": 0.5247195683270671,
+          "conditionalProbability": 3.4859244217761984e-7
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 2.909676658155992e-7,
+          "score": 0.4576387216326949,
+          "profileSimilarity": 0.5258817619978032,
+          "conditionalProbability": 2.9096767218069594e-7
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 7.761812559973166e-8,
+          "score": 0.2760658327952108,
+          "profileSimilarity": 0.5251092945404949,
+          "conditionalProbability": 7.761812729767592e-8
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 2.111123325012149e-8,
+          "score": 0.09716079146245157,
+          "profileSimilarity": 0.5247594454993993,
+          "conditionalProbability": 0.9650578293209389
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 1.7960596055822182e-9,
+          "score": -0.2414421816265605,
+          "profileSimilarity": 0.5202844649154581,
+          "conditionalProbability": 1.7960596448721273e-9
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 5.031691816440968e-10,
+          "score": -0.41628382268018593,
+          "profileSimilarity": 0.5136503231626126,
+          "conditionalProbability": 0.023001373366752547
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 1.7442118361673694e-10,
+          "score": -0.5618615466985855,
+          "profileSimilarity": 0.5155687578149756,
+          "conditionalProbability": 0.007973315762961805
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 4.5078360017752463e-11,
+          "score": -0.7477847129955028,
+          "profileSimilarity": 0.4837649459398301,
+          "conditionalProbability": 0.0020606671222217505
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 3.7032171981961977e-11,
+          "score": -0.774801285729531,
+          "profileSimilarity": 0.5187824648513956,
+          "conditionalProbability": 0.0016928517194866504
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 2.713515176773072e-12,
+          "score": -1.1339237204280774,
+          "profileSimilarity": 0.49833141443124473,
+          "conditionalProbability": 0.00012404292232956
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 1.1522881903637489e-12,
+          "score": -1.2516132884895237,
+          "profileSimilarity": 0.5037720863768382,
+          "conditionalProbability": 0.000052674551342858796
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 8.147623881417516e-13,
+          "score": -1.2992401736768187,
+          "profileSimilarity": 0.47200659205571005,
+          "conditionalProbability": 0.00003724523396604024
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        16
+      ],
+      "prediction": "gpt-6-astra",
+      "usedOutputs": 1,
+      "calibration": {
+        "queries": "1",
+        "beta": 7.277579699216447,
+        "cv_accuracy": 0.953125
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999999909123146
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 9.087685520526756e-9
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-6-astra",
+          "probability": 0.9999917286150846,
+          "score": 2.8988556534214425,
+          "profileSimilarity": 0.581279887545308,
+          "conditionalProbability": 0.9999917377026949
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 0.000008082833108194802,
+          "score": 1.2876386928528898,
+          "profileSimilarity": 0.5745111065090673,
+          "conditionalProbability": 0.000008082833181649047
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 1.7552560024522447e-7,
+          "score": 0.7614042882936845,
+          "profileSimilarity": 0.5676369863271329,
+          "conditionalProbability": 1.755256018403459e-7
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 8.99076922532064e-9,
+          "score": 0.3530835805787158,
+          "profileSimilarity": 0.5607678798669118,
+          "conditionalProbability": 0.9893354259467709
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 1.859384480282558e-9,
+          "score": 0.13653454008296617,
+          "profileSimilarity": 0.5616925982356921,
+          "conditionalProbability": 1.8593844971800594e-9
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 1.200744762703907e-9,
+          "score": 0.07644539965632467,
+          "profileSimilarity": 0.5624557392164968,
+          "conditionalProbability": 1.2007447736158977e-9
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 4.83370756838406e-10,
+          "score": -0.04858425920888592,
+          "profileSimilarity": 0.560199336549777,
+          "conditionalProbability": 4.833707612311275e-10
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 2.5878862464892234e-10,
+          "score": -0.1344331801507066,
+          "profileSimilarity": 0.5583630434392366,
+          "conditionalProbability": 2.5878862700071195e-10
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 1.3623288689892295e-10,
+          "score": -0.22260064915153846,
+          "profileSimilarity": 0.5610042132103574,
+          "conditionalProbability": 1.3623288813696458e-10
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 6.345396273820362e-11,
+          "score": -0.32758763792781,
+          "profileSimilarity": 0.5299875997921741,
+          "conditionalProbability": 0.006982411813753608
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 2.021850785066265e-11,
+          "score": -0.4847437638416045,
+          "profileSimilarity": 0.5462206681153332,
+          "conditionalProbability": 0.0022248247702887844
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 7.727659931665518e-12,
+          "score": -0.6169020312417558,
+          "profileSimilarity": 0.5590133025199153,
+          "conditionalProbability": 0.0008503441183358196
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 2.937948556119699e-12,
+          "score": -0.7497888649752252,
+          "profileSimilarity": 0.5474969887075931,
+          "conditionalProbability": 0.0003232889770980328
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 1.7057181637366395e-12,
+          "score": -0.8245012498321038,
+          "profileSimilarity": 0.526316316802045,
+          "conditionalProbability": 0.00018769555349201495
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 7.275185874452624e-13,
+          "score": -0.9415871490158234,
+          "profileSimilarity": 0.5402875325107814,
+          "conditionalProbability": 0.0000800554316940198
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 1.4497937828367335e-13,
+          "score": -1.1632333695405705,
+          "profileSimilarity": 0.5476389596282377,
+          "conditionalProbability": 0.00001595338856700114
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        17
+      ],
+      "prediction": "gpt-6-astra",
+      "usedOutputs": 1,
+      "calibration": {
+        "queries": "1",
+        "beta": 7.277579699216447,
+        "cv_accuracy": 0.953125
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.999958132013621
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 0.000041867986379025236
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-6-astra",
+          "probability": 0.9898235370270484,
+          "score": 1.8243776259220352,
+          "profileSimilarity": 0.6122353458730012,
+          "conditionalProbability": 0.9898649806805765
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 0.009133973161412956,
+          "score": 1.1805473830355513,
+          "profileSimilarity": 0.6111307392400194,
+          "conditionalProbability": 0.009134355598488735
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 0.0005582307433281316,
+          "score": 0.7964933739383633,
+          "profileSimilarity": 0.6026323914408109,
+          "conditionalProbability": 0.000558254116303869
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 0.00016956595175306681,
+          "score": 0.6327671768191547,
+          "profileSimilarity": 0.6001904403101688,
+          "conditionalProbability": 0.00016957305143527453
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 0.00015890697515787456,
+          "score": 0.6238462194941466,
+          "profileSimilarity": 0.6035895967628377,
+          "conditionalProbability": 0.00015891362855151018
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 0.000058150150663846976,
+          "score": 0.48571094090699535,
+          "profileSimilarity": 0.6020977816013664,
+          "conditionalProbability": 0.00005815258539550022
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 0.000045201780142851974,
+          "score": 0.4510988843483911,
+          "profileSimilarity": 0.6004700491326176,
+          "conditionalProbability": 0.0000452036727296061
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 0.00004118071305924136,
+          "score": 0.4382970386131144,
+          "profileSimilarity": 0.5982531018515932,
+          "conditionalProbability": 0.9835847534304114
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 0.00001056622411389397,
+          "score": 0.25137946931561683,
+          "profileSimilarity": 0.5995225432023077,
+          "conditionalProbability": 0.000010566666518943856
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 5.155116330164726e-7,
+          "score": -0.16362909720063865,
+          "profileSimilarity": 0.597284280540797,
+          "conditionalProbability": 0.01231278782670882
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 1.6559429321579228e-7,
+          "score": -0.3196726084378847,
+          "profileSimilarity": 0.5839402182823087,
+          "conditionalProbability": 0.003955153030687683
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 4.668661782103618e-9,
+          "score": -0.8100373249058218,
+          "profileSimilarity": 0.574027745316815,
+          "conditionalProbability": 0.00011150910721711937
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 1.148306518910828e-9,
+          "score": -1.0027640647693343,
+          "profileSimilarity": 0.5407622300102355,
+          "conditionalProbability": 0.00002742683893405725
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 1.842233087282352e-10,
+          "score": -1.254206847021599,
+          "profileSimilarity": 0.5689384624022056,
+          "conditionalProbability": 0.0000044000995667784545
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 1.640248053979364e-10,
+          "score": -1.2701642108883278,
+          "profileSimilarity": 0.5342483506186828,
+          "conditionalProbability": 0.000003917666445981948
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 2.177136473205948e-12,
+          "score": -1.8640439591697626,
+          "profileSimilarity": 0.5507011055643183,
+          "conditionalProbability": 5.200002821957151e-8
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        0,
+        1
+      ],
+      "prediction": "gpt-5.4",
+      "usedOutputs": 2,
+      "calibration": {
+        "queries": "2",
+        "beta": 11.99999999999999,
+        "cv_accuracy": 0.9965277777777778
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999999999468314
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 5.3168824954752855e-11
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.4",
+          "probability": 0.9999990040188741,
+          "score": 2.458549066969158,
+          "profileSimilarity": 0.6674391425192125,
+          "conditionalProbability": 0.9999990040720427
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 9.958433309296724e-7,
+          "score": 1.3069094924678035,
+          "profileSimilarity": 0.6618338151250058,
+          "conditionalProbability": 9.9584333098262e-7
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 8.09658541005126e-11,
+          "score": 0.5221330162634775,
+          "profileSimilarity": 0.6529379669120106,
+          "conditionalProbability": 8.096585410481744e-11
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 5.27331372795552e-11,
+          "score": 0.4864010610422925,
+          "profileSimilarity": 0.6414529456125304,
+          "conditionalProbability": 0.9918055801389549
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 1.6140739071543635e-12,
+          "score": 0.19586083698166143,
+          "profileSimilarity": 0.6506617672290322,
+          "conditionalProbability": 1.6140739072401815e-12
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 1.4835438015750904e-12,
+          "score": 0.18883353081917006,
+          "profileSimilarity": 0.6484143350283552,
+          "conditionalProbability": 1.4835438016539684e-12
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 3.2202618624025877e-13,
+          "score": 0.06153718922217767,
+          "profileSimilarity": 0.6483558006411407,
+          "conditionalProbability": 3.2202618625738046e-13
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 2.781466802253976e-13,
+          "score": 0.049330167162956295,
+          "profileSimilarity": 0.6458768399873189,
+          "conditionalProbability": 0.005231386634218509
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 2.4055646043725663e-13,
+          "score": 0.03723068578558661,
+          "profileSimilarity": 0.6528314289028718,
+          "conditionalProbability": 2.405564604500467e-13
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 1.569485278159662e-13,
+          "score": 0.0016442756657634033,
+          "profileSimilarity": 0.644736539484336,
+          "conditionalProbability": 0.0029518900963023125
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 5.846313422431051e-16,
+          "score": -0.46441336749156864,
+          "profileSimilarity": 0.6274626339303169,
+          "conditionalProbability": 0.000010995754424526621
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 2.626889338132816e-16,
+          "score": -0.5310809419403173,
+          "profileSimilarity": 0.6399019379474036,
+          "conditionalProbability": 2.626889338272484e-16
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 7.385086720574991e-18,
+          "score": -0.8287066012972792,
+          "profileSimilarity": 0.6085531443348178,
+          "conditionalProbability": 1.3889881386056145e-7
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 2.2351794374880923e-19,
+          "score": -1.1201837881002477,
+          "profileSimilarity": 0.5904448734241556,
+          "conditionalProbability": 4.203928597989988e-9
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 1.5335385635304704e-19,
+          "score": -1.1515790929686882,
+          "profileSimilarity": 0.6140236042467176,
+          "conditionalProbability": 2.8842814653803717e-9
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 7.385552251028383e-20,
+          "score": -1.212465530581946,
+          "profileSimilarity": 0.5794663013802552,
+          "conditionalProbability": 1.3890756956381027e-9
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        3,
+        4
+      ],
+      "prediction": "gpt-5.5",
+      "usedOutputs": 2,
+      "calibration": {
+        "queries": "2",
+        "beta": 11.99999999999999,
+        "cv_accuracy": 0.9965277777777778
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999999999938913
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 6.109026857066466e-12
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.5",
+          "probability": 0.9999999999194249,
+          "score": 2.7094420494294646,
+          "profileSimilarity": 0.6893160185694989,
+          "conditionalProbability": 0.9999999999255336
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 6.534378784984094e-11,
+          "score": 0.7551621544313558,
+          "profileSimilarity": 0.670751585098314,
+          "conditionalProbability": 6.534378785024011e-11
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 7.39950649520223e-12,
+          "score": 0.5736413987878588,
+          "profileSimilarity": 0.6724033382922934,
+          "conditionalProbability": 7.399506495247432e-12
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 6.108783118841482e-12,
+          "score": 0.5576675890362156,
+          "profileSimilarity": 0.6666683530939681,
+          "conditionalProbability": 0.9999601019555673
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 7.69228567806732e-13,
+          "score": 0.38499302924856205,
+          "profileSimilarity": 0.6665983689044481,
+          "conditionalProbability": 7.692285678114309e-13
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 6.291312968987162e-13,
+          "score": 0.36823901436238027,
+          "profileSimilarity": 0.6675951387393111,
+          "conditionalProbability": 6.291312969025594e-13
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 2.4502651925437285e-13,
+          "score": 0.2896578870720855,
+          "profileSimilarity": 0.6638664220782582,
+          "conditionalProbability": 2.4502651925586964e-13
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 7.950847694513531e-14,
+          "score": 0.19586598687833642,
+          "profileSimilarity": 0.6676887900772908,
+          "conditionalProbability": 7.9508476945621e-14
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 1.4604538856419362e-16,
+          "score": -0.32910913555725396,
+          "profileSimilarity": 0.6649722051849736,
+          "conditionalProbability": 0.000023906489852022705
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 9.474370634183686e-17,
+          "score": -0.3651709718945986,
+          "profileSimilarity": 0.6616465429664193,
+          "conditionalProbability": 9.474370634241561e-17
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 9.005104205858397e-17,
+          "score": -0.36940420309198946,
+          "profileSimilarity": 0.6426393780190949,
+          "conditionalProbability": 0.00001474065250743163
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 4.062104586154264e-18,
+          "score": -0.6276271558649108,
+          "profileSimilarity": 0.6416375447540907,
+          "conditionalProbability": 6.649348056893095e-7
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 3.4910576892036965e-18,
+          "score": -0.6402518606291285,
+          "profileSimilarity": 0.6118847113218828,
+          "conditionalProbability": 5.714588871328175e-7
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 6.958102958495555e-20,
+          "score": -0.9665408660739316,
+          "profileSimilarity": 0.6363196619256083,
+          "conditionalProbability": 1.138987128604115e-8
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 1.886731879859834e-20,
+          "score": -1.0752959248667047,
+          "profileSimilarity": 0.597116530798821,
+          "conditionalProbability": 3.0884327798909634e-9
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 1.837378003820242e-22,
+          "score": -1.461268991267742,
+          "profileSimilarity": 0.6263467242421159,
+          "conditionalProbability": 3.007644338140207e-11
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        6,
+        7
+      ],
+      "prediction": "gpt-5.6-sol",
+      "usedOutputs": 2,
+      "calibration": {
+        "queries": "2",
+        "beta": 11.99999999999999,
+        "cv_accuracy": 0.9965277777777778
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999999995474615
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 4.525387379614575e-10
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 0.9999989414661828,
+          "score": 2.2116382322748827,
+          "profileSimilarity": 0.7273264104836612,
+          "conditionalProbability": 0.9999989419187209
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 0.0000010419560395534048,
+          "score": 1.063770753481791,
+          "profileSimilarity": 0.7141022126271829,
+          "conditionalProbability": 0.00000104195604002493
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 8.667191381103723e-9,
+          "score": 0.6646615666983922,
+          "profileSimilarity": 0.7068180396084265,
+          "conditionalProbability": 8.66719138502596e-9
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 4.423468758867944e-9,
+          "score": 0.6086098486888323,
+          "profileSimilarity": 0.7076370922133333,
+          "conditionalProbability": 4.423468760869734e-9
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 1.1678713911365582e-9,
+          "score": 0.4976313980751415,
+          "profileSimilarity": 0.704308481596577,
+          "conditionalProbability": 1.167871391665065e-9
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 1.0446675741599633e-9,
+          "score": 0.48834106107030095,
+          "profileSimilarity": 0.7065888290017464,
+          "conditionalProbability": 1.0446675746327156e-9
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 5.384786966791413e-10,
+          "score": 0.43311555543615743,
+          "profileSimilarity": 0.6979710659253817,
+          "conditionalProbability": 5.384786969228237e-10
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 4.5253430872312503e-10,
+          "score": 0.4186251925460633,
+          "profileSimilarity": 0.7002344919294592,
+          "conditionalProbability": 0.9999902124658931
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 2.8356125723989287e-10,
+          "score": 0.3796722420543034,
+          "profileSimilarity": 0.7031239274028607,
+          "conditionalProbability": 2.8356125736821526e-10
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 3.796029779629302e-15,
+          "score": -0.5554300686131989,
+          "profileSimilarity": 0.6891416934470959,
+          "conditionalProbability": 0.000008388297975835624
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 4.499339728109157e-16,
+          "score": -0.7331475819289873,
+          "profileSimilarity": 0.6658316368840043,
+          "conditionalProbability": 9.942441056819235e-7
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 1.0076164732127094e-16,
+          "score": -0.8578428356457094,
+          "profileSimilarity": 0.6348546960081147,
+          "conditionalProbability": 2.2265861211168347e-7
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 4.667692973370913e-17,
+          "score": -0.921968482952749,
+          "profileSimilarity": 0.6643534691482811,
+          "conditionalProbability": 1.0314460579435429e-7
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 3.5186949271660194e-17,
+          "score": -0.9455163811276586,
+          "profileSimilarity": 0.6591822342600329,
+          "conditionalProbability": 7.775455738919979e-8
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 5.795739910323946e-19,
+          "score": -1.2876944809664626,
+          "profileSimilarity": 0.6154842175574606,
+          "conditionalProbability": 1.280716858943812e-9
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 6.947971767386954e-20,
+          "score": -1.4644660190910992,
+          "profileSimilarity": 0.6483615060640662,
+          "conditionalProbability": 1.5353319361532116e-10
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        9,
+        10
+      ],
+      "prediction": "gpt-5.6-terra",
+      "usedOutputs": 2,
+      "calibration": {
+        "queries": "2",
+        "beta": 11.99999999999999,
+        "cv_accuracy": 0.9965277777777778
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999999999998421
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 1.5795455456639476e-13
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 0.9999999678363484,
+          "score": 2.373959717366337,
+          "profileSimilarity": 0.7417173355381081,
+          "conditionalProbability": 0.9999999678365062
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 2.7987253670479367e-8,
+          "score": 0.924666665340611,
+          "profileSimilarity": 0.7185392220511839,
+          "conditionalProbability": 2.7987253670483785e-8
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 1.8508338752867493e-9,
+          "score": 0.698323923712288,
+          "profileSimilarity": 0.7126850306956102,
+          "conditionalProbability": 1.8508338752870415e-9
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 1.4489703043415717e-9,
+          "score": 0.6779253310703046,
+          "profileSimilarity": 0.7123837510057345,
+          "conditionalProbability": 1.4489703043418004e-9
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 6.016968724839693e-10,
+          "score": 0.6046874424203591,
+          "profileSimilarity": 0.7122391936029684,
+          "conditionalProbability": 6.016968724840643e-10
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 1.849193116539476e-10,
+          "score": 0.506367925112089,
+          "profileSimilarity": 0.7116680510581048,
+          "conditionalProbability": 1.849193116539768e-10
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 7.434063293366496e-11,
+          "score": 0.4304294336252556,
+          "profileSimilarity": 0.708738810165428,
+          "conditionalProbability": 7.434063293367669e-11
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 1.5479021555842344e-11,
+          "score": 0.2996650986506778,
+          "profileSimilarity": 0.7119656224921124,
+          "conditionalProbability": 1.5479021555844787e-11
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 1.400056902735728e-13,
+          "score": -0.09246472397970429,
+          "profileSimilarity": 0.6963691176510074,
+          "conditionalProbability": 0.8863669088739236
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 1.7907283115735556e-14,
+          "score": -0.2638376871902206,
+          "profileSimilarity": 0.6789430258892899,
+          "conditionalProbability": 0.11336984340143477
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 1.928835347591363e-17,
+          "score": -0.833292797201125,
+          "profileSimilarity": 0.6910891371081673,
+          "conditionalProbability": 0.00012211330992552004
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 1.689755682779771e-17,
+          "score": -0.8443204990214472,
+          "profileSimilarity": 0.6681432332407737,
+          "conditionalProbability": 0.00010697733201922314
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 4.2064792118250575e-18,
+          "score": -0.9601990856044915,
+          "profileSimilarity": 0.6609875425371612,
+          "conditionalProbability": 0.000026630945991854272
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 7.483785822477569e-19,
+          "score": -1.1040717780316425,
+          "profileSimilarity": 0.6257101529990763,
+          "conditionalProbability": 0.0000047379360747282715
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 2.7731803576953856e-19,
+          "score": -1.1868004434306978,
+          "profileSimilarity": 0.6486174685852069,
+          "conditionalProbability": 0.0000017556824273336826
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 1.6309095286970227e-19,
+          "score": -1.2310385228385936,
+          "profileSimilarity": 0.6076435546547685,
+          "conditionalProbability": 0.0000010325182032098257
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        12,
+        13
+      ],
+      "prediction": "gpt-5.6-luna",
+      "usedOutputs": 2,
+      "calibration": {
+        "queries": "2",
+        "beta": 11.99999999999999,
+        "cv_accuracy": 0.9965277777777778
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999999999998987
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 1.0105184165037745e-13
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 0.99999996879268,
+          "score": 2.4659686823315754,
+          "profileSimilarity": 0.7337243140873067,
+          "conditionalProbability": 0.9999999687927813
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 3.075205351421254e-8,
+          "score": 1.0245262629343816,
+          "profileSimilarity": 0.7186908782300627,
+          "conditionalProbability": 3.075205351421566e-8
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 2.838949111494122e-10,
+          "score": 0.6341006034813665,
+          "profileSimilarity": 0.712275529489302,
+          "conditionalProbability": 2.8389491114944097e-10
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 7.298848260326029e-11,
+          "score": 0.5209087299500477,
+          "profileSimilarity": 0.7103905289159872,
+          "conditionalProbability": 7.298848260326768e-11
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 6.375064479899567e-11,
+          "score": 0.5096318668115909,
+          "profileSimilarity": 0.7132228594338457,
+          "conditionalProbability": 6.375064479900212e-11
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 3.3401780420960346e-11,
+          "score": 0.4557676923196978,
+          "profileSimilarity": 0.713900769319978,
+          "conditionalProbability": 3.3401780420963725e-11
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 9.418866306623825e-13,
+          "score": 0.15839439516616505,
+          "profileSimilarity": 0.7074210600910981,
+          "conditionalProbability": 9.418866306624778e-13
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 1.8755211866337424e-13,
+          "score": 0.02390871643876641,
+          "profileSimilarity": 0.7078478893601288,
+          "conditionalProbability": 1.8755211866339323e-13
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 8.431754007125199e-14,
+          "score": -0.042713522090419176,
+          "profileSimilarity": 0.7068070148375951,
+          "conditionalProbability": 0.8343988461187738
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 1.657651366147587e-14,
+          "score": -0.17826377682190234,
+          "profileSimilarity": 0.6999329394649891,
+          "conditionalProbability": 0.164039698740255
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 1.411611096257378e-16,
+          "score": -0.5754171329303654,
+          "profileSimilarity": 0.6772020635615648,
+          "conditionalProbability": 0.0013969177337126793
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 7.487582934740396e-18,
+          "score": -0.8201384512416922,
+          "profileSimilarity": 0.6693257160196163,
+          "conditionalProbability": 0.0000740964520037763
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 6.020585098127314e-18,
+          "score": -0.8383102506440685,
+          "profileSimilarity": 0.6697588828156344,
+          "conditionalProbability": 0.00005957917243069687
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 2.6939337867302936e-18,
+          "score": -0.9053254129226349,
+          "profileSimilarity": 0.6327082284306313,
+          "conditionalProbability": 0.000026658928157399213
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 4.1471942209791626e-19,
+          "score": -1.0612550444534334,
+          "profileSimilarity": 0.6162015050160017,
+          "conditionalProbability": 0.000004104026362357417
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 9.98678215074051e-21,
+          "score": -1.3717833583290755,
+          "profileSimilarity": 0.6484182864196658,
+          "conditionalProbability": 9.882830424103615e-8
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        15,
+        16
+      ],
+      "prediction": "gpt-6-astra",
+      "usedOutputs": 2,
+      "calibration": {
+        "queries": "2",
+        "beta": 11.99999999999999,
+        "cv_accuracy": 0.9965277777777778
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999999999998906
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 1.0922791229797634e-13
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-6-astra",
+          "probability": 0.9999999890183678,
+          "score": 2.7122461583030395,
+          "profileSimilarity": 0.6834528206893522,
+          "conditionalProbability": 0.9999999890184772
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 1.0976040351601783e-8,
+          "score": 1.1849502350830838,
+          "profileSimilarity": 0.6723076225259172,
+          "conditionalProbability": 1.0976040351602984e-8
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 3.7020544852987106e-12,
+          "score": 0.5187350605444476,
+          "profileSimilarity": 0.6608569881934474,
+          "conditionalProbability": 3.702054485299115e-12
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 7.733414767828127e-13,
+          "score": 0.38824151849723326,
+          "profileSimilarity": 0.6595479832031933,
+          "conditionalProbability": 7.733414767828973e-13
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 6.884271732533078e-13,
+          "score": 0.37854892102699983,
+          "profileSimilarity": 0.6609894041845195,
+          "conditionalProbability": 6.884271732533831e-13
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 2.590088043073832e-13,
+          "score": 0.29708663085783055,
+          "profileSimilarity": 0.6583811166375437,
+          "conditionalProbability": 2.590088043074115e-13
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 1.0921175636537967e-13,
+          "score": 0.2251221860205837,
+          "profileSimilarity": 0.6523495706732237,
+          "conditionalProbability": 0.9998520897062226
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 5.914704594395109e-14,
+          "score": 0.17401701359239005,
+          "profileSimilarity": 0.6541449561258479,
+          "conditionalProbability": 5.914704594395755e-14
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 4.527412537887316e-16,
+          "score": -0.23202141538904947,
+          "profileSimilarity": 0.6539812639572671,
+          "conditionalProbability": 4.527412537887811e-16
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 1.1557604952453937e-17,
+          "score": -0.5376861754616564,
+          "profileSimilarity": 0.6052419208647717,
+          "conditionalProbability": 0.00010581182693416785
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 2.1219849188020528e-18,
+          "score": -0.6789354858480047,
+          "profileSimilarity": 0.6330684844572412,
+          "conditionalProbability": 0.00001942713061303623
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 1.7321403865525415e-18,
+          "score": -0.6958516584856433,
+          "profileSimilarity": 0.6503588942608248,
+          "conditionalProbability": 0.000015858038024449478
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 4.437796416480318e-19,
+          "score": -0.809333742134841,
+          "profileSimilarity": 0.625895699880372,
+          "conditionalProbability": 0.0000040628776318400224
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 2.3433777204224533e-19,
+          "score": -0.862547458119578,
+          "profileSimilarity": 0.6430965486096161,
+          "conditionalProbability": 0.000002145401913413545
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 4.46529386983172e-20,
+          "score": -1.0007010767323745,
+          "profileSimilarity": 0.633768129336058,
+          "conditionalProbability": 4.088052015175656e-7
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 2.1431986475577504e-20,
+          "score": -1.0618707117544612,
+          "profileSimilarity": 0.5961124934362501,
+          "conditionalProbability": 1.9621345885574132e-7
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        0,
+        1,
+        2
+      ],
+      "prediction": "gpt-5.4",
+      "usedOutputs": 3,
+      "calibration": {
+        "queries": "3",
+        "beta": 11.99999999999999,
+        "cv_accuracy": 1
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999999999900651
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 9.934893509228714e-12
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.4",
+          "probability": 0.9999997898233897,
+          "score": 2.357689348900625,
+          "profileSimilarity": 0.7608312898683426,
+          "conditionalProbability": 0.9999997898333246
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 2.101194752717e-7,
+          "score": 1.0763902382367645,
+          "profileSimilarity": 0.7495968796578159,
+          "conditionalProbability": 2.1011947527378752e-7
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 1.75406469608459e-11,
+          "score": 0.29381434601685474,
+          "profileSimilarity": 0.7353051686594325,
+          "conditionalProbability": 1.7540646961020164e-11
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 1.447410692128913e-11,
+          "score": 0.2778010503833422,
+          "profileSimilarity": 0.740017163097076,
+          "conditionalProbability": 1.447410692143293e-11
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 1.1192360815903885e-11,
+          "score": 0.25637356305270437,
+          "profileSimilarity": 0.7380585540856099,
+          "conditionalProbability": 1.1192360816015081e-11
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 7.232352248144247e-12,
+          "score": 0.21998463415313707,
+          "profileSimilarity": 0.7119095049194295,
+          "conditionalProbability": 0.7279748133612076
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 2.746810240386597e-12,
+          "score": 0.13930763391067572,
+          "profileSimilarity": 0.7409386211620632,
+          "conditionalProbability": 2.746810240413886e-12
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 2.4393851116200763e-12,
+          "score": 0.12941644043067269,
+          "profileSimilarity": 0.7280028625499957,
+          "conditionalProbability": 0.24553711716729368
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 1.1415200748758658e-12,
+          "score": 0.06613433785740552,
+          "profileSimilarity": 0.7353058532103717,
+          "conditionalProbability": 1.1415200748872068e-12
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 2.6299797280463305e-13,
+          "score": -0.056196472812141296,
+          "profileSimilarity": 0.7302961967296713,
+          "conditionalProbability": 0.02647214814736858
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 1.0469541494900702e-13,
+          "score": -0.1329540561068412,
+          "profileSimilarity": 0.7326636380508497,
+          "conditionalProbability": 1.0469541495004717e-13
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 1.0598815214254681e-16,
+          "score": -0.7075776634403139,
+          "profileSimilarity": 0.6990457528838092,
+          "conditionalProbability": 0.000010668272593369257
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 3.485814099277079e-17,
+          "score": -0.8002477138368588,
+          "profileSimilarity": 0.6779581919464857,
+          "conditionalProbability": 0.0000035086577385444937
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 1.1516238606418795e-17,
+          "score": -0.8925417654013676,
+          "profileSimilarity": 0.6872008851058576,
+          "conditionalProbability": 0.0000011591708150390478
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 5.698857572357598e-18,
+          "score": -0.9511661290048626,
+          "profileSimilarity": 0.6584185159137217,
+          "conditionalProbability": 5.736203983529184e-7
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 1.1527044323710169e-19,
+          "score": -1.2762277923397958,
+          "profileSimilarity": 0.6400664735633814,
+          "conditionalProbability": 1.1602584680955538e-8
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        3,
+        4,
+        5
+      ],
+      "prediction": "gpt-5.5",
+      "usedOutputs": 3,
+      "calibration": {
+        "queries": "3",
+        "beta": 11.99999999999999,
+        "cv_accuracy": 1
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999999999855393
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 1.4460972654707209e-11
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.5",
+          "probability": 0.9999999975759863,
+          "score": 2.4971582996995187,
+          "profileSimilarity": 0.7920257699911938,
+          "conditionalProbability": 0.999999997590447
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 1.6948902144118582e-9,
+          "score": 0.8141876441956706,
+          "profileSimilarity": 0.7732740483465472,
+          "conditionalProbability": 1.6948902144363674e-9
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 6.689606570272856e-10,
+          "score": 0.7367169777216444,
+          "profileSimilarity": 0.7675225466476143,
+          "conditionalProbability": 6.689606570369592e-10
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 2.1725345811238002e-11,
+          "score": 0.45111317263148926,
+          "profileSimilarity": 0.7617030262534824,
+          "conditionalProbability": 2.1725345811552166e-11
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 1.4457362062832567e-11,
+          "score": 0.4171735210851386,
+          "profileSimilarity": 0.7620903446010397,
+          "conditionalProbability": 0.9997503216442729
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 1.3847690458398149e-11,
+          "score": 0.4135830789759805,
+          "profileSimilarity": 0.759250917332263,
+          "conditionalProbability": 1.3847690458598396e-11
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 6.121224030292203e-12,
+          "score": 0.34555338036377364,
+          "profileSimilarity": 0.7622576573080734,
+          "conditionalProbability": 6.1212240303807206e-12
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 3.99820974827227e-12,
+          "score": 0.3100604317409536,
+          "profileSimilarity": 0.766085112104814,
+          "conditionalProbability": 3.998209748330087e-12
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 9.563595298453347e-15,
+          "score": -0.19290942187370133,
+          "profileSimilarity": 0.7593655246615898,
+          "conditionalProbability": 9.563595298591642e-15
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 2.5164327304362295e-15,
+          "score": -0.30416954005114755,
+          "profileSimilarity": 0.7573648445097114,
+          "conditionalProbability": 0.00017401545459786913
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 1.0644274619780205e-15,
+          "score": -0.3758699779894666,
+          "profileSimilarity": 0.7284367814572115,
+          "conditionalProbability": 0.00007360690649197358
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 2.2525686034088212e-17,
+          "score": -0.6971646512900596,
+          "profileSimilarity": 0.6847574267867387,
+          "conditionalProbability": 0.0000015576881702183323
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 5.460451593074957e-18,
+          "score": -0.8152583816153042,
+          "profileSimilarity": 0.7181733640656018,
+          "conditionalProbability": 3.775991922159896e-7
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 1.6588778000670686e-18,
+          "score": -0.9145408937807872,
+          "profileSimilarity": 0.7210642730121384,
+          "conditionalProbability": 1.147141232942644e-7
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 8.556170363935254e-20,
+          "score": -1.1615957965339498,
+          "profileSimilarity": 0.6608657707693576,
+          "conditionalProbability": 5.916732275370236e-9
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 1.1050971334705988e-21,
+          "score": -1.5240378432797534,
+          "profileSimilarity": 0.6999862144349417,
+          "conditionalProbability": 7.64192810440643e-11
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        6,
+        7,
+        8
+      ],
+      "prediction": "gpt-5.6-sol",
+      "usedOutputs": 3,
+      "calibration": {
+        "queries": "3",
+        "beta": 11.99999999999999,
+        "cv_accuracy": 1
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999999999535062
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 4.6493795406624004e-11
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 0.9999998780761412,
+          "score": 2.3065036656564355,
+          "profileSimilarity": 0.7744038299595993,
+          "conditionalProbability": 0.999999878122635
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 1.1770600905487102e-7,
+          "score": 0.976914028317483,
+          "profileSimilarity": 0.754541337661329,
+          "conditionalProbability": 1.1770600906034362e-7
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 2.039394540724416e-9,
+          "score": 0.6389526035746885,
+          "profileSimilarity": 0.7471564585494628,
+          "conditionalProbability": 2.0393945408192354e-9
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 1.3928939215714738e-9,
+          "score": 0.6071801511409415,
+          "profileSimilarity": 0.7417983967353812,
+          "conditionalProbability": 1.3928939216362348e-9
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 3.7611932211086386e-10,
+          "score": 0.49807745274652887,
+          "profileSimilarity": 0.747676544280808,
+          "conditionalProbability": 3.761193221283511e-10
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 1.9474101844827797e-10,
+          "score": 0.4432244632661824,
+          "profileSimilarity": 0.748653298869415,
+          "conditionalProbability": 1.947410184573322e-10
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 1.0310505127389734e-10,
+          "score": 0.3902309481352086,
+          "profileSimilarity": 0.7421384686711865,
+          "conditionalProbability": 1.0310505127869108e-10
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 6.510204699026831e-11,
+          "score": 0.3519149155313021,
+          "profileSimilarity": 0.7434143254234907,
+          "conditionalProbability": 6.510204699329516e-11
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 4.647832942273819e-11,
+          "score": 0.32383409699322224,
+          "profileSimilarity": 0.7401604536915078,
+          "conditionalProbability": 0.9996673538103191
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 1.5275795043549914e-14,
+          "score": -0.34453856106073943,
+          "profileSimilarity": 0.7325213562044148,
+          "conditionalProbability": 0.00032855556123029614
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 1.0585181344798708e-16,
+          "score": -0.758870619534502,
+          "profileSimilarity": 0.6972842859422652,
+          "conditionalProbability": 0.0000022766868680483397
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 6.383465813908137e-17,
+          "score": -0.8010159408514578,
+          "profileSimilarity": 0.6647630894827767,
+          "conditionalProbability": 0.000001372971545575021
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 1.569597013447658e-17,
+          "score": -0.9179236303348318,
+          "profileSimilarity": 0.6972483052132441,
+          "conditionalProbability": 3.3759279054771173e-7
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 4.530431521072639e-18,
+          "score": -1.021472530884891,
+          "profileSimilarity": 0.6904071218958031,
+          "conditionalProbability": 9.744163670551158e-8
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 2.411186292128895e-19,
+          "score": -1.265912816107871,
+          "profileSimilarity": 0.6424212190701031,
+          "conditionalProbability": 5.186038848928585e-9
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 3.4850382892605145e-20,
+          "score": -1.4270982265877,
+          "profileSimilarity": 0.6783216186373553,
+          "conditionalProbability": 7.495706166341496e-10
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        9,
+        10,
+        11
+      ],
+      "prediction": "gpt-5.6-terra",
+      "usedOutputs": 3,
+      "calibration": {
+        "queries": "3",
+        "beta": 11.99999999999999,
+        "cv_accuracy": 1
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999999999985301
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 1.4699797997556027e-12
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 0.9999998377178846,
+          "score": 2.2503997762670145,
+          "profileSimilarity": 0.7888919833225657,
+          "conditionalProbability": 0.9999998377193545
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 1.4108816539606476e-7,
+          "score": 0.9359097185004009,
+          "profileSimilarity": 0.763300422008016,
+          "conditionalProbability": 1.4108816539627215e-7
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 1.209839722108854e-8,
+          "score": 0.7312170519418139,
+          "profileSimilarity": 0.7584733957118879,
+          "conditionalProbability": 1.2098397221106325e-8
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 4.236574916744556e-9,
+          "score": 0.6437738983900647,
+          "profileSimilarity": 0.7595865705282752,
+          "conditionalProbability": 4.236574916750784e-9
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 3.400156586776117e-9,
+          "score": 0.6254460938363039,
+          "profileSimilarity": 0.7586454821644587,
+          "conditionalProbability": 3.400156586781115e-9
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 1.2098643903754564e-9,
+          "score": 0.5393366599831569,
+          "profileSimilarity": 0.7558259774192069,
+          "conditionalProbability": 1.2098643903772348e-9
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 1.8002055323590735e-10,
+          "score": 0.3805706158811086,
+          "profileSimilarity": 0.7582770940554563,
+          "conditionalProbability": 1.8002055323617197e-10
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 6.746642329415598e-11,
+          "score": 0.29878386691636416,
+          "profileSimilarity": 0.7547257781682233,
+          "conditionalProbability": 6.746642329425515e-11
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 1.4106578156910709e-12,
+          "score": -0.023513958907928224,
+          "profileSimilarity": 0.7424276664858193,
+          "conditionalProbability": 0.95964435424596
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 5.755281483584954e-14,
+          "score": -0.29010632269309167,
+          "profileSimilarity": 0.720319837750446,
+          "conditionalProbability": 0.03915211273339825
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 1.6347305964779028e-15,
+          "score": -0.5868750749540093,
+          "profileSimilarity": 0.7362266225789071,
+          "conditionalProbability": 0.0011120769120430713
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 1.1931260226486587e-16,
+          "score": -0.8049989364835969,
+          "profileSimilarity": 0.705159942365521,
+          "conditionalProbability": 0.00008116615091221162
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 8.904464130553136e-18,
+          "score": -1.0212651214765767,
+          "profileSimilarity": 0.663297906975528,
+          "conditionalProbability": 0.000006057541832910617
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 4.690193953016976e-18,
+          "score": -1.0746883550179671,
+          "profileSimilarity": 0.6996818012156406,
+          "conditionalProbability": 0.00000319065197616781
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 1.4673056580540924e-18,
+          "score": -1.171525530256974,
+          "profileSimilarity": 0.6874185805745504,
+          "conditionalProbability": 9.9818083098696e-7
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 6.406619798276124e-20,
+          "score": -1.4324643819260843,
+          "profileSimilarity": 0.6389467317067208,
+          "conditionalProbability": 4.358304651085193e-8
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        12,
+        13,
+        14
+      ],
+      "prediction": "gpt-5.6-luna",
+      "usedOutputs": 3,
+      "calibration": {
+        "queries": "3",
+        "beta": 11.99999999999999,
+        "cv_accuracy": 1
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999999999998425
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 1.5804216171873552e-13
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 0.9999999748125519,
+          "score": 2.41965201576297,
+          "profileSimilarity": 0.8153598206647027,
+          "conditionalProbability": 0.9999999748127094
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 2.3604387866709954e-8,
+          "score": 0.9561659165584612,
+          "profileSimilarity": 0.7874088532498772,
+          "conditionalProbability": 2.3604387866713673e-8
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 1.2071268949457418e-9,
+          "score": 0.708400120541761,
+          "profileSimilarity": 0.7832415803132898,
+          "conditionalProbability": 1.207126894945932e-9
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 2.1491305176861635e-10,
+          "score": 0.5645863861973105,
+          "profileSimilarity": 0.7791608290287113,
+          "conditionalProbability": 2.149130517686502e-10
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 1.2460950858297725e-10,
+          "score": 0.5191656678934317,
+          "profileSimilarity": 0.7847211399442195,
+          "conditionalProbability": 1.2460950858299687e-10
+        },
+        {
+          "model": "gpt-6-astra",
+          "probability": 2.940809820511264e-11,
+          "score": 0.3988394319986246,
+          "profileSimilarity": 0.7806358503908105,
+          "conditionalProbability": 2.9408098205117275e-11
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 5.766959838155003e-12,
+          "score": 0.26307901241202525,
+          "profileSimilarity": 0.7745934908458024,
+          "conditionalProbability": 5.766959838155912e-12
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 1.078082836795968e-12,
+          "score": 0.12333228424899807,
+          "profileSimilarity": 0.7774133704097982,
+          "conditionalProbability": 1.0780828367961378e-12
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 1.252562407050375e-13,
+          "score": -0.05604921798796638,
+          "profileSimilarity": 0.7670319113055164,
+          "conditionalProbability": 0.7925495281945936
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 3.229497841256776e-14,
+          "score": -0.1690033691273699,
+          "profileSimilarity": 0.768287594439061,
+          "conditionalProbability": 0.2043440690848211
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 4.093861563684302e-16,
+          "score": -0.5330040501111577,
+          "profileSimilarity": 0.7352319922996735,
+          "conditionalProbability": 0.0025903603944433928
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 7.717527713616127e-17,
+          "score": -0.6720523581798705,
+          "profileSimilarity": 0.725947971542203,
+          "conditionalProbability": 0.000488320814502073
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 2.626642654617783e-18,
+          "score": -0.9537500821694046,
+          "profileSimilarity": 0.680003116150224,
+          "conditionalProbability": 0.000016619885643505474
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 1.5555475104086422e-18,
+          "score": -0.9974066565970219,
+          "profileSimilarity": 0.7196607959208303,
+          "conditionalProbability": 0.000009842610943129333
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 1.8621425680823293e-19,
+          "score": -1.1742970674536437,
+          "profileSimilarity": 0.6552353746846147,
+          "conditionalProbability": 0.0000011782568321207523
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 1.2763203835487922e-20,
+          "score": -1.3976580339871472,
+          "profileSimilarity": 0.6946115258564338,
+          "conditionalProbability": 8.075822107648933e-8
+        }
+      ]
+    },
+    {
+      "sampleIndexes": [
+        15,
+        16,
+        17
+      ],
+      "prediction": "gpt-6-astra",
+      "usedOutputs": 3,
+      "calibration": {
+        "queries": "3",
+        "beta": 11.99999999999999,
+        "cv_accuracy": 1
+      },
+      "familyPrediction": "gpt",
+      "familyProbabilities": [
+        {
+          "family": "gpt",
+          "display_name": "GPT",
+          "probability": 0.9999999999995671
+        },
+        {
+          "family": "claude",
+          "display_name": "Claude",
+          "probability": 4.3283456308797233e-13
+        }
+      ],
+      "results": [
+        {
+          "model": "gpt-6-astra",
+          "probability": 0.9999996236029431,
+          "score": 2.4162899808427047,
+          "profileSimilarity": 0.7719480250045745,
+          "conditionalProbability": 0.999999623603376
+        },
+        {
+          "model": "gpt-6-sol",
+          "probability": 3.759954729322901e-7,
+          "score": 1.1834826177339064,
+          "profileSimilarity": 0.7624686600545014,
+          "conditionalProbability": 3.7599547293245285e-7
+        },
+        {
+          "model": "gpt-6-luna",
+          "probability": 1.9652827847141374e-10,
+          "score": 0.5537721135276806,
+          "profileSimilarity": 0.7480047305346935,
+          "conditionalProbability": 1.965282784714988e-10
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "probability": 1.3802662663147588e-10,
+          "score": 0.5243254703109432,
+          "profileSimilarity": 0.7478088027735739,
+          "conditionalProbability": 1.3802662663153561e-10
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "probability": 3.6847069901326164e-11,
+          "score": 0.41426959432033167,
+          "profileSimilarity": 0.748335344589307,
+          "conditionalProbability": 3.684706990134211e-11
+        },
+        {
+          "model": "gpt-5.4",
+          "probability": 1.672040038222539e-11,
+          "score": 0.3484240486880174,
+          "profileSimilarity": 0.7445755334630406,
+          "conditionalProbability": 1.672040038223263e-11
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "probability": 1.2919603195170631e-11,
+          "score": 0.3269337346679783,
+          "profileSimilarity": 0.7404006943480305,
+          "conditionalProbability": 1.2919603195176225e-11
+        },
+        {
+          "model": "claude-sonnet-4-6",
+          "probability": 4.3077387601691467e-13,
+          "score": 0.04352392120109424,
+          "profileSimilarity": 0.7241158100373537,
+          "conditionalProbability": 0.995239088449046
+        },
+        {
+          "model": "gpt-5.5",
+          "probability": 1.0914123774117858e-13,
+          "score": -0.0708877871541607,
+          "profileSimilarity": 0.7408226082339524,
+          "conditionalProbability": 1.0914123774122582e-13
+        },
+        {
+          "model": "claude-opus-5-5",
+          "probability": 1.4860249525291665e-15,
+          "score": -0.4289326258753472,
+          "profileSimilarity": 0.7305730021595899,
+          "conditionalProbability": 0.0034332400396294978
+        },
+        {
+          "model": "claude-opus-4-6",
+          "probability": 5.076142814534712e-16,
+          "score": -0.5184441380573085,
+          "profileSimilarity": 0.7357049271367155,
+          "conditionalProbability": 0.0011727674375909304
+        },
+        {
+          "model": "claude-haiku-4-5-20251001",
+          "probability": 4.3790563150142916e-17,
+          "score": -0.7226360988672771,
+          "profileSimilarity": 0.7068366177071903,
+          "conditionalProbability": 0.00010117159507255574
+        },
+        {
+          "model": "claude-opus-4-7",
+          "probability": 2.1518333229574894e-17,
+          "score": -0.7818455206038802,
+          "profileSimilarity": 0.6578712140630978,
+          "conditionalProbability": 0.000049714914345233
+        },
+        {
+          "model": "claude-sonnet-5",
+          "probability": 9.465131399749565e-19,
+          "score": -1.0421684960927522,
+          "profileSimilarity": 0.6574296142888989,
+          "conditionalProbability": 0.000002186778091893231
+        },
+        {
+          "model": "claude-opus-5",
+          "probability": 5.647430248564344e-19,
+          "score": -1.085203000162116,
+          "profileSimilarity": 0.7017197440406473,
+          "conditionalProbability": 0.0000013047549179700145
+        },
+        {
+          "model": "claude-opus-4-8",
+          "probability": 2.276845304822977e-19,
+          "score": -1.1609038144798147,
+          "profileSimilarity": 0.6837576305948383,
+          "conditionalProbability": 5.260313059519267e-7
+        }
+      ]
+    }
+  ]
+}

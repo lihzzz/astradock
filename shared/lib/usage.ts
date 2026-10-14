@@ -1,4 +1,5 @@
-import type { UsageInterval, UsageRange, UsageRank, UsageReport, UsageTimings } from "../types/usage";
+import type { UsageInterval, UsageRange, UsageRank, UsageReport, UsageTimings, UsageTokens } from "../types/usage";
+import { buildTokenUsageReport } from "./token-usage";
 
 export const USAGE_SAMPLE_MS = 15_000;
 export const USAGE_MAX_GAP_MS = 45_000;
@@ -133,7 +134,7 @@ function ranking(counts: Map<string, number>): UsageRank[] {
 }
 
 export function buildUsageReport(
-  sessions: UsageSessionSummary[], timings: UsageTimings, range: UsageRange, now = Date.now(),
+  sessions: UsageSessionSummary[], timings: UsageTimings, range: UsageRange, tokens: UsageTokens, now = Date.now(),
 ): UsageReport {
   const today = new Date(now);
   const starts = Array.from({ length: range + 1 }, (_, i) => new Date(today.getFullYear(), today.getMonth(), today.getDate() - range + 1 + i));
@@ -172,7 +173,8 @@ export function buildUsageReport(
     }
   }
   return {
-    days, tools: ranking(tools), commands: ranking(commands), slashCommands: ranking(slashCommands),
+    days, tokens: buildTokenUsageReport(tokens, range, now),
+    tools: ranking(tools), commands: ranking(commands), slashCommands: ranking(slashCommands),
     trackingStartedAt: timings.trackingStartedAt,
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     incompleteHistory: false,

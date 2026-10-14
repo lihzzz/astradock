@@ -1,4 +1,8 @@
 ﻿export const MEMORY_PANEL_ZH: Record<string, string> = {
+  "Last prompt memory context": "最近一次发送的记忆上下文",
+  "App-injected context only, not agent MCP reads. Refresh to see the latest prompt.": "仅展示应用自动注入的内容，不含 Agent 自行通过 MCP 读取的记忆。发送后刷新查看。",
+  "Skip app memory injection for the next message": "下一条消息跳过应用记忆注入",
+  "No app memory injected into the last prompt.": "最近一次发送没有注入应用记忆。",
   "Long-term memory": "长期记忆",
   "Enable and configure long-term memory in Settings first.": "请先在设置中配置并启用长期记忆。",
   "This project is isolated from personal memory.": "当前项目已与个人记忆隔离。",

@@ -23,7 +23,7 @@ async function runChecks() {
   const button = (name: string) => { const found = [...container.querySelectorAll("button")].find((entry) => entry.textContent === name); assert(found, `Missing ${name}`); return found; };
   const checks: string[] = [];
   try {
-    flushSync(() => root.render(<StrictMode><I18nProvider><MemoryPanel projectId="project" headerControls={null} /></I18nProvider></StrictMode>));
+    flushSync(() => root.render(<StrictMode><I18nProvider><MemoryPanel projectId="project" sessionId={null} headerControls={null} /></I18nProvider></StrictMode>));
     await waitFor(() => container.textContent?.includes("Fixture fact") === true);
     checks.push("loads project facts through real React effects");
     const textarea = container.querySelector("textarea"); assert(textarea, "Quick save missing");

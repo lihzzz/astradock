@@ -7,7 +7,7 @@ import type { PermissionUpdate } from "./permissions";
 import type { GitRepoInfo, GitStatus, GitBranch, GitLogEntry } from "@shared/types/git";
 import type { InstalledAgent } from "@shared/types/registry";
 import type { AppSettings, EngineBinaryScanResult, MacBackgroundEffect, ThemeOption } from "@shared/types/settings";
-import type { MemoryDocument, MemoryFact, MemoryGoldenReport, MemoryProjectConfig, MemoryStatusResult } from "@shared/types/memory";
+import type { MemoryRecallState, MemoryDocument, MemoryFact, MemoryGoldenReport, MemoryProjectConfig, MemoryStatusResult } from "@shared/types/memory";
 import type { SkillsListResult } from "@shared/types/skills";
 import type { UsageRange, UsageReport } from "@shared/types/usage";
 import type {
@@ -418,6 +418,8 @@ declare global {
         list: () => Promise<SkillsListResult>;
       };
       memory: {
+        sessionRecall: (sessionId: string) => Promise<{ state?: MemoryRecallState | null; error?: string }>;
+        skipNextRecall: (sessionId: string, skip: boolean) => Promise<IpcResult>;
         getDocument: (bankId: string, documentId: string) => Promise<{ text?: string; tags?: string[]; error?: string }>;
         projectBank: (projectId: string) => Promise<{ bankId?: string; error?: string }>;
         retainProject: (projectId: string, content: string, scope: "project" | "user") => Promise<IpcResult>;

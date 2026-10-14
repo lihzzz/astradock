@@ -8,7 +8,10 @@ export interface CodexFingerprintSamplePrompt {
 
 export interface CodexFingerprintProbeRequest {
   model: string;
-  effort?: ReasoningEffort;
+  effort?: ReasoningEffort | "max" | "ultra";
+  /** Probe the live session's persisted thread; omitted for a fresh-session probe. */
+  sessionId?: string;
+  cwd?: string;
 }
 
 export interface CodexFingerprintSample extends CodexFingerprintSamplePrompt {
@@ -69,9 +72,13 @@ export interface CodexFingerprintVerdict {
 }
 
 export interface CodexFingerprintProbeResult {
+  mode: "fresh" | "fork";
+  parentThreadId: string | null;
   selectedModel: string;
+  /** The label returned by Codex, independent of the statistical prediction. */
   actualModel: string | null;
-  reasoningEffort: ReasoningEffort | null;
+  modelProvider: string | null;
+  reasoningEffort: ReasoningEffort | "max" | "ultra" | null;
   verdict: CodexFingerprintVerdict;
   analysis: CodexFingerprintAnalysis | null;
   samples: CodexFingerprintSample[];

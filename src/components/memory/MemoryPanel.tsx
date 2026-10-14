@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useI18n } from "@/lib/i18n";
 import { reportError } from "@/lib/analytics/analytics";
-import type { MemoryDocument, MemoryFact, MemoryProjectConfig } from "@shared/types/memory";
+import type { MemoryRecallState, MemoryDocument, MemoryFact, MemoryProjectConfig } from "@shared/types/memory";
 
-interface Props { projectId: string | null; headerControls: ReactNode }
-export function MemoryPanel({ projectId, headerControls }: Props) {
+interface Props { projectId: string | null; sessionId: string | null; headerControls: ReactNode }
+export function MemoryPanel({ projectId, sessionId, headerControls }: Props) {
   const { t } = useI18n();
+  const [recall, setRecall] = useState<MemoryRecallState | null>(null);
   const [scope, setScope] = useState<"project" | "user">("project");
   const [bank, setBank] = useState("");
   const [config, setConfig] = useState<MemoryProjectConfig | null>(null);
@@ -30,6 +31,7 @@ export function MemoryPanel({ projectId, headerControls }: Props) {
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; generation.current++; }; }, []);
   const refresh = useCallback(async () => {
     const version = ++generation.current;
+    setRecall(null);
     setReady(false); setDocuments([]); setFacts([]); setSources({}); setMessage("");
     try {
       if (!projectId) return;
@@ -38,6 +40,12 @@ export function MemoryPanel({ projectId, headerControls }: Props) {
       if (binding.error || !binding.bankId) throw new Error(binding.error ?? "Project unavailable");
       if ("error" in nextConfig) throw new Error(nextConfig.error);
       setConfig(nextConfig);
+      if (sessionId) {
+        const recalled = await window.claude.memory.sessionRecall(sessionId);
+        if (version !== generation.current) return;
+        if (recalled.error) throw new Error(recalled.error);
+        setRecall(recalled.state ?? null);
+      }
       if (!status.enabled || !status.healthy) throw new Error(t("Enable and configure long-term memory in Settings first."));
       if (scope === "user" && nextConfig.memoryIsolated) throw new Error(t("This project is isolated from personal memory."));
       const bankId = scope === "user" ? "harnss-user" : binding.bankId;
@@ -49,7 +57,7 @@ export function MemoryPanel({ projectId, headerControls }: Props) {
       const detail = reportError("MEMORY_PANEL_LOAD", error);
       if (version === generation.current) setMessage(detail);
     }
-  }, [projectId, scope, t]);
+  }, [projectId, sessionId, scope, t]);
   useEffect(() => { setEdit(null); setDeleting(null); void refresh(); }, [refresh]);
   const loadSource = async (id: string) => {
     const version = generation.current;
@@ -84,6 +92,12 @@ export function MemoryPanel({ projectId, headerControls }: Props) {
       {!projectId ? <p>{t("Open a project to manage memory.")}</p> : <>
         <div className="flex gap-2"><select aria-label={t("Memory scope")} className="min-w-0 flex-1 rounded border bg-background p-2" value={scope} disabled={busy || !!text.trim() || !!edit} onChange={(event) => setScope(event.target.value === "user" ? "user" : "project")}><option value="project">{t("Project memory")}</option><option value="user" disabled={config?.memoryIsolated}>{t("Personal memory (shared across projects)")}</option></select><Button size="sm" variant="ghost" aria-label={t("Refresh")} disabled={busy} onClick={() => void refresh()}><RefreshCw className="h-3.5 w-3.5" /></Button></div>
         {config ? <label className="block">{t("Project memory mode")}<select className="ms-2 rounded border bg-background p-1" value={config.memoryMode} disabled={busy} onChange={(event) => { const mode = event.target.value; if (mode === "auto" || mode === "manual" || mode === "off") void perform(async () => { const result = await window.claude.memory.setProjectConfig(projectId, { memoryMode: mode }); return "error" in result ? result : {}; }); }}><option value="manual">{t("Manual")}</option><option value="auto">{t("Automatic")}</option><option value="off">{t("Off")}</option></select></label> : null}
+        {recall && sessionId ? <section className="space-y-2 rounded border p-2">
+          <h3 className="font-semibold">{t("Last prompt memory context")}</h3>
+          <p className="text-muted-foreground">{t("App-injected context only, not agent MCP reads. Refresh to see the latest prompt.")}</p>
+          <label className="flex items-start gap-2"><input type="checkbox" checked={recall.skipNext} disabled={busy} onChange={(event) => { const skip = event.target.checked; void perform(() => window.claude.memory.skipNextRecall(sessionId, skip)); }} />{t("Skip app memory injection for the next message")}</label>
+          {!recall.items.length ? <p>{t("No app memory injected into the last prompt.")}</p> : recall.items.map((item, index) => <p key={index} className="whitespace-pre-wrap wrap-break-word">{item.text}<span className="block text-muted-foreground">{item.bankId} · {item.documentId}</span></p>)}
+        </section> : null}
         <form onSubmit={(event) => { event.preventDefault(); void perform(() => window.claude.memory.retainProject(projectId, text, scope), true); }} className="space-y-2">
           <textarea aria-label={t("Remember this")} placeholder={t("Remember this")} className="min-h-24 w-full rounded border bg-background p-2" maxLength={20000} value={text} disabled={busy} onChange={(event) => setText(event.target.value)} />
           <Button size="sm" disabled={busy || !ready || config?.memoryMode === "off" || text.trim().length < 3}>{t(busy ? "Saving…" : "Save memory")}</Button>

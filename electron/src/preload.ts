@@ -458,6 +458,8 @@ contextBridge.exposeInMainWorld("claude", {
     list: () => ipcRenderer.invoke("skills:list"),
   },
   memory: {
+    sessionRecall: (sessionId: string) => ipcRenderer.invoke("memory:session-recall", sessionId),
+    skipNextRecall: (sessionId: string, skip: boolean) => ipcRenderer.invoke("memory:skip-next-recall", { sessionId, skip }),
     getDocument: (bankId: string, documentId: string) => ipcRenderer.invoke("memory:get-document", { bankId, documentId }),
     projectBank: (projectId: string) => ipcRenderer.invoke("memory:project-bank", projectId),
     retainProject: (projectId: string, content: string, scope: "project" | "user") => ipcRenderer.invoke("memory:retain-project", { projectId, content, scope }),

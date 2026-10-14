@@ -19,6 +19,34 @@ beforeEach(() => {
   f.retain.mockResolvedValue({}); f.recall.mockResolvedValue([{ text: "Known preference" }]); f.remove.mockResolvedValue(true); f.update.mockResolvedValue(true);
 });
 describe("memory trust and control", () => {
+  it("shows detached actual injected context and skips exactly one message", async () => {
+    const service = await import("./service"); service.registerMemorySession("s", "p", "claude");
+    await service.beforeMemorySend("s", "Recall question");
+    const state = service.getMemoryRecallState("s"); expect(state?.items.length).toBe(2);
+    if (state) state.items.length = 0;
+    expect(service.getMemoryRecallState("s")?.items.length).toBe(2);
+    service.setSkipNextMemoryRecall("s", true);
+    expect((await service.beforeMemorySend("s", "Next question")).text).toBe("Next question");
+    expect(service.getMemoryRecallState("s")).toEqual({ items: [], usedAt: null, skipNext: false });
+    expect((await service.beforeMemorySend("s", "Another question")).text).toContain("harnss-memory");
+    service.unregisterMemorySession("s"); expect(service.getMemoryRecallState("s")).toBeNull();
+  });
+  it("preserves a next-message skip selected while the current recall is in flight", async () => {
+    const service = await import("./service"); service.registerMemorySession("s", "p", "claude");
+    f.config.memoryIsolated = true;
+    let resolveRecall!: (items: { text: string }[]) => void;
+    f.recall.mockReturnValueOnce(new Promise<{ text: string }[]>((resolve) => { resolveRecall = resolve; }));
+    const pending = service.beforeMemorySend("s", "Current question");
+    service.setSkipNextMemoryRecall("s", true);
+    resolveRecall([{ text: "Current recalled context" }]);
+    expect((await pending).text).toContain("Current recalled context");
+    expect(service.getMemoryRecallState("s")?.skipNext).toBe(true);
+    expect((await service.beforeMemorySend("s", "Next question")).text).toBe("Next question");
+    expect(f.recall).toHaveBeenCalledTimes(1);
+    expect(service.getMemoryRecallState("s")).toEqual({ items: [], usedAt: null, skipNext: false });
+    expect((await service.beforeMemorySend("s", "Following question")).text).toContain("harnss-memory");
+    expect(f.recall).toHaveBeenCalledTimes(2);
+  });
   it("returns a manual write failure and permits the next queued write", async () => {
     const service = await import("./service"); service.registerMemorySession("s", "p", "claude");
     f.retain.mockRejectedValueOnce(new Error("write failed"));

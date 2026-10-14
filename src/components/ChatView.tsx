@@ -10,7 +10,6 @@ import { MessageBubble } from "./MessageBubble";
 import { SummaryBlock } from "./SummaryBlock";
 import { ToolCall } from "./ToolCall";
 import { ToolGroupBlock } from "./ToolGroupBlock";
-import { ToolResultSelection, SelectableToolGroup } from "./ToolResultSelection";
 import { TurnChangesSummary } from "./TurnChangesSummary";
 import { extractTurnSummaries } from "@/lib/chat/turn-changes";
 import type { TurnSummary } from "@/lib/chat/turn-changes";
@@ -65,8 +64,8 @@ function RowEntrance({ animate, children }: { animate: boolean; children: ReactN
     </motion.div>
   );
 }
-// Header clearance is reserved above the in-flow tool selection toolbar.
-const CHAT_TOP_PADDING_PX = 12;
+// Reserve clearance for the floating chat header.
+const CHAT_TOP_PADDING_PX = 68;
 const CHAT_BOTTOM_PADDING_PX = 144;
 const CHAT_EXTRA_BOTTOM_PADDING_PX = 280;
 const CHAT_COMPOSER_CLEARANCE_PX = 24;
@@ -242,7 +241,7 @@ const ChatMessageRow = memo(function ChatMessageRow({
     const isNewGroup = animatingGroupKeys.has(groupKey);
     return (
       <Fragment>
-        <SelectableToolGroup tools={row.group.tools}><ToolGroupBlock
+        <ToolGroupBlock
           tools={row.group.tools}
           messages={row.group.messages}
           showThinking={showThinking}
@@ -253,7 +252,7 @@ const ChatMessageRow = memo(function ChatMessageRow({
           disableCollapseAnimation
           animate={isNewGroup}
           revealMessageId={revealMessageId}
-        /></SelectableToolGroup>
+        />
         {row.groupTurnSummary ? <TurnChangesSummary summary={row.groupTurnSummary} /> : null}
       </Fragment>
     );
@@ -422,7 +421,7 @@ export const ChatView = memo(function ChatView(props: ChatViewProps) {
   // spaceId ensures the spinner shows immediately when switching spaces (before the 60ms debounced
   // session switch fires). sessionId + messages[0]?.id handle same-space session switches.
   const contentKey = `${props.spaceId ?? "s"}-${props.sessionId ?? "__empty__"}-${messages[0]?.id ?? ""}`;
-  return <ToolResultSelection key={contentKey} messages={messages}><ChatViewContent {...props} /></ToolResultSelection>;
+  return <ChatViewContent key={contentKey} {...props} />;
 });
 
 // ── ChatViewContent (inner, module-level) ──

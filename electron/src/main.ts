@@ -707,7 +707,8 @@ app.on("will-quit", (event) => {
       reportError("POSTHOG", err, { context: "shutdown" });
     }),
     shutdownMemory,
-    shutdownUsage().catch((err) => log("USAGE_SHUTDOWN_ERR", err)),
+    // Engine teardown may deliver final usage reports before its process exits.
+    engineShutdown.then(() => shutdownUsage()).catch((err) => reportError("USAGE_SHUTDOWN_ERR", err)),
     historyIpc.shutdownHistory().catch((err) => reportError("HISTORY:SHUTDOWN", err)),
   ]).finally(() => {
     app.exit(0);

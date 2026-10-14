@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
+import { reportError } from "@/lib/analytics/analytics";
+import { TokenUsageSection } from "./TokenUsageSection";
 import type { UsageRange, UsageRank, UsageReport } from "@shared/types/usage";
 
 function Rankings({ entries, label }: { entries: UsageRank[]; label: string }) {
@@ -59,7 +61,8 @@ export function UsageDashboard() {
         const result = await window.claude.usage.get(range);
         if (!result.data || result.error) throw new Error(result.error ?? "Missing usage report");
         if (!cancelled) { setReport(result.data); setError(false); }
-      } catch {
+      } catch (err) {
+        reportError("UsageDashboard.load", err, { range });
         if (!cancelled) setError(true);
       } finally {
         pending = false;
@@ -98,11 +101,11 @@ export function UsageDashboard() {
           <p className="mt-1 text-xs text-muted-foreground">{t("usageLocalOnly")}</p>
         </div>
         <div className="flex items-center gap-1" role="group" aria-label={t("usageDateRange")}>
-          {([7, 30, 90] as const).map((days) => (
+          {([1, 7, 30, 90] as const).map((days) => (
             <Button key={days} size="sm" variant={range === days ? "secondary" : "ghost"}
               aria-pressed={range === days}
               onClick={() => { if (range !== days) { setReport(null); setRange(days); } }}>
-              {days}{t("usageDays")}
+              {days === 1 ? t("usageSingleDay") : `${days}${t("usageDays")}`}
             </Button>
           ))}
           <Button variant="ghost" size="icon-sm" disabled={loading} aria-label={t("usageRefresh")}
@@ -147,6 +150,8 @@ export function UsageDashboard() {
             <p className="text-xs text-muted-foreground">{t("usageEmpty")}</p>
           )}
           {report.incompleteHistory && <p role="status" className="text-xs text-destructive">{t("usageIncomplete")}</p>}
+
+          <TokenUsageSection report={report.tokens} />
 
           <div>
             <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">

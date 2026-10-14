@@ -73,23 +73,24 @@ describe("sdk path resolution", () => {
     );
   });
 
-  it("prefers embed resolution when the candidate exists", async () => {
-    const embedEntry = require.resolve("@anthropic-ai/claude-agent-sdk/embed");
-    const embedCliPath = path.join(path.dirname(embedEntry), "cli.js");
-    mockExistsSync.mockImplementation((candidate: unknown) => candidate === embedCliPath);
-
-    const mod = await loadSdkModule();
-
-    expect(mod.getCliPath()).toBe(embedCliPath);
-    expect(mockLog).toHaveBeenCalledWith("CLI_PATH_SELECTED", `strategy=embed path=${embedCliPath}`);
-  });
-
-  it("falls back to package entry resolution when embed resolution is unavailable", async () => {
+  it("resolves a package CLI when the SDK no longer exports a legacy embed entry", async () => {
     const packageEntry = require.resolve("@anthropic-ai/claude-agent-sdk");
     const packageCliPath = path.join(path.dirname(packageEntry), "cli.js");
-    mockExistsSync.mockReturnValueOnce(false).mockReturnValueOnce(true);
+    mockExistsSync.mockImplementation((candidate: unknown) => candidate === packageCliPath);
 
     const mod = await loadSdkModule();
+
+    expect(mod.getCliPath()).toBe(packageCliPath);
+    expect(mockLog).toHaveBeenCalledWith("CLI_PATH_RESOLVE_ERR", expect.stringContaining("strategy=embed"));
+    expect(mockLog).toHaveBeenCalledWith("CLI_PATH_SELECTED", `strategy=package path=${packageCliPath}`);
+  });
+
+  it("maps an existing package CLI to the unpacked location when packaged", async () => {
+    mockApp.isPackaged = true;
+    const packageEntry = require.resolve("@anthropic-ai/claude-agent-sdk");
+    const mod = await loadSdkModule();
+    const packageCliPath = mod.resolveCliPathFromEntry(packageEntry, true);
+    mockExistsSync.mockImplementation((candidate: unknown) => candidate === packageCliPath);
 
     expect(mod.getCliPath()).toBe(packageCliPath);
     expect(mockLog).toHaveBeenCalledWith("CLI_PATH_SELECTED", `strategy=package path=${packageCliPath}`);
@@ -98,7 +99,7 @@ describe("sdk path resolution", () => {
   it("falls back to the packaged app path only after SDK-based strategies fail", async () => {
     mockApp.isPackaged = true;
     const packagedCliPath = path.normalize("/Applications/Harnss.app/Contents/Resources/app.asar.unpacked/node_modules/@anthropic-ai/claude-agent-sdk/cli.js");
-    mockExistsSync.mockReturnValueOnce(false).mockReturnValueOnce(false).mockReturnValueOnce(true);
+    mockExistsSync.mockImplementation((candidate: unknown) => candidate === packagedCliPath);
 
     const mod = await loadSdkModule();
 

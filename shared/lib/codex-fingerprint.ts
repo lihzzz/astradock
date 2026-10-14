@@ -13,6 +13,7 @@ const DIMENSION = VALUE_MAX - VALUE_MIN + 1;
 const ALPHA = 0.5;
 const MISMATCH_CONFIDENCE = 0.8;
 const MISMATCH_MARGIN = 0.5;
+const COMPARISON_EPSILON = 1e-9;
 
 interface BankModel {
   id: string;
@@ -52,7 +53,7 @@ export function parseFingerprintNumbers(text: string): number[] {
   for (const match of matches) {
     const separator = text.slice(previousEnd, match.index ?? 0);
     const value = Number.parseInt(match[0], 10);
-    if (current.length > 0 && /[a-z]/i.test(separator)) {
+    if (current.length > 0 && /\p{L}/u.test(separator)) {
       runs.push(current);
       current = [];
     }
@@ -191,7 +192,9 @@ export function analyzeFingerprintSamples(samples: CodexFingerprintSample[]): Co
   samples.forEach((sample, index) => {
     const numbers = parseFingerprintNumbers(sample.response);
     const minimum = minimumNumbers(sample.requestedCount);
-    const accepted = numbers.length >= minimum;
+    // Transport/tool failures may still contain a long sequence of numbers.
+    // Preserve the probe runner's rejection when validating its text.
+    const accepted = sample.accepted && sample.error === undefined && numbers.length >= minimum;
     diagnostics.push({
       index,
       parsedNumbers: numbers.length,
@@ -267,7 +270,7 @@ export function analyzeFingerprintSamples(samples: CodexFingerprintSample[]): Co
 
 function normalizeModel(model: string): string {
   const normalized = model.trim().toLowerCase();
-  return normalized.includes("/") ? normalized.split("/")[1] : normalized;
+  return normalized.slice(normalized.lastIndexOf("/") + 1);
 }
 
 function modelVersion(model: string): [number, number] | null {
@@ -301,8 +304,8 @@ function classifyChange(selected: string, predicted: string): CodexFingerprintVe
   return "lateral";
 }
 
-export function assessFingerprint(selectedModel: string, analysis: CodexFingerprintAnalysis | null): CodexFingerprintVerdict {
-  if (!analysis) {
+export function assessFingerprint(selectedModel: string | null, analysis: CodexFingerprintAnalysis | null): CodexFingerprintVerdict {
+  if (!analysis || analysis.results.length === 0) {
     return {
       verdict: "INVALID",
       direction: null,
@@ -314,7 +317,7 @@ export function assessFingerprint(selectedModel: string, analysis: CodexFingerpr
     };
   }
 
-  const selected = normalizeModel(selectedModel);
+  const selected = normalizeModel(selectedModel ?? "");
   const top = analysis.results[0];
   const selectedResult = analysis.results.find((result) => result.model === selected) ?? null;
   const base = {
@@ -322,6 +325,16 @@ export function assessFingerprint(selectedModel: string, analysis: CodexFingerpr
     selectedModelProbability: selectedResult?.probability ?? null,
     margin: selectedResult ? top.score - selectedResult.score : null,
   };
+
+  if (!selected) {
+    return {
+      ...base,
+      verdict: "UNKNOWN",
+      direction: null,
+      confidence: null,
+      message: "未能确定所选模型，无法判断指纹是否匹配。",
+    };
+  }
 
   if (!selectedResult) {
     return {
@@ -343,11 +356,13 @@ export function assessFingerprint(selectedModel: string, analysis: CodexFingerpr
     };
   }
 
-  const direction = classifyChange(selected, top.model);
+  // Version numbers from different model families do not describe a shared
+  // capability scale. A confident cross-family match is a reroute.
+  const direction = selectedResult.family === top.family ? classifyChange(selected, top.model) : "lateral";
   const confident = analysis.usedOutputs >= 2 &&
-    top.probability >= MISMATCH_CONFIDENCE &&
-    selectedResult.probability <= 1 - MISMATCH_CONFIDENCE &&
-    top.score - selectedResult.score >= MISMATCH_MARGIN;
+    top.probability + COMPARISON_EPSILON >= MISMATCH_CONFIDENCE &&
+    selectedResult.probability <= 1 - MISMATCH_CONFIDENCE + COMPARISON_EPSILON &&
+    top.score - selectedResult.score + COMPARISON_EPSILON >= MISMATCH_MARGIN;
 
   return {
     ...base,

@@ -1,46 +1,70 @@
-import { memo, useEffect, useMemo, useState } from "react";
-import { Fingerprint, Loader2, Play, ShieldCheck, ShieldAlert } from "lucide-react";
+import { memo, useEffect, useState } from "react";
+import { useStore } from "zustand";
+import { CheckCircle2, Fingerprint, Loader2, Play, ShieldAlert } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PanelHeader } from "@/components/PanelHeader";
+import { reportError } from "@/lib/analytics/analytics";
+import { getFingerprintProbeStore } from "@/stores/fingerprint-probe-store";
 import type { CodexFingerprintProbeResult, CodexFingerprintVerdict } from "@/types";
 import type { CodexModel } from "@shared/types/codex";
 
 interface FingerprintProbePanelProps {
+  scopeId: string | null;
+  sessionId: string | null;
+  cwd: string | undefined;
   headerControls?: React.ReactNode;
 }
 
+const neutralStyle = "bg-foreground/[0.06] text-muted-foreground";
+const cautionStyle = "bg-amber-500/10 text-amber-600 dark:text-amber-300";
 const verdictStyles: Record<CodexFingerprintVerdict["verdict"], string> = {
   MATCH: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
-  SUSPICIOUS: "bg-amber-500/10 text-amber-600 dark:text-amber-300",
+  SUSPICIOUS: cautionStyle,
   MISMATCH: "bg-red-500/10 text-red-600 dark:text-red-300",
-  UNLISTED: "bg-foreground/[0.06] text-muted-foreground",
-  INVALID: "bg-foreground/[0.06] text-muted-foreground",
-  UNKNOWN: "bg-foreground/[0.06] text-muted-foreground",
+  UNLISTED: neutralStyle,
+  INVALID: neutralStyle,
+  UNKNOWN: neutralStyle,
 };
+
+function verdictStyle(verdict: CodexFingerprintVerdict): string {
+  return verdict.verdict === "MATCH" && verdict.confidence !== "high"
+    ? cautionStyle
+    : verdictStyles[verdict.verdict];
+}
+
+function verdictLabel(verdict: CodexFingerprintVerdict): string {
+  return verdict.verdict === "MATCH" && verdict.confidence !== "high"
+    ? "MATCH · low confidence"
+    : verdict.verdict;
+}
 
 function formatPercent(value: number | null | undefined): string {
   return value == null ? "—" : `${(value * 100).toFixed(1)}%`;
 }
 
-export const FingerprintProbePanel = memo(function FingerprintProbePanel({
-  headerControls,
-}: FingerprintProbePanelProps) {
+// Remount view-local model loading at the session/project boundary. Probe
+// state lives outside the view and is restored when the same scope reopens.
+export const FingerprintProbePanel = memo(function FingerprintProbePanel(props: FingerprintProbePanelProps) {
+  return <FingerprintProbePanelContent key={JSON.stringify([props.scopeId, props.sessionId, props.cwd])} {...props} />;
+});
+
+function FingerprintProbePanelContent({ scopeId, sessionId, cwd, headerControls }: FingerprintProbePanelProps) {
+  const probeStore = getFingerprintProbeStore({ scopeId, sessionId, cwd });
+  const {
+    selectedModel, setSelectedModel, selectedEffort, setSelectedEffort,
+    probeTarget, running, result, latestAttempt, probeError,
+    changeTarget: setProbeTarget, runProbe,
+  } = useStore(probeStore);
   const [models, setModels] = useState<CodexModel[]>([]);
   const [modelsLoading, setModelsLoading] = useState(true);
   const [modelsError, setModelsError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<string>("");
-  const [selectedEffort, setSelectedEffort] = useState<string>("");
-  const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<CodexFingerprintProbeResult | null>(null);
-  const [probeError, setProbeError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setModelsLoading(true);
     window.claude.codex.listModels()
       .then((response) => {
         if (cancelled) return;
@@ -50,14 +74,14 @@ export const FingerprintProbePanel = memo(function FingerprintProbePanel({
         } else {
           setModelsError(null);
           setModels(response.models ?? []);
-          setSelectedModel((current) =>
-            current || (response.models.find((model) => model.isDefault)?.id ?? response.models[0]?.id ?? ""),
-          );
+          if (!probeStore.getState().selectedModel) {
+            setSelectedModel(response.models.find((model) => model.isDefault)?.id ?? response.models[0]?.id ?? "");
+          }
         }
       })
       .catch((error: unknown) => {
-        if (cancelled) return;
-        setModelsError(error instanceof Error ? error.message : "Unable to load Codex models");
+        const message = reportError("fingerprint:list-models", error);
+        if (!cancelled) setModelsError(message);
       })
       .finally(() => {
         if (!cancelled) setModelsLoading(false);
@@ -65,36 +89,34 @@ export const FingerprintProbePanel = memo(function FingerprintProbePanel({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [probeStore, setSelectedModel]);
 
   const currentModel = models.find((model) => model.id === selectedModel);
   const effortOptions = currentModel?.supportedReasoningEfforts ?? [];
   const activeEffort = effortOptions.find((option) => option.reasoningEffort === selectedEffort)?.reasoningEffort
     ?? effortOptions.find((option) => option.reasoningEffort === currentModel?.defaultReasoningEffort)?.reasoningEffort
     ?? effortOptions[0]?.reasoningEffort;
+  const canRun = probeTarget === "current" ? sessionId != null : currentModel != null && !modelsLoading;
 
-  const runProbe = async () => {
-    if (!selectedModel || running) return;
-    setRunning(true);
-    setProbeError(null);
-    setResult(null);
-    try {
-      const response = await window.claude.codex.fingerprintProbe({ model: selectedModel, effort: activeEffort });
-      if ("error" in response && response.error) {
-        setProbeError(response.error);
-      } else if ("error" in response) {
-        setProbeError("Fingerprint probe failed");
-      } else {
-        setResult(response);
-      }
-    } catch (error: unknown) {
-      setProbeError(error instanceof Error ? error.message : "Fingerprint probe failed");
-    } finally {
-      setRunning(false);
-    }
+  const changeTarget = (target: string) => {
+    if (target !== "fresh" && target !== "current") return;
+    if (target === "current" && sessionId == null) return;
+    setProbeTarget(target);
   };
 
-  const topCandidates = useMemo(() => result?.analysis?.results ?? [], [result]);
+  const startProbe = () => {
+    if (!canRun) return;
+    void runProbe({
+      model: selectedModel,
+      cwd,
+      ...(probeTarget === "current" && sessionId != null ? { sessionId } : { effort: activeEffort }),
+    });
+  };
+
+  const displayedResult = result ?? latestAttempt;
+  const previousResult = result != null && (running || probeError != null || (latestAttempt != null && latestAttempt !== result));
+  const sampleResult = latestAttempt ?? (!running && !probeError ? result : null);
+  const latestVerdict = latestAttempt?.verdict ?? result?.verdict;
 
   return (
     <div className="flex h-full flex-col">
@@ -106,153 +128,182 @@ export const FingerprintProbePanel = memo(function FingerprintProbePanel({
         <div className="space-y-3 p-3">
           <div className="space-y-2 rounded-lg border border-border/50 bg-background/70 p-3">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-medium text-muted-foreground">Target model</span>
-              {result && (
-                <Badge variant="secondary" className={verdictStyles[result.verdict.verdict]}>
-                  {result.verdict.verdict}
-                </Badge>
-              )}
+              <span className="text-[11px] font-medium text-muted-foreground">Probe target</span>
+              {running ? (
+                <Badge variant="secondary">Running</Badge>
+              ) : probeError && !latestAttempt ? (
+                <Badge variant="secondary" className={neutralStyle}>Failed</Badge>
+              ) : latestVerdict ? (
+                <Badge variant="secondary" className={verdictStyle(latestVerdict)}>{verdictLabel(latestVerdict)}</Badge>
+              ) : null}
             </div>
-            <div className="flex gap-2">
-              <div className="flex-1 min-w-0">
+            <Select value={probeTarget} onValueChange={changeTarget} disabled={running}>
+              <SelectTrigger size="sm" className="w-full text-foreground/80" aria-label="Probe target">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fresh">Fresh session</SelectItem>
+                <SelectItem value="current" disabled={sessionId == null}>Current session</SelectItem>
+              </SelectContent>
+            </Select>
+            {probeTarget === "fresh" ? (
+              <>
+                <span className="text-[11px] font-medium text-muted-foreground">Target model</span>
                 <Select value={selectedModel} onValueChange={setSelectedModel} disabled={modelsLoading || running}>
-                  <SelectTrigger size="sm" className="w-full text-foreground/80">
+                  <SelectTrigger size="sm" className="w-full text-foreground/80" aria-label="Target model">
                     <SelectValue placeholder={modelsLoading ? "Loading models…" : "Select model"} />
                   </SelectTrigger>
                   <SelectContent>
                     {models.map((model) => (
-                      <SelectItem key={model.id} value={model.id}>
-                        {model.displayName || model.id}
-                      </SelectItem>
+                      <SelectItem key={model.id} value={model.id}>{model.displayName || model.id}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <Button size="sm" onClick={() => void runProbe()} disabled={!selectedModel || running || modelsLoading}>
-                {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
-                Run
-              </Button>
-            </div>
-            {effortOptions.length > 0 && (
-              <div className="space-y-2">
-                <span className="text-[11px] font-medium text-muted-foreground">Reasoning effort</span>
-                <Select value={activeEffort} onValueChange={setSelectedEffort} disabled={modelsLoading || running}>
-                  <SelectTrigger size="sm" className="w-full capitalize text-foreground/80" aria-label="Reasoning effort">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {effortOptions.map((option) => (
-                      <SelectItem key={option.reasoningEffort} value={option.reasoningEffort} className="capitalize">
-                        {option.reasoningEffort}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {effortOptions.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-medium text-muted-foreground">Reasoning effort</span>
+                    <Select value={activeEffort} onValueChange={setSelectedEffort} disabled={modelsLoading || running}>
+                      <SelectTrigger size="sm" className="w-full capitalize text-foreground/80" aria-label="Reasoning effort">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {effortOptions.map((option) => (
+                          <SelectItem key={option.reasoningEffort} value={option.reasoningEffort} className="capitalize">
+                            {option.reasoningEffort}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-[10px] leading-relaxed text-muted-foreground">
+                Inherits this session's model, provider, and reasoning effort. Samples run in temporary branches of this session.
+              </p>
+            )}
+            <Button size="sm" onClick={startProbe} disabled={!canRun || running}>
+              {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+              Run
+            </Button>
+            <p className="text-[10px] leading-relaxed text-muted-foreground/60">
+              Compares three short model responses with the local fingerprint bank using your Codex account.
+              {probeTarget === "fresh" ? " This tests fresh sessions." : " This tests the current session."}
+            </p>
+            {modelsError && probeTarget === "fresh" && <p className="text-[10px] text-red-500">{modelsError}</p>}
+            {probeError && (
+              <div role="alert" className="space-y-1 text-[10px] leading-relaxed text-red-500">
+                <p>Latest attempt: {probeError}</p>
+                {!latestAttempt && <p>No samples were returned.</p>}
               </div>
             )}
-            <p className="text-[10px] leading-relaxed text-muted-foreground/50">
-              Runs three fresh, ephemeral Codex turns and compares their random-number fingerprint with a local
-              ModelTrace bank. This uses three short model responses from your Codex account.
-            </p>
-            {modelsError && <p className="text-[10px] text-red-500">{modelsError}</p>}
-            {probeError && <p className="text-[10px] leading-relaxed text-red-500">{probeError}</p>}
           </div>
 
-          {result?.analysis && (
-            <div className="space-y-3 rounded-lg border border-border/50 bg-background/70 p-3">
-              <div className="flex items-start gap-2">
-                {result.verdict.verdict === "MATCH" ? (
-                  <ShieldCheck className="mt-0.5 h-4 w-4 text-emerald-500" />
-                ) : (
-                  <ShieldAlert className="mt-0.5 h-4 w-4 text-amber-500" />
-                )}
-                <div className="min-w-0 flex-1 space-y-1">
-                  <p className="text-xs font-semibold text-foreground">{result.verdict.message}</p>
-                  <p className="text-[10px] leading-relaxed text-muted-foreground">
-                    Selected <span className="font-mono">{result.selectedModel}</span>; fingerprint{" "}
-                    <span className="font-mono">{result.analysis.prediction}</span> ·{" "}
-                    {formatPercent(result.analysis.probability)} · {result.analysis.usedOutputs} valid samples ·{" "}
-                    {result.verdict.direction ? `${result.verdict.direction} · ` : ""}
-                    {(result.elapsedMs / 1000).toFixed(1)}s
-                  </p>
-                </div>
-              </div>
+          {displayedResult && <FingerprintResultSummary result={displayedResult} previous={previousResult} />}
 
-              <div className="space-y-1.5">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">
-                  Candidate probabilities
-                </p>
-                <div className="space-y-1">
-                  {topCandidates.map((candidate) => (
-                    <div key={candidate.model} className="space-y-0.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate font-mono text-[10px] text-foreground/70">{candidate.model}</span>
-                        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-                          {formatPercent(candidate.probability)}
-                        </span>
-                      </div>
-                      <div className="h-1 overflow-hidden rounded-full bg-foreground/[0.06]">
-                        <div
-                          className="h-full rounded-full bg-foreground/35"
-                          style={{ width: `${Math.max(1, candidate.probability * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid gap-1 text-[10px] text-muted-foreground">
-                {result.reasoningEffort && <span>Reasoning effort: {result.reasoningEffort}</span>}
-                <span>
-                  Selected-model probability: {formatPercent(result.verdict.selectedModelProbability)}
-                </span>
-                <span>Score margin: {result.verdict.margin == null ? "—" : result.verdict.margin.toFixed(2)}</span>
-                <span>
-                  Calibration: n={result.analysis.calibration.queries}, β={result.analysis.calibration.beta.toFixed(2)},
-                  CV accuracy={formatPercent(result.analysis.calibration.cvAccuracy)}
-                </span>
-                <span>Method: {result.analysis.method}</span>
-              </div>
-            </div>
-          )}
-
-          {result && (
+          {sampleResult && (
             <div className="space-y-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">
-                Samples
-              </p>
-              {result.samples.map((sample) => (
-                <div key={sample.sampleId} className="space-y-1 rounded-lg border border-border/50 bg-background/70 p-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-semibold text-foreground/70">Sample {sample.sampleId + 1}</span>
-                    <Badge variant="secondary" className="h-4 rounded-full px-1.5 text-[9px] tabular-nums">
-                      {sample.parsedCount}/{sample.requestedCount}
-                    </Badge>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">Latest attempt samples</p>
+              {sampleResult.samples.map((sample) => {
+                const diagnostic = sampleResult.analysis?.diagnostics.find((entry) => entry.index === sample.sampleId);
+                return (
+                  <div key={sample.sampleId} className="space-y-1 rounded-lg border border-border/50 bg-background/70 p-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-semibold text-foreground/70">Sample {sample.sampleId + 1}</span>
+                      <Badge variant="secondary" className="h-4 rounded-full px-1.5 text-[9px] tabular-nums">
+                        {sample.parsedCount}/{sample.requestedCount}
+                      </Badge>
+                    </div>
+                    <p className="wrap-break-word text-[10px] leading-relaxed text-muted-foreground/60">Prompt: {sample.prompt}</p>
+                    <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-foreground/[0.03] p-2 font-mono text-[10px] leading-relaxed text-foreground/75">
+                      {sample.response || "(empty response)"}
+                    </pre>
+                    {sample.error && <p className="wrap-break-word text-[10px] text-red-500">{sample.error}</p>}
+                    <p className="text-[10px] text-muted-foreground/60">
+                      {sample.accepted ? "Accepted" : "Rejected"} · parsed {sample.parsedCount}
+                      {diagnostic ? `, minimum ${diagnostic.minimumNumbers}` : ""}
+                    </p>
                   </div>
-                  <p className="break-all text-[10px] leading-relaxed text-muted-foreground/60">
-                    Prompt: {sample.prompt}
-                  </p>
-                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-foreground/[0.03] p-2 font-mono text-[10px] leading-relaxed text-foreground/75">
-                    {sample.response || "(empty response)"}
-                  </pre>
-                  {sample.error && <p className="text-[10px] text-red-500">{sample.error}</p>}
-                  <p className="text-[10px] text-muted-foreground/50">
-                    {sample.accepted ? "Accepted" : "Rejected"} · parsed {sample.parsedCount}, minimum{" "}
-                    {Math.max(80, Math.ceil(sample.requestedCount * 0.55))}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
-          {!result && !running && !probeError && !modelsError && (
-            <p className="px-1 py-2 text-[10px] leading-relaxed text-muted-foreground/40">
-              Run a probe to verify whether the selected model is actually the one answering.
+          {!displayedResult && !running && !probeError && !modelsError && (
+            <p className="px-1 py-2 text-[10px] leading-relaxed text-muted-foreground/60">
+              Run a probe to compare the model's responses with known fingerprints.
             </p>
           )}
         </div>
       </ScrollArea>
     </div>
   );
-});
+}
+
+function FingerprintResultSummary({ result, previous }: { result: CodexFingerprintProbeResult; previous: boolean }) {
+  const strongMatch = result.verdict.verdict === "MATCH" && result.verdict.confidence === "high";
+  const analysis = result.analysis;
+  return (
+    <div className="space-y-3 rounded-lg border border-border/50 bg-background/70 p-3">
+      {previous && <p className="text-[10px] font-semibold text-muted-foreground">Last valid result · retained from the previous probe</p>}
+      <div className="flex items-start gap-2">
+        {strongMatch ? (
+          <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-500" />
+        ) : result.verdict.verdict === "MATCH" ? (
+          <Fingerprint className="mt-0.5 h-4 w-4 text-amber-500" />
+        ) : (
+          <ShieldAlert className={`mt-0.5 h-4 w-4 ${result.verdict.verdict === "MISMATCH" ? "text-red-500" : "text-muted-foreground"}`} />
+        )}
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="text-xs font-semibold text-foreground">{result.verdict.message}</p>
+          <p className="text-[10px] leading-relaxed text-muted-foreground">
+            {result.mode === "fork" ? "Current session" : "Fresh sessions"} · {analysis?.usedOutputs ?? 0} valid samples · {(result.elapsedMs / 1000).toFixed(1)}s
+          </p>
+        </div>
+      </div>
+      <dl className="grid gap-1 text-[10px] text-muted-foreground">
+        <div><dt className="inline">Expected model: </dt><dd className="inline wrap-break-word font-mono text-foreground/80">{result.selectedModel}</dd></div>
+        <div><dt className="inline">Server-reported model: </dt><dd className="inline wrap-break-word font-mono text-foreground/80">{result.actualModel ?? "Not reported"}</dd></div>
+        <div><dt className="inline">Statistical prediction: </dt><dd className="inline wrap-break-word font-mono text-foreground/80">{analysis?.prediction ?? "Unavailable"}</dd>{analysis && ` · ${formatPercent(analysis.probability)}`}</div>
+        {result.reasoningEffort && <div><dt className="inline">Reasoning effort: </dt><dd className="inline">{result.reasoningEffort}</dd></div>}
+        {result.modelProvider && <div><dt className="inline">Provider: </dt><dd className="inline wrap-break-word">{result.modelProvider}</dd></div>}
+      </dl>
+      {result.verdict.verdict === "MATCH" && !strongMatch && (
+        <p className="text-[10px] leading-relaxed text-amber-600 dark:text-amber-300">Low confidence: the closest fingerprint matches, but the evidence is limited.</p>
+      )}
+      {result.verdict.verdict === "UNLISTED" && (
+        <p className="text-[10px] leading-relaxed text-muted-foreground">The expected model is outside the fingerprint bank. Its nearest candidate cannot establish a model downgrade.</p>
+      )}
+      <p className="text-[10px] leading-relaxed text-muted-foreground">
+        Statistical comparison only. Probabilities rank models in the bank and do not verify model identity.
+      </p>
+      {analysis && (
+        <>
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">Probabilities within the fingerprint bank</p>
+            {analysis.results.map((candidate) => (
+              <div key={candidate.model} className="space-y-0.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-mono text-[10px] text-foreground/70">{candidate.model}</span>
+                  <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{formatPercent(candidate.probability)}</span>
+                </div>
+                <div className="h-1 overflow-hidden rounded-full bg-foreground/[0.06]">
+                  <div className="h-full rounded-full bg-foreground/35" style={{ width: `${Math.min(100, Math.max(0, candidate.probability * 100))}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <details className="text-[10px] text-muted-foreground">
+            <summary className="cursor-pointer">Scoring details</summary>
+            <div className="mt-1 grid gap-1">
+              <span>Expected-model probability: {formatPercent(result.verdict.selectedModelProbability)}</span>
+              <span>Score margin: {result.verdict.margin == null ? "—" : result.verdict.margin.toFixed(2)}</span>
+              <span>Calibration: n={analysis.calibration.queries}, β={analysis.calibration.beta.toFixed(2)}, CV accuracy={formatPercent(analysis.calibration.cvAccuracy)}</span>
+              <span className="wrap-break-word">Method: {analysis.method}</span>
+            </div>
+          </details>
+        </>
+      )}
+    </div>
+  );
+}

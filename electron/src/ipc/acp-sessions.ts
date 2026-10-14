@@ -40,6 +40,7 @@ import { withComputerUseMcpServer } from "../lib/computer-use-runtime";
 import { withHindsightMcpServers, registerMemorySession, unregisterMemorySession, beforeMemorySend, observeAcpUpdate, completeMemoryTurn } from "../lib/memory/service";
 import { cancelProjectAppAgentPermissions, registerProjectAppAgentSession, revokeProjectAppAgentSession, withProjectAppMcpServer } from "../lib/project-apps/agent-bridge";
 import { beginUsageTurn, endUsageTurn, stopUsageSession } from "../lib/usage";
+import { recordAcpTokenUsage } from "../lib/token-usage";
 import { finishAcpTaskTurn } from "../lib/tasks/engine-events";
 import { taskRuntimeEvents } from "../lib/tasks/runtime-events";
 import { stopProcessAndWait } from "@shared/lib/process-stop";
@@ -859,6 +860,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
       });
 
       log("ACP_TURN_COMPLETE", `session=${sessionId.slice(0, 8)} stopReason=${result.stopReason} usage=${JSON.stringify(result.usage ?? null)}`);
+      recordAcpTokenUsage(usageTurnId, result.usage);
       void completeMemoryTurn(sessionId);
       finishAcpTaskTurn(sessionId, result.stopReason);
 

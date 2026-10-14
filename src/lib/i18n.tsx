@@ -4,6 +4,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import type { Language } from "@/types";
 import { APPS_EN, APPS_ZH } from "@/components/apps/strings";
 import { TASKS_EN, TASKS_ZH } from "@/components/tasks/strings";
+import { TOKEN_USAGE_EN, TOKEN_USAGE_ZH } from "@/components/settings/usage-strings";
 
 /**
  * Small, dependency-free UI translation layer.
@@ -16,6 +17,7 @@ const ZH_CN: Record<string, string> = {
   ...MEMORY_PANEL_ZH,
   ...APPS_ZH,
   ...TASKS_ZH,
+  ...TOKEN_USAGE_ZH,
   sessionRecoveryCancelled: "会话已切换或停用，已取消恢复。未发送内容保留在原会话队列中。",
   sessionRecoveryNoAgent: "此会话缺少 Agent 配置，请选择有效的 Agent 后重试。",
   sessionRecoveryNoThread: "未找到可恢复的 Codex 线程。",
@@ -144,16 +146,8 @@ const ZH_CN: Record<string, string> = {
   "Clipboard text exceeds 64 KiB; reduce it and try again": "剪贴板文本超过 64 KiB，请缩减后重试",
   "Clipboard text is unavailable": "无法读取剪贴板文本",
   "The input is not ready; retry after the window finishes loading": "输入框尚未就绪，请在窗口加载完毕后重试",
-  "Select tool results": "多选工具结果",
-  "Select tool result": "选择工具结果",
-  "Select completed tools in group": "选择本组已完成工具",
   "Copy Markdown": "复制 Markdown",
-  "Tool results copied as Markdown": "工具结果已复制为 Markdown",
   "Clipboard write failed": "复制失败，请检查剪贴板权限",
-  "Unable to copy tool results": "无法复制工具结果",
-  "No tool results selected": "尚未选择工具结果",
-  "Wait for the selected tools to finish": "请等待所选工具执行完成",
-  "Selected tool results exceed 5 MiB; select fewer results": "所选结果超过 5 MiB，请减少选择后重试",
   "Select conversations": "多选会话",
   "Select conversation": "选择会话",
   "Select loaded (max 500)": "全选已加载（最多 500 项）",
@@ -528,6 +522,7 @@ export type TranslationKey = keyof typeof ZH_CN;
 const EN_US: Record<TranslationKey, string> = {
   ...APPS_EN,
   ...TASKS_EN,
+  ...TOKEN_USAGE_EN,
   sessionRecoveryCancelled: "The conversation changed or became unavailable. Restoration was cancelled; unsent input remains in its queue.",
   sessionRecoveryNoAgent: "This conversation has no agent configuration. Select an available agent and retry.",
   sessionRecoveryNoThread: "No resumable Codex thread was found.",

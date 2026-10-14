@@ -165,8 +165,16 @@ export function ToolIslandContent({
         />
       );
     case "memory":
-      return <MemoryPanel key={projectId ?? "none"} projectId={projectId} headerControls={headerControls} />;
+      return <MemoryPanel key={projectId ?? "none"} projectId={projectId} sessionId={sessionId} headerControls={headerControls} />;
     case "fingerprint":
-      return <FingerprintProbePanel headerControls={headerControls} />;
+      return (
+        <FingerprintProbePanel
+          key={sessionId ?? "no-session"}
+          scopeId={sessionId}
+          sessionId={activeEngine === "codex" && hasLiveSession ? sessionId : null}
+          cwd={projectPath}
+          headerControls={headerControls}
+        />
+      );
   }
 }

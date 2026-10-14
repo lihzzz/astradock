@@ -21,6 +21,7 @@ vi.mock("electron", () => ({
 }));
 vi.mock("../lib/data-dir", () => ({ getDataDir: () => mocks.directory }));
 vi.mock("../lib/logger", () => ({ log: vi.fn() }));
+vi.mock("../lib/error-utils", () => ({ reportError: vi.fn() }));
 
 const now = new Date(2026, 9, 7, 12).getTime();
 let usage: typeof import("../lib/usage");
@@ -52,6 +53,21 @@ async function query(range: unknown = 7, sender: unknown = mocks.sender) {
 }
 
 describe("local usage IPC", () => {
+  it.each([1, 7, 30, 90])("supports a %s-day report with engine token totals", async (range) => {
+    await fs.writeFile(path.join(mocks.directory, "usage-tokens.json"), JSON.stringify({
+      version: 1, trackingStartedAt: now - 86_400_000,
+      entries: [{ timestamp: now, engine: "codex", totalTokens: 150, inputTokens: 100,
+        outputTokens: 50, cacheReadTokens: 40, cacheCreationTokens: 0 }],
+    }));
+    await register();
+    const result = await query(range);
+    expect(result.error).toBeUndefined();
+    expect(result.data?.days).toHaveLength(range);
+    expect(result.data?.tokens.days).toHaveLength(range);
+    expect(result.data?.tokens.engines.find((entry) => entry.engine === "codex"))
+      .toMatchObject({ totalTokens: 150, cacheReadTokens: 40, reported: true });
+  });
+
   it("combines persisted history with live timing and saves durations independently of telemetry", async () => {
     const directory = path.join(mocks.directory, "sessions", "p");
     await fs.mkdir(directory, { recursive: true });
@@ -95,6 +111,14 @@ describe("local usage IPC", () => {
     await fs.writeFile(file, "{broken");
     await register();
     expect((await query()).error).toBeTruthy();
+    expect(await fs.readFile(file, "utf-8")).toBe("{broken");
+  });
+
+  it("surfaces corrupted token data without replacing retained usage", async () => {
+    const file = path.join(mocks.directory, "usage-tokens.json");
+    await fs.writeFile(file, "{broken");
+    await register();
+    expect((await query(1)).error).toBeTruthy();
     expect(await fs.readFile(file, "utf-8")).toBe("{broken");
   });
 });

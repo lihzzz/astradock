@@ -19,6 +19,7 @@ import { captureEvent } from "../lib/posthog";
 import { withComputerUseMcpServer } from "../lib/computer-use-runtime";
 import { withHindsightMcpServers, registerMemorySession, unregisterMemorySession, beforeMemorySend, observeClaudeEvent, completeMemoryTurn } from "../lib/memory/service";
 import { beginUsageTurn, endUsageTurn, stopUsageSession } from "../lib/usage";
+import { createClaudeTokenObserver } from "../lib/token-usage";
 import { observeClaudeTaskEvent } from "../lib/tasks/engine-events";
 import { taskRuntimeEvents } from "../lib/tasks/runtime-events";
 import { getSessionRepository } from "../lib/session-service";
@@ -291,6 +292,7 @@ function startEventLoop(
   // Maps tool_use_id → tool name, populated from assistant events so tool_result events can
   // reference the name when capturing analytics.
   const toolNameMap = new Map<string, string>();
+  const tokenObserver = createClaudeTokenObserver(!!session.startOptions?.resume && !session.startOptions.forkSession);
   let deltaCounter = 0;
   (async () => {
     try {
@@ -316,6 +318,7 @@ function startEventLoop(
           log("EVENT_FULL", message);
         }
         observeClaudeEvent(sessionId, msgObj);
+        tokenObserver.observe(msgObj);
         if (!session.stopping) observeClaudeTaskEvent(sessionId, msgObj);
         if (msgObj.type === "system" && typeof msgObj.task_id === "string") {
           if (msgObj.subtype === "task_started") beginUsageTurn(sessionId, `task:${msgObj.task_id}`);

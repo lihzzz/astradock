@@ -19,7 +19,6 @@ import {
   CHAT_ROW_WIDTH_CLASS,
 } from "@/components/lib/chat-layout";
 import { getToolDiffStats } from "@/lib/diff/diff-stats";
-import { SelectableToolResult } from "./ToolResultSelection";
 
 // ── Main entry ──
 
@@ -59,12 +58,12 @@ export const ToolCall = memo(function ToolCall({
     );
 
   // compact: skip outer padding wrapper (used inside ToolGroupBlock to avoid double padding)
-  if (compact) return <SelectableToolResult message={message}>{content}</SelectableToolResult>;
+  if (compact) return content;
 
   return (
     <div className={`flex justify-start ${CHAT_ROW_CLASS}`}>
       <div className={`${CHAT_ROW_WIDTH_CLASS} ${isWideTool ? "w-full" : ""}`}>
-        <SelectableToolResult message={message}>{content}</SelectableToolResult>
+        {content}
       </div>
     </div>
   );

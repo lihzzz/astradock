@@ -131,15 +131,6 @@ export function renderToolCall(message: MarkdownMessage): string {
   return sections.join("\n\n");
 }
 
-export function buildToolResultsMarkdown(messages: MarkdownMessage[], selectedIds: ReadonlySet<string>): string {
-  const selected = messages.filter((message) => message.role === "tool_call" && message.id && selectedIds.has(message.id));
-  if (!selected.length) throw new Error("No tool results selected");
-  if (selected.some((message) => message.toolResult == null && !message.toolError && !message.isError)) throw new Error("Wait for the selected tools to finish");
-  const result = selected.map(renderToolCall).join("\n\n---\n\n") + "\n";
-  if (new TextEncoder().encode(result).byteLength > 5 * 1024 * 1024) throw new Error("Selected tool results exceed 5 MiB; select fewer results");
-  return result;
-}
-
 export function sanitizeExportFileName(name: string): string {
   const cleaned = name.replace(/[\\/:*?"<>|\u0000-\u001f]/g, "-").replace(/\s+/g, " ").replace(/[. ]+$/, "").trim();
   const safe = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(cleaned) ? `session-${cleaned}` : cleaned;
