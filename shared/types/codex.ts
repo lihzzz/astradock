@@ -5,6 +5,7 @@
  * This file provides convenience aliases and Harnss-specific wrappers (e.g. _sessionId tags).
  */
 
+import type { CodexSubagentNotification } from "./codex-subagents";
 import type { ServerNotification as CodexServerNotification } from "./codex-protocol/ServerNotification";
 import type { ToolRequestUserInputQuestion as CodexToolRequestUserInputQuestion } from "./codex-protocol/v2/ToolRequestUserInputQuestion";
 
@@ -121,7 +122,7 @@ export interface CodexAuthRequiredNotification {
 }
 
 /** Codex notification forwarded from main process, tagged with our internal session ID. */
-export type CodexSessionEvent = { _sessionId: string } & (CodexServerNotification | CodexAuthRequiredNotification);
+export type CodexSessionEvent = { _sessionId: string } & (CodexServerNotification | CodexAuthRequiredNotification | CodexSubagentNotification);
 
 /** Codex server-initiated approval request forwarded to the renderer. */
 export interface CodexApprovalRequest {

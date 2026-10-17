@@ -1,3 +1,4 @@
+import { applyCodexSubagentUpdate, startsCodexAgentCard } from "@/lib/engine/codex-agent-cards";
 import type { CodexSessionEvent } from "@/types";
 import type { InternalState } from "./session-store";
 import { codexItemToToolName, codexItemToToolInput, codexItemToToolResult, codexPlanToTodos } from "@/lib/engine/codex-adapter";
@@ -36,11 +37,16 @@ export function handleCodexEvent(
   const { method, params } = event;
   // Streaming activity means the upstream is back — clear the transient
   // reconnect status. (Not cleared by passive events like rate-limit updates.)
-  if (method.startsWith("item/") || method.startsWith("turn/")) {
+  if (method.startsWith("item/") || method.startsWith("turn/") || (method === "codex:subagent" && params.call)) {
     state.reconnectMessage = null;
   }
 
   switch (method) {
+    case "codex:subagent":
+      if (startsCodexAgentCard(state.messages, params)) finalizeACPStreamingMsg(state);
+      state.messages = applyCodexSubagentUpdate(state.messages, params);
+      break;
+
     case "thread/goal/updated": {
       const goal = parseThreadGoal((params as { goal?: unknown }).goal);
       if (!goal) break;

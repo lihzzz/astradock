@@ -10,6 +10,8 @@ import * as claude from "./claude-sessions";
 import * as codex from "./codex-sessions";
 import * as acp from "./acp-sessions";
 import * as processStop from "@shared/lib/process-stop";
+import { safeSend } from "../lib/safe-send";
+import { beginUsageTurn, endUsageTurn } from "../lib/usage";
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown;
 const state = vi.hoisted(() => ({
@@ -77,6 +79,7 @@ vi.mock("child_process", async (importOriginal) => {
   const fixture = `
     const readline = require('node:readline');
     const input = readline.createInterface({ input: process.stdin });
+    process.on('message', message => process.stdout.write(JSON.stringify(message) + '\\n'));
     input.on('line', line => {
       const message = JSON.parse(line);
       if (message.id === undefined || !message.method) return;
@@ -365,5 +368,46 @@ describe("deletion while an engine is being restored", () => {
     expect(await invoke("claude:restart-session", { sessionId: started.sessionId })).toHaveProperty("error");
     expect(claude.sessions.get(started.sessionId)).toBe(original);
     expect(original?.stopping).not.toBe(true);
+  });
+});
+
+
+describe("Codex subagent notification routing", () => {
+  it("forwards normalized cards and keeps child turns out of root processing/interrupt state", async () => {
+    await save("codex");
+    const result = await resume("codex");
+    expect(result.error).toBeUndefined();
+    if (typeof result.sessionId !== "string") throw new Error("Missing runtime ID");
+    vi.mocked(safeSend).mockClear();
+    vi.mocked(beginUsageTurn).mockClear();
+    vi.mocked(endUsageTurn).mockClear();
+    const child = state.children[0];
+    child.send({ method: "turn/started", params: { threadId: "thread", turn: { id: "root-turn", status: "inProgress", items: [] } } });
+    const item = { type: "collabAgentToolCall", id: "spawn", tool: "spawnAgent", senderThreadId: "thread", prompt: "Inspect the renderer",
+      model: "worker-model", reasoningEffort: "high", receiverThreadIds: [], agentsStates: {}, status: "inProgress" };
+    child.send({ method: "item/started", params: { threadId: "thread", turnId: "root-turn", item } });
+    child.send({ method: "item/completed", params: { threadId: "thread", turnId: "root-turn", item: { ...item, status: "completed", receiverThreadIds: ["agent"],
+      agentsStates: { agent: { status: "running", message: null } } } } });
+    child.send({ method: "turn/started", params: { threadId: "agent", turn: { id: "child-turn", status: "inProgress", items: [] } } });
+    child.send({ method: "item/completed", params: { threadId: "agent", turnId: "child-turn", item: { type: "agentMessage", id: "reply", text: "Renderer inspected", phase: "final_answer" } } });
+    child.send({ method: "turn/completed", params: { threadId: "agent", turn: { id: "child-turn", status: "completed", items: [] } } });
+    child.send({ method: "item/agentMessage/delta", params: { threadId: "thread", turnId: "root-turn", itemId: "answer", delta: "Root is still running" } });
+    await vi.waitFor(() => expect(safeSend).toHaveBeenCalledWith(expect.any(Function), "codex:event", expect.objectContaining({
+      method: "item/agentMessage/delta", params: expect.objectContaining({ delta: "Root is still running" }),
+    })));
+    expect(safeSend).toHaveBeenCalledWith(expect.any(Function), "codex:event", expect.objectContaining({
+      method: "codex:subagent", params: expect.objectContaining({ call: expect.objectContaining({ requestedModel: "worker-model", prompt: "Inspect the renderer" }) }),
+    }));
+    expect(safeSend).toHaveBeenCalledWith(expect.any(Function), "codex:event", expect.objectContaining({
+      method: "codex:subagent", params: { call: null, agents: [expect.objectContaining({ status: "completed", message: "Renderer inspected" })] },
+    }));
+    expect(safeSend).not.toHaveBeenCalledWith(expect.any(Function), "codex:event", expect.objectContaining({
+      method: "turn/completed", params: expect.objectContaining({ threadId: "agent" }),
+    }));
+    expect(beginUsageTurn).toHaveBeenCalledExactlyOnceWith(result.sessionId, "root-turn");
+    expect(endUsageTurn).not.toHaveBeenCalled();
+    await invoke("codex:interrupt", result.sessionId);
+    await vi.waitFor(() => expect(state.requests).toContain("turn/interrupt"));
+    await codex.stopForDeletion(result.sessionId);
   });
 });

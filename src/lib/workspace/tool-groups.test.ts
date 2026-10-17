@@ -66,3 +66,13 @@ describe("computeToolGroups", () => {
     expect(result.groupedIndices.has(6)).toBe(false);
   });
 });
+
+
+describe("Codex subagent cards", () => {
+  it("keeps agent cards visible between collapsed ordinary tool groups", () => {
+    const messages = ["Read", "Bash", "CodexAgent", "Read", "Bash"].map((name, index) => makeToolCall(String(index), name, index));
+    const groups = computeToolGroups(messages, false, false);
+    expect(groups.groupedIndices.has(2)).toBe(false);
+    expect(groups.groups.size).toBe(2);
+  });
+});

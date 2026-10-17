@@ -25,7 +25,7 @@ export interface ToolGroupInfo {
 
 // ── Tool names excluded from grouping ──
 
-const EXCLUDED_TOOL_NAMES = new Set(["task", "agent", "exitplanmode", "askuserquestion"]);
+const EXCLUDED_TOOL_NAMES = new Set(["task", "agent", "codexagent", "exitplanmode", "askuserquestion"]);
 const EDIT_BOUNDARY_TOOL_NAMES = new Set(["edit", "write"]);
 
 function isGroupableToolCall(msg: UIMessage): boolean {

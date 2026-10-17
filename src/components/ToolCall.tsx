@@ -10,6 +10,7 @@ import { getToolIcon, getToolLabel, getToolColor } from "@/components/lib/tool-m
 import { formatCompactSummary } from "@/components/lib/tool-formatting";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import { TaskTool } from "./tool-renderers/TaskTool";
+import { CodexAgentTool } from "./tool-renderers/CodexAgentTool";
 import { ExpandedToolContent } from "./tool-renderers/ExpandedToolContent";
 import { useChatPersistedState } from "@/components/chat-ui-state";
 import { ToolGlyph } from "@/components/lib/ToolGlyph";
@@ -44,7 +45,9 @@ export const ToolCall = memo(function ToolCall({
   const normalizedToolName = (message.toolName ?? "").toLowerCase();
   const isTask = normalizedToolName === "task" || normalizedToolName === "agent";
   const isWideTool = normalizedToolName === "edit" || normalizedToolName === "write" || normalizedToolName === "notebookedit";
-  const content = isTask
+  const content = message.codexAgent
+    ? <CodexAgentTool data={message.codexAgent} messageId={message.id} />
+    : isTask
     ? <TaskTool message={message} />
     : (
       <RegularTool
@@ -62,7 +65,7 @@ export const ToolCall = memo(function ToolCall({
 
   return (
     <div className={`flex justify-start ${CHAT_ROW_CLASS}`}>
-      <div className={`${CHAT_ROW_WIDTH_CLASS} ${isWideTool ? "w-full" : ""}`}>
+      <div className={`${CHAT_ROW_WIDTH_CLASS} ${isWideTool || message.codexAgent ? "w-full" : ""}`}>
         {content}
       </div>
     </div>
@@ -74,6 +77,7 @@ export const ToolCall = memo(function ToolCall({
   prev.showToolIcons === next.showToolIcons &&
   prev.coloredToolIcons === next.coloredToolIcons &&
   prev.disableCollapseAnimation === next.disableCollapseAnimation &&
+  prev.message.codexAgent === next.message.codexAgent &&
   prev.message.toolInput === next.message.toolInput &&
   prev.message.toolResult === next.message.toolResult &&
   prev.message.toolError === next.message.toolError &&

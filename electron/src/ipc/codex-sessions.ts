@@ -12,6 +12,7 @@ import crypto from "crypto";
 import { log } from "../lib/logger";
 import { safeSend } from "../lib/safe-send";
 import { CodexRpcClient } from "../lib/codex-rpc";
+import { CodexSubagentTracker, codexNotificationThreadId, isCodexSubagentItem } from "@shared/lib/codex-subagents";
 import { getCodexBinaryPath, getCodexBinaryStatus, getCodexHome, getCodexVersion, scanCodexBinaries } from "../lib/codex-binary";
 import { getAppSetting } from "../lib/app-settings";
 import { reportError } from "../lib/error-utils";
@@ -427,6 +428,7 @@ function setupCodexHandlers(
 ): void {
   bindSessionTokenUsage(internalId);
   const tokenObserver = createCodexTokenObserver(resumed, internalId);
+  const subagents = new CodexSubagentTracker(() => session.threadId);
   rpc.onStderr = (text) => {
     log("codex", `[stderr:${internalId.slice(0, 8)}] ${text.slice(0, 500)}`);
   };
@@ -471,8 +473,25 @@ function setupCodexHandlers(
       }
     }
 
-    observeCodexTaskEvent(internalId, notification.method, notification.params);
+    // Normalize evolving collaboration schemas before the legacy typed adapter.
+    // This also caches metadata arriving before spawn completion or while hidden.
+    const agentUpdate = subagents.observe(msg.method, msg.params);
+    if (agentUpdate) {
+      safeSend(getMainWindow, "codex:event", {
+        _sessionId: internalId,
+        method: "codex:subagent",
+        params: agentUpdate,
+      });
+    }
+    // Accounting observes owned child notifications before transcript filtering.
     tokenObserver.observe(notification.method, notification.params, session.threadId);
+    const eventThreadId = codexNotificationThreadId(msg.method, msg.params);
+    // Child turns must never finish the root turn, change its interruption target,
+    // overwrite its context usage, or merge their text into the root transcript.
+    if (session.threadId && eventThreadId && eventThreadId !== session.threadId) return;
+    if (isCodexSubagentItem(msg.method, msg.params)) return;
+
+    observeCodexTaskEvent(internalId, notification.method, notification.params);
 
     // Track active turn from turn events
     if (notification.method === "turn/started") {

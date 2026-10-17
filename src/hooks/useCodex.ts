@@ -35,6 +35,7 @@ import { createSystemMessage, createUserMessage, nextId } from "@/lib/message-fa
 import { isRetryableUpstreamError } from "@/lib/session/retry";
 import { useEngineBase } from "./useEngineBase";
 import { parseThreadGoal } from "@shared/lib/codex-goal";
+import { applyCodexSubagentUpdate, startsCodexAgentCard } from "@/lib/engine/codex-agent-cards";
 
 export interface CodexSendResult {
   ok: boolean;
@@ -327,10 +328,15 @@ export function useCodex({
     // Streaming activity means the upstream is back — clear the transient
     // reconnect status. (Not cleared by passive events like rate-limit updates,
     // so the indicator doesn't flicker while Codex core waits between retries.)
-    if (event.method.startsWith("item/") || event.method.startsWith("turn/")) {
+    if (event.method.startsWith("item/") || event.method.startsWith("turn/") || (event.method === "codex:subagent" && event.params.call)) {
       setReconnectMessage(null);
     }
     switch (event.method) {
+      case "codex:subagent":
+        if (startsCodexAgentCard(messagesRef.current, event.params)) finalizeStreamingAssistant();
+        setMessages((previous) => applyCodexSubagentUpdate(previous, event.params));
+        break;
+
       case "thread/goal/updated": {
         const goal = parseThreadGoal((event.params as { goal?: unknown } | undefined)?.goal);
         if (!goal) return;

@@ -1,3 +1,4 @@
+import type { CodexAgentCardData } from "@shared/types/codex-subagents";
 import type { ToolUseResult } from "./protocol";
 import type { EngineId } from "./engine";
 import type { ImageAttachment } from "./attachments";
@@ -36,6 +37,8 @@ export interface UIMessage {
   thinkingComplete?: boolean;
   isStreaming?: boolean;
   timestamp: number;
+  /** Codex collaboration call plus independently tracked target agent states. */
+  codexAgent?: CodexAgentCardData;
   subagentId?: string;
   subagentSteps?: SubagentToolStep[];
   subagentStatus?: "running" | "completed";

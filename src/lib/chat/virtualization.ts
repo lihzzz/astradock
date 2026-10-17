@@ -79,6 +79,8 @@ function estimateRowHeightBase(row: RowDescriptor): number {
   if (msg.role === "summary") return 48;
 
   if (msg.role === "tool_call") {
+    if (msg.codexAgent) return 160 + Math.max(1, msg.codexAgent.agents.length) * 64;
+
     if (msg.toolName === "ExitPlanMode") {
       const plan = typeof msg.toolInput?.plan === "string" ? msg.toolInput.plan : "";
       const lines = estimateLineCount(plan);
