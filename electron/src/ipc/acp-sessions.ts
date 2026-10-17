@@ -1,4 +1,5 @@
-import { BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
+import { AcpSerialQueue, AcpEventRouter, acpMcpStatuses, canRestoreAcpSession, restoreAcpSession, setAcpConfig, closeAcpSession, withAcpTimeout as withTimeout } from "../lib/acp-runtime";
 import type { ChildProcess } from "child_process";
 import { spawnExecutable } from "../lib/command-launch";
 import { Readable, Writable } from "stream";
@@ -21,6 +22,10 @@ import {
 
 // ACP SDK is ESM-only, must be async-imported
 import type {
+  AgentCapabilities,
+  SessionConfigOption,
+  SessionNotification,
+  NewSessionResponse,
   ClientSideConnection,
   ContentBlock,
   McpServer,
@@ -77,11 +82,20 @@ interface ACPSessionEntry {
   internalId: string;
   analyticsProperties: AcpAnalyticsProperties;
   eventCounter: number;
-  pendingPermissions: Map<string, { resolve: (response: RequestPermissionResponse) => void }>;
+  pendingPermissions: Map<string, { resolve: (response: RequestPermissionResponse) => void; optionIds: Set<string> }>;
   cwd: string;
   projectId: string | undefined;
   supportsLoadSession: boolean;
+  capabilities: AgentCapabilities;
+  router: AcpEventRouter<SessionNotification["update"]>;
   agentName: string;
+  agentId: string;
+  agentBinary: string;
+  agentEnv: Record<string, string>;
+  isPrompting?: boolean;
+  promptFinished?: Promise<void>;
+  turnCancelled?: boolean;
+  historyCapture?: { sessionId: string; events: SessionNotification[]; bytes: number; overflow: boolean };
   authMethods: ACPAuthMethod[];
   pendingStartRequest?: {
     cwd: string;
@@ -90,12 +104,6 @@ interface ACPSessionEntry {
   };
   /** True while session/load is in-flight — suppresses history replay notifications from reaching the renderer */
   isReloading: boolean;
-  /** ACP-side session IDs for ephemeral utility prompts (title gen, commit msg) */
-  utilitySessionIds?: Set<string>;
-  /** Text accumulator buffers for utility sessions, keyed by ACP sessionId */
-  utilityTextBuffers?: Map<string, string>;
-  /** Refusal reason for a utility session that attempted a tool call. */
-  utilityErrors?: Map<string, string>;
   /** Last actionable stderr error line observed from the ACP agent process */
   lastStderrError?: string;
 }
@@ -123,6 +131,11 @@ export async function stopForDeletion(sessionId: string): Promise<void> {
   if (pendingStartProcess?.id === sessionId) pendingStartProcess.aborted = true;
   for (const permission of runtime.pendingPermissions.values()) permission.resolve({ outcome: { outcome: "cancelled" } });
   runtime.pendingPermissions.clear();
+  const session = acpSessions.get(sessionId);
+  if (session?.acpSessionId && !session.connection.signal.aborted) {
+    try { await withTimeout(closeAcpSession(session.connection, session.capabilities, session.acpSessionId), 1000, "ACP close", session.connection.signal); }
+    catch (error) { reportError("ACP_CLOSE_ERR", error, { sessionId }); }
+  }
   await stopProcessAndWait(runtime.process);
   acpSessions.delete(sessionId);
   unregisterMemorySession(sessionId); revokeProjectAppAgentSession(sessionId);
@@ -132,10 +145,15 @@ export async function stopForDeletion(sessionId: string): Promise<void> {
 
 // Buffer latest config options per session — survives the renderer's DRAFT→active transition
 // where events arrive before useACP's listener is subscribed
-const configBuffer = new Map<string, unknown[]>();
+const configQueue = new AcpSerialQueue();
+const configBuffer = new Map<string, SessionConfigOption[]>();
 
 // Buffer latest available commands per session — same lifecycle as configBuffer
-const commandsBuffer = new Map<string, unknown[]>();
+export function getAcpSessionModel(sessionId: string): string | undefined {
+  return configBuffer.get(sessionId)?.find(option => option.category === "model")?.currentValue;
+}
+
+const commandsBuffer = new Map<string, import("@agentclientprotocol/sdk").AvailableCommand[]>();
 
 // Track in-flight acp:start so the renderer can abort during npx download / protocol init.
 // Only one start can be in-flight at a time (guarded by materializingRef in the renderer).
@@ -265,75 +283,48 @@ async function buildAcpMcpServers(servers: McpServerInput[]): Promise<McpServer[
   return resolved.filter((server): server is McpServer => server != null);
 }
 
-/** Merge configOptions from session response, event buffer, and unstable models API. */
+/** Prefer authoritative stable options; synthesize legacy model and mode independently. */
 function resolveConfigOptions(
-  sessionResult: { configOptions?: unknown[] | null; models?: unknown },
+  sessionResult: Pick<NewSessionResponse, "configOptions" | "models" | "modes">,
   internalId: string,
   logLabel: string,
-): unknown[] {
-  const fromResponse = (sessionResult.configOptions ?? []) as unknown[];
-  const fromEvents = (configBuffer.get(internalId) ?? []) as unknown[];
-  let configOptions = fromResponse.length ? fromResponse : fromEvents;
-
-  // Fallback: synthesize config option from unstable models API
-  const models = (sessionResult as Record<string, unknown>).models as { currentModelId?: string; availableModels?: Array<{ modelId: string; name: string; description?: string }> } | null;
-  if (configOptions.length === 0 && models?.availableModels?.length) {
-    log(logLabel, `No configOptions, synthesizing from ${models.availableModels.length} models (unstable API)`);
-    configOptions = [{
-      id: "model",
-      name: "Model",
-      category: "model",
-      type: "select",
-      currentValue: models.currentModelId ?? models.availableModels[0].modelId,
-      options: models.availableModels.map(m => ({
-        value: m.modelId,
-        name: m.name,
-        description: m.description ?? null,
-      })),
-    }];
+): SessionConfigOption[] {
+  let configOptions = sessionResult.configOptions ?? configBuffer.get(internalId) ?? [];
+  if (!configOptions.length && sessionResult.configOptions == null) {
+    const models = sessionResult.models;
+    const modes = sessionResult.modes;
+    configOptions = [
+      ...(models?.availableModels.length ? [{ id: "model", name: "Model", category: "model", type: "select" as const,
+        currentValue: models.currentModelId, options: models.availableModels.map(model => ({ value: model.modelId, name: model.name, description: model.description })) }] : []),
+      ...(modes?.availableModes.length ? [{ id: "mode", name: "Mode", category: "mode", type: "select" as const,
+        currentValue: modes.currentModeId, options: modes.availableModes.map(mode => ({ value: mode.id, name: mode.name, description: mode.description })) }] : []),
+    ];
   }
-
-  if (configOptions.length) configBuffer.set(internalId, configOptions);
-  log(logLabel, `${configOptions.length} config options (response=${fromResponse.length}, buffered=${fromEvents.length}, models=${models?.availableModels?.length ?? 0})`);
+  configBuffer.set(internalId, configOptions);
+  log(logLabel, `${configOptions.length} config options`);
   return configOptions;
 }
 
 interface AcpConnectionResult {
   proc: ChildProcess;
   connection: ClientSideConnection;
-  pendingPermissions: Map<string, { resolve: (r: RequestPermissionResponse) => void }>;
+  pendingPermissions: Map<string, { resolve: (r: RequestPermissionResponse) => void; optionIds: Set<string> }>;
   internalId: string;
   supportsLoadSession: boolean;
+  capabilities: AgentCapabilities;
+  router: AcpEventRouter<SessionNotification["update"]>;
   authMethods: ACPAuthMethod[];
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, stage: string, signal?: AbortSignal): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const cleanup = () => { clearTimeout(timer); signal?.removeEventListener("abort", closed); };
-    const fail = (error: unknown) => { cleanup(); reject(error); };
-    const closed = () => fail(new Error(`${stage}: connection closed`));
-    const timer = setTimeout(() => fail(new Error(`${stage} timed out after ${timeoutMs}ms`)), timeoutMs);
-    signal?.addEventListener("abort", closed, { once: true });
-    if (signal?.aborted) closed();
-    promise.then((value) => { cleanup(); resolve(value); }, fail);
-  });
-}
-
-function deriveMcpStatuses(servers: McpServerInput[]): Array<{ name: string; status: "connected" }> {
-  return servers.map((server) => ({
-    name: server.name,
-    status: "connected" as const,
-  }));
 }
 
 async function finalizePendingAcpSession(
   entry: ACPSessionEntry,
-  sessionResult: { sessionId: string; configOptions?: unknown[] | null; models?: unknown },
+  sessionResult: NewSessionResponse,
   sourceServers: McpServerInput[],
   logLabel: string,
 ): Promise<ACPAuthenticateResult> {
   assertAcpProcessActive(entry.internalId);
   entry.acpSessionId = sessionResult.sessionId;
+  entry.router.bind(sessionResult.sessionId);
   entry.pendingStartRequest = undefined;
   const configOptions = resolveConfigOptions(sessionResult, entry.internalId, logLabel);
   return {
@@ -342,7 +333,7 @@ async function finalizePendingAcpSession(
     agentSessionId: sessionResult.sessionId,
     agentName: entry.agentName,
     configOptions: configOptions as ACPAuthenticateResult["configOptions"],
-    mcpStatuses: deriveMcpStatuses(sourceServers),
+    mcpStatuses: acpMcpStatuses(sourceServers),
   };
 }
 
@@ -361,7 +352,7 @@ async function createAcpConnection(
   options.runtimeLease?.assertActive();
   const { internalId } = options;
   let lastStderrError: string | undefined;
-  const pendingPermissions = new Map<string, { resolve: (r: RequestPermissionResponse) => void }>();
+  const pendingPermissions = new Map<string, { resolve: (r: RequestPermissionResponse) => void; optionIds: Set<string> }>();
 
   const proc = spawnExecutable(agentDef.binary, agentDef.args ?? [], {
     stdio: ["pipe", "pipe", "pipe"],
@@ -433,52 +424,34 @@ async function createAcpConnection(
   const output = Readable.toWeb(proc.stdout!) as ReadableStream<Uint8Array>;
   const stream = acp.ndJsonStream(input, output);
 
-  const connection = new acp.ClientSideConnection((_agent) => ({
-    async sessionUpdate(params: Record<string, unknown>) {
-      const update = (params as { update: Record<string, unknown> }).update;
-      const acpSessionId = (params as { sessionId: string }).sessionId;
+  const router = new AcpEventRouter<SessionNotification["update"]>((update, acpSessionId) => {
       const entry = acpSessions.get(internalId);
-
-      // Utility session events: accumulate text, skip renderer forwarding
-      if (entry?.utilitySessionIds?.has(acpSessionId)) {
-        const eventKind = (update as { sessionUpdate: string }).sessionUpdate;
-        if (eventKind === "tool_call" || eventKind === "tool_call_update") {
-          if (!entry.utilityErrors) entry.utilityErrors = new Map();
-          entry.utilityErrors.set(acpSessionId, "ACP utility sessions cannot execute tools");
-          void entry.connection.cancel({ sessionId: acpSessionId }).catch(() => {});
-          return;
-        }
-        if (eventKind === "agent_message_chunk") {
-          const text = (update as { content?: { text?: string } }).content?.text ?? "";
-          if (text && entry.utilityTextBuffers) {
-            const current = entry.utilityTextBuffers.get(acpSessionId) ?? "";
-            entry.utilityTextBuffers.set(acpSessionId, current + text);
-          }
-        }
-        return;
-      }
-
-      if (entry) entry.eventCounter++;
+      if (!entry || acpProcesses.get(internalId)?.stopping) return;
+      entry.eventCounter++;
       const count = entry?.eventCounter ?? 0;
       const summary = summarizeUpdate(update);
       log("ACP_EVENT", `session=${internalId.slice(0, 8)} #${count} ${entry?.isReloading ? "[suppressed] " : ""}${summary}`);
 
       // Full dump for tool calls and tool results
       const eventKind = update?.sessionUpdate as string;
-      observeAcpUpdate(internalId, update);
+      if (!entry?.isReloading) observeAcpUpdate(internalId, update);
       if (eventKind === "tool_call" || eventKind === "tool_call_update") {
         log("ACP_EVENT_FULL", update);
       }
 
       // Buffer config options for late-subscribing renderer listeners
       if (eventKind === "config_option_update") {
-        const configOptions = (update as { configOptions: unknown[] }).configOptions;
+        const configOptions = update.sessionUpdate === "config_option_update" ? update.configOptions : [];
         configBuffer.set(internalId, configOptions);
+      }
+
+      if (update.sessionUpdate === "current_mode_update") {
+        configBuffer.set(internalId, (configBuffer.get(internalId) ?? []).map(option => option.category === "mode" ? { ...option, currentValue: update.currentModeId } : option));
       }
 
       // Buffer available commands for late-subscribing renderer listeners
       if (eventKind === "available_commands_update") {
-        const commands = (update as { availableCommands: unknown[] }).availableCommands;
+        const commands = update.sessionUpdate === "available_commands_update" ? update.availableCommands : [];
         commandsBuffer.set(internalId, commands);
       }
 
@@ -490,27 +463,35 @@ async function createAcpConnection(
         sessionId: acpSessionId,
         update,
       });
+
+  });
+  const connection = new acp.ClientSideConnection((_agent) => ({
+    async sessionUpdate(params) {
+      const capture = acpSessions.get(internalId)?.historyCapture;
+      if (capture?.sessionId === params.sessionId) {
+        capture.bytes += Buffer.byteLength(JSON.stringify(params));
+        if (capture.events.length >= 10000 || capture.bytes > 32 * 1024 * 1024) capture.overflow = true;
+        else capture.events.push(params);
+        return;
+      }
+      router.receive(params.sessionId, params.update);
     },
 
-    async requestPermission(params: Record<string, unknown>) {
+    async requestPermission(params) {
       try { assertAcpProcessActive(internalId); }
       catch { return { outcome: { outcome: "cancelled" } }; }
       const acpSessionId = (params as { sessionId: string }).sessionId;
       const entry = acpSessions.get(internalId);
 
-      // Auto-deny permission requests for utility sessions
-      if (entry?.utilitySessionIds?.has(acpSessionId)) {
-        log("ACP_UTILITY", `Auto-denying permission for utility session ${acpSessionId.slice(0, 12)}`);
-        const options = (params as { options: Array<{ optionId: string; kind: string }> }).options;
-        const rejectOption = options.find(o => o.kind === "reject_once") ?? options[options.length - 1];
-        return { outcome: { outcome: "selected", optionId: rejectOption?.optionId ?? "reject" } };
+      if (!entry?.acpSessionId || acpSessionId !== entry.acpSessionId || entry.isReloading) {
+        return { outcome: { outcome: "cancelled" } };
       }
 
       return new Promise<RequestPermissionResponse>((resolve) => {
         const requestId = crypto.randomUUID();
         const toolCall = (params as { toolCall: Record<string, unknown> }).toolCall;
         const opts = (params as { options: unknown[] }).options;
-        pendingPermissions.set(requestId, { resolve });
+        pendingPermissions.set(requestId, { resolve, optionIds: new Set(params.options.map(option => option.optionId)) });
         taskRuntimeEvents.wait(internalId, "acp", requestId, "waiting_permission");
 
         log("ACP_PERMISSION_REQUEST", {
@@ -534,8 +515,9 @@ async function createAcpConnection(
 
     async readTextFile(params: { path?: string; uri?: string; line?: number | null; limit?: number | null; sessionId?: string }) {
       const utilityEntry = acpSessions.get(internalId);
-      if (params.sessionId && utilityEntry?.utilitySessionIds?.has(params.sessionId)) {
-        throw new Error("ACP utility sessions cannot access files");
+      assertAcpProcessActive(internalId);
+      if (!params.sessionId || utilityEntry?.acpSessionId !== params.sessionId || utilityEntry.isReloading) {
+        throw new Error("Unknown or inactive ACP file-access session");
       }
       const { filePath, content } = await acpReadTextFile(params);
       log("ACP_FS", `readTextFile path=${filePath} line=${params.line ?? ""} limit=${params.limit ?? ""}`);
@@ -544,14 +526,22 @@ async function createAcpConnection(
     },
     async writeTextFile(params: { path?: string; uri?: string; content: string; sessionId?: string }) {
       const utilityEntry = acpSessions.get(internalId);
-      if (params.sessionId && utilityEntry?.utilitySessionIds?.has(params.sessionId)) {
-        throw new Error("ACP utility sessions cannot access files");
+      assertAcpProcessActive(internalId);
+      if (!params.sessionId || utilityEntry?.acpSessionId !== params.sessionId || utilityEntry.isReloading) {
+        throw new Error("Unknown or inactive ACP file-access session");
       }
       const { filePath } = await acpWriteTextFile(params);
       log("ACP_FS", `writeTextFile path=${filePath} len=${params.content.length}`);
       return {};
     },
   }), stream);
+
+  connection.signal.addEventListener("abort", () => {
+    for (const pending of pendingPermissions.values()) pending.resolve({ outcome: { outcome: "cancelled" } });
+    pendingPermissions.clear();
+    if (acpProcesses.get(internalId)?.stopping) return;
+    void stopForDeletion(internalId).catch(error => reportError("ACP_DISCONNECT_STOP_ERR", error, { sessionId: internalId }));
+  }, { once: true });
 
   // Protocol initialization
   log(logLabel, `Initializing protocol...`);
@@ -560,6 +550,7 @@ async function createAcpConnection(
     initResult = await withTimeout(connection.initialize({
       protocolVersion: acp.PROTOCOL_VERSION,
       clientCapabilities: ACP_CLIENT_CAPABILITIES,
+      clientInfo: { name: "astradock", version: app.getVersion() },
     }), ACP_INIT_TIMEOUT_MS, `${agentDef.name} ACP initialize`, connection.signal);
   } catch (err) {
     if (lastStderrError) {
@@ -569,11 +560,12 @@ async function createAcpConnection(
     throw err;
   }
   assertAcpProcessActive(internalId);
-  const supportsLoadSession = initResult.agentCapabilities?.loadSession === true;
+  const capabilities = initResult.agentCapabilities ?? {};
+  const supportsLoadSession = canRestoreAcpSession(capabilities);
   const authMethods = normalizeAcpAuthMethods((initResult as Record<string, unknown>).authMethods);
   log(logLabel, `Initialized protocol v${initResult.protocolVersion} for ${agentDef.name} (loadSession=${supportsLoadSession}, authMethods=${authMethods.length})`);
 
-  return { proc, connection, pendingPermissions, internalId, supportsLoadSession, authMethods };
+  return { proc, connection, pendingPermissions, internalId, supportsLoadSession, capabilities, router, authMethods };
 }
 
 export function register(getMainWindow: () => BrowserWindow | null): void {
@@ -617,7 +609,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
           onSpawn: (internalId, proc) => { pendingStartProcess = { id: internalId, process: proc }; },
         },
       );
-      const { proc, connection, pendingPermissions, internalId, supportsLoadSession, authMethods } = connResult;
+      const { proc, connection, pendingPermissions, internalId, supportsLoadSession, capabilities, router, authMethods } = connResult;
 
       if (options.memoryContext?.projectId) registerMemorySession(internalId, options.memoryContext.projectId, "acp");
       await registerProjectAppAgentSession(internalId, options.source?.projectId ?? options.memoryContext?.projectId, options.cwd);
@@ -634,7 +626,8 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
         pendingPermissions,
         cwd: options.cwd,
         projectId: options.source?.projectId ?? options.memoryContext?.projectId,
-        supportsLoadSession,
+        supportsLoadSession, capabilities, router,
+        agentId: agentDef.id, agentBinary: agentDef.binary, agentEnv: agentDef.env ?? {},
         agentName: agentDef.name,
         authMethods,
         pendingStartRequest: {
@@ -780,7 +773,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
         "ACP_REVIVE",
         { internalId: runtimeId, runtimeLease },
       );
-      const { proc, connection, pendingPermissions, internalId, supportsLoadSession, authMethods } = connResult;
+      const { proc, connection, pendingPermissions, internalId, supportsLoadSession, capabilities, router, authMethods } = connResult;
 
       if (options.memoryContext?.projectId) registerMemorySession(internalId, options.memoryContext.projectId, "acp");
       await registerProjectAppAgentSession(internalId, options.source.projectId, options.cwd);
@@ -791,32 +784,34 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
 
       let acpSessionId: string;
       let usedLoad = false;
-      let configOptions: unknown[] = [];
+      let configOptions: SessionConfigOption[] = [];
 
       if (supportsLoadSession && options.agentSessionId) {
         // Restore full context — suppress history replay from reaching the renderer
-        const entry: ACPSessionEntry = { process: proc, connection, acpSessionId: options.agentSessionId, internalId, analyticsProperties, eventCounter: 0, pendingPermissions, cwd: options.cwd, projectId: options.source.projectId, supportsLoadSession, agentName: agentDef.name, authMethods, isReloading: true };
+        const entry: ACPSessionEntry = { process: proc, connection, acpSessionId: options.agentSessionId, internalId, analyticsProperties, eventCounter: 0, pendingPermissions, cwd: options.cwd, projectId: options.source.projectId, supportsLoadSession, capabilities, router, agentId: agentDef.id, agentBinary: agentDef.binary, agentEnv: agentDef.env ?? {}, agentName: agentDef.name, authMethods, isReloading: true };
         acpSessions.set(internalId, entry);
-        const loadResult = await withTimeout(connection.loadSession({ sessionId: options.agentSessionId, cwd: options.cwd, mcpServers: acpMcpServers }), ACP_START_TIMEOUT_MS, `${agentDef.name} ACP session/load`, connection.signal);
+        router.bind(options.agentSessionId);
+        const restored = await withTimeout(restoreAcpSession(connection, capabilities, { sessionId: options.agentSessionId, cwd: options.cwd, mcpServers: acpMcpServers }), ACP_START_TIMEOUT_MS, `${agentDef.name} ACP session/restore`, connection.signal);
+        const loadResult = restored.result;
         assertAcpProcessActive(internalId);
         entry.isReloading = false;
         acpSessionId = options.agentSessionId;
         usedLoad = true;
-        configOptions = (loadResult.configOptions ?? configBuffer.get(internalId) ?? []) as unknown[];
-        if (configOptions.length) configBuffer.set(internalId, configOptions);
+        configOptions = resolveConfigOptions(loadResult, internalId, "ACP_REVIVE");
         log("ACP_REVIVE", `loadSession OK, session=${acpSessionId.slice(0, 12)} configOptions=${configOptions.length}`);
       } else {
         // Fall back to fresh session — UI messages already restored from disk
         const sessionResult = await withTimeout(connection.newSession({ cwd: options.cwd, mcpServers: acpMcpServers }), ACP_START_TIMEOUT_MS, `${agentDef.name} ACP session/new`, connection.signal);
         assertAcpProcessActive(internalId);
         acpSessionId = sessionResult.sessionId;
-        const entry: ACPSessionEntry = { process: proc, connection, acpSessionId, internalId, analyticsProperties, eventCounter: 0, pendingPermissions, cwd: options.cwd, projectId: options.source.projectId, supportsLoadSession, agentName: agentDef.name, authMethods, isReloading: false };
+        const entry: ACPSessionEntry = { process: proc, connection, acpSessionId, internalId, analyticsProperties, eventCounter: 0, pendingPermissions, cwd: options.cwd, projectId: options.source.projectId, supportsLoadSession, capabilities, router, agentId: agentDef.id, agentBinary: agentDef.binary, agentEnv: agentDef.env ?? {}, agentName: agentDef.name, authMethods, isReloading: false };
         acpSessions.set(internalId, entry);
+        router.bind(acpSessionId);
         configOptions = resolveConfigOptions(sessionResult, internalId, "ACP_REVIVE");
         log("ACP_REVIVE", `newSession fallback, session=${acpSessionId.slice(0, 12)}`);
       }
 
-      const mcpStatuses = sourceServers.map(s => ({ name: s.name, status: "connected" as const }));
+      const mcpStatuses = acpMcpStatuses(sourceServers);
       void captureEvent("session_revived", { engine: "acp", success: true, ...analyticsProperties });
       return { sessionId: internalId, agentSessionId: acpSessionId, usedLoad, configOptions, mcpStatuses };
     } catch (err) {
@@ -837,9 +832,17 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     if (!session.acpSessionId) {
       return { error: buildAuthRequiredError(session.agentName, session.authMethods) };
     }
+    if (session.isPrompting || session.isReloading) return { error: "ACP session is busy" };
+    if (images?.length && !session.capabilities.promptCapabilities?.image) return { error: "Agent does not support image prompts" };
+    session.isPrompting = true;
+    session.turnCancelled = false;
+    let finishPrompt!: () => void;
+    session.promptFinished = new Promise<void>(resolve => { finishPrompt = resolve; });
     const acpSessionId = session.acpSessionId;
 
-    const memory = await beforeMemorySend(sessionId, text);
+    let memory: Awaited<ReturnType<typeof beforeMemorySend>>;
+    try { memory = await beforeMemorySend(sessionId, text); }
+    catch (error) { session.isPrompting = false; finishPrompt(); return { error: reportError("ACP_MEMORY_ERR", error, { sessionId }) }; }
     log("ACP_SEND", `session=${sessionId.slice(0, 8)} text=${text.slice(0, 500)} images=${images?.length ?? 0}`);
 
     const prompt: ContentBlock[] = [];
@@ -864,11 +867,11 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
       log("ACP_TURN_COMPLETE", `session=${sessionId.slice(0, 8)} stopReason=${result.stopReason} usage=${JSON.stringify(result.usage ?? null)}`);
       recordAcpTokenUsage(usageTurnId, result.usage, sessionId);
       void completeMemoryTurn(sessionId);
-      finishAcpTaskTurn(sessionId, result.stopReason);
+      finishAcpTaskTurn(sessionId, session.turnCancelled ? "cancelled" : result.stopReason);
 
       safeSend(getMainWindow,"acp:turn_complete", {
         _sessionId: sessionId,
-        stopReason: result.stopReason,
+        stopReason: session.turnCancelled ? "cancelled" : result.stopReason,
         usage: result.usage,
       });
 
@@ -880,6 +883,8 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
       if (taskRuntimeEvents.get(sessionId)?.status !== "interrupted") taskRuntimeEvents.publish(sessionId, "acp", "failed", surfacedError);
       return { error: surfacedError };
     } finally {
+      session.isPrompting = false;
+      finishPrompt();
       endUsageTurn(sessionId, usageTurnId);
     }
   });
@@ -904,7 +909,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
   });
 
   // Reload an existing ACP session with a new MCP server list using session/load.
-  // This preserves full conversation context on the agent side — no process restart needed.
+  // Generic agents can reload in place. OpenCode requires restart to remove stale MCP registrations.
   // Returns { ok: true, supportsLoad: true } if successful, { supportsLoad: false } if not supported.
   ipcMain.handle("acp:reload-session", async (_event, { sessionId, mcpServers, cwd }: {
     sessionId: string;
@@ -916,6 +921,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
       log("ACP_RELOAD", `ERROR: session ${sessionId?.slice(0, 8)} not found`);
       return { error: "Session not found" };
     }
+    if (session.agentId === "opencode") return { supportsLoad: false, requiresRestart: true };
     if (!session.supportsLoadSession) {
       log("ACP_RELOAD", `session=${sessionId.slice(0, 8)} agent does not support session/load, falling back to restart`);
       return { supportsLoad: false };
@@ -925,6 +931,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     }
     const acpSessionId = session.acpSessionId;
 
+    if (session.isPrompting || session.isReloading) return { error: "ACP session is busy", supportsLoad: true };
     const nextCwd = cwd ?? session.cwd;
     log("ACP_RELOAD", `session=${sessionId.slice(0, 8)} calling loadSession with ${mcpServers?.length ?? 0} MCP server(s) cwd=${nextCwd}`);
 
@@ -937,11 +944,13 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
       assertAcpProcessActive(sessionId);
       session.isReloading = true;
       try {
-        await withTimeout(session.connection.loadSession({
+        const restored = await withTimeout(restoreAcpSession(session.connection, session.capabilities, {
           sessionId: acpSessionId,
           cwd: nextCwd,
           mcpServers: acpMcpServers,
-        }), ACP_START_TIMEOUT_MS, `${session.agentName} ACP session/load`, session.connection.signal);
+        }), ACP_START_TIMEOUT_MS, `${session.agentName} ACP session/restore`, session.connection.signal);
+        const configOptions = resolveConfigOptions(restored.result, sessionId, "ACP_RELOAD");
+        safeSend(getMainWindow, "acp:event", { _sessionId: sessionId, sessionId: acpSessionId, update: { sessionUpdate: "config_option_update", configOptions } });
       } finally {
         // Always reset — even if loadSession throws or process crashes
         if (acpSessions.has(sessionId)) {
@@ -951,7 +960,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
       assertAcpProcessActive(sessionId);
       session.cwd = nextCwd;
       log("ACP_RELOAD", `session=${sessionId.slice(0, 8)} loadSession OK`);
-      return { ok: true, supportsLoad: true };
+      return { ok: true, supportsLoad: true, mcpStatuses: acpMcpStatuses(mcpServers ?? []) };
     } catch (err) {
       const msg = reportError("ACP_RELOAD_ERR", err, { engine: "acp", sessionId });
       return { error: msg, supportsLoad: true };
@@ -966,6 +975,8 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
       return { error: "Session not found" };
     }
 
+    session.turnCancelled = true;
+    taskRuntimeEvents.publish(sessionId, "acp", "interrupted");
     const pendingCount = session.pendingPermissions.size;
     log("ACP_CANCEL", `session=${sessionId.slice(0, 8)} cancelling (${pendingCount} pending permissions)`);
 
@@ -979,11 +990,16 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     const acpSessionId = session.acpSessionId;
 
     try {
-      await session.connection.cancel({ sessionId: acpSessionId });
+      await withTimeout(session.connection.cancel({ sessionId: acpSessionId }), 5000, "ACP cancel", session.connection.signal);
+      if (session.promptFinished) {
+        try { await withTimeout(session.promptFinished, 5000, "ACP prompt cancellation"); }
+        catch { await stopForDeletion(sessionId); }
+      }
       log("ACP_CANCEL", `session=${sessionId.slice(0, 8)} acknowledged`);
       return { ok: true };
     } catch (err) {
       const msg = reportError("ACP_CANCEL_ERR", err, { engine: "acp", sessionId });
+      try { await stopForDeletion(sessionId); } catch (stopError) { reportError("ACP_CANCEL_STOP_ERR", stopError, { sessionId }); }
       return { error: msg };
     }
   });
@@ -1000,43 +1016,70 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     const acpSessionId = session.acpSessionId;
     log("ACP_CONFIG", `session=${sessionId.slice(0, 8)} setting ${configId}=${value}`);
     try {
-      const conn = session.connection;
-
-      // Try the stable config option API first
-      try {
-        const result = await conn.setSessionConfigOption({
-          sessionId: acpSessionId,
-          configId,
-          value,
-        });
-        log("ACP_CONFIG", `session=${sessionId.slice(0, 8)} ${configId}=${value} OK (via setSessionConfigOption)`);
-        if (result.configOptions) configBuffer.set(sessionId, result.configOptions);
-        return { configOptions: result.configOptions };
-      } catch (configErr) {
-        // If it fails and this is the model config, try the unstable setSessionModel API
-        if (configId === "model") {
-          log("ACP_CONFIG", `session=${sessionId.slice(0, 8)} setSessionConfigOption failed, trying unstable_setSessionModel...`);
-          await conn.unstable_setSessionModel({
-            sessionId: acpSessionId,
-            modelId: value,
-          });
-          log("ACP_CONFIG", `session=${sessionId.slice(0, 8)} model=${value} OK (via unstable_setSessionModel)`);
-
-          // Update the synthesized config option in the buffer
-          const buffered = configBuffer.get(sessionId) as Array<{ id: string; currentValue: string }> | undefined;
-          if (buffered) {
-            const modelOpt = buffered.find(o => o.id === "model");
-            if (modelOpt) modelOpt.currentValue = value;
-            return { configOptions: buffered };
-          }
-          return {};
-        }
-        throw configErr;
-      }
+      return await configQueue.run(sessionId, async () => {
+        assertAcpProcessActive(sessionId);
+      const configOptions = await withTimeout(setAcpConfig(session.connection,
+        { sessionId: acpSessionId, configId, value }, configBuffer.get(sessionId) ?? []),
+        ACP_START_TIMEOUT_MS, "ACP configuration", session.connection.signal);
+      configBuffer.set(sessionId, configOptions);
+      safeSend(getMainWindow, "acp:event", { _sessionId: sessionId, sessionId: acpSessionId, update: { sessionUpdate: "config_option_update", configOptions } });
+      return { configOptions };
+      });
     } catch (err) {
       const errMsg = reportError("ACP_CONFIG_ERR", err, { engine: "acp", sessionId, configId });
       return { error: errMsg };
     }
+  });
+
+  ipcMain.handle("acp:get-capabilities", (_event, sessionId: string) => {
+    const session = acpSessions.get(sessionId);
+    return { capabilities: session?.capabilities ?? {}, agentName: session?.agentName };
+  });
+
+  ipcMain.handle("acp:list-sessions", async (_event, { sessionId, cursor }: { sessionId: string; cursor?: string }) => {
+    const session = acpSessions.get(sessionId);
+    if (!session?.capabilities.sessionCapabilities?.list) return { error: "Agent does not support session listing" };
+    try {
+      assertAcpProcessActive(sessionId);
+      return await withTimeout(session.connection.unstable_listSessions({ cwd: session.cwd, cursor }), ACP_START_TIMEOUT_MS, "ACP session/list", session.connection.signal);
+    } catch (error) { return { error: reportError("ACP_LIST_ERR", error, { sessionId }) }; }
+  });
+
+  ipcMain.handle("acp:read-session", async (_event, { sessionId, agentSessionId }: { sessionId: string; agentSessionId: string }) => {
+    const session = acpSessions.get(sessionId);
+    if (!session?.capabilities.loadSession) return { error: "Agent does not support history loading" };
+    if (session.isPrompting || session.isReloading) return { error: "ACP session is busy" };
+    session.isReloading = true;
+    const capture = { sessionId: agentSessionId, events: [] as SessionNotification[], bytes: 0, overflow: false };
+    session.historyCapture = capture;
+    try {
+      assertAcpProcessActive(sessionId);
+      await withTimeout(session.connection.loadSession({ sessionId: agentSessionId, cwd: session.cwd, mcpServers: [] }), ACP_START_TIMEOUT_MS, "ACP history", session.connection.signal);
+      if (capture.overflow) throw new Error("History exceeds the import limit; refusing an incomplete import");
+      return { events: capture.events };
+    } catch (error) { return { error: reportError("ACP_HISTORY_ERR", error, { sessionId }) }; }
+    finally {
+      if (agentSessionId !== session.acpSessionId) {
+        try { await withTimeout(closeAcpSession(session.connection, session.capabilities, agentSessionId), 1000, "ACP history close", session.connection.signal); }
+        catch (error) { reportError("ACP_HISTORY_CLOSE_ERR", error, { sessionId }); }
+      }
+      session.historyCapture = undefined; session.isReloading = false;
+    }
+  });
+
+  ipcMain.handle("acp:fork-session", async (_event, { sessionId }: { sessionId: string }) => {
+    const session = acpSessions.get(sessionId);
+    if (!session?.acpSessionId || !session.capabilities.sessionCapabilities?.fork) return { error: "Agent does not support session fork" };
+    if (session.isPrompting || session.isReloading) return { error: "ACP session is busy" };
+    session.isReloading = true;
+    try {
+      assertAcpProcessActive(sessionId);
+      const fork = await withTimeout(session.connection.unstable_forkSession({ sessionId: session.acpSessionId, cwd: session.cwd, mcpServers: [] }), ACP_START_TIMEOUT_MS, "ACP session/fork", session.connection.signal);
+      // Persistent history remains; only detach the transient fork from this connection.
+      await withTimeout(closeAcpSession(session.connection, session.capabilities, fork.sessionId), 1000, "ACP fork close", session.connection.signal);
+      return { agentSessionId: fork.sessionId, cwd: session.cwd };
+    } catch (error) { return { error: reportError("ACP_FORK_ERR", error, { sessionId }) }; }
+    finally { session.isReloading = false; }
   });
 
   // Retrieve buffered config options — used by renderer when useACP first mounts
@@ -1064,6 +1107,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     }
 
     log("ACP_PERMISSION_RESPONSE", `session=${sessionId.slice(0, 8)} requestId=${requestId} optionId=${optionId}`);
+    if (!resolver.optionIds.has(optionId)) return { error: "Invalid ACP permission option" };
     resolver.resolve({ outcome: { outcome: "selected", optionId } });
     session.pendingPermissions.delete(requestId);
     taskRuntimeEvents.resolve(sessionId, requestId);
@@ -1073,20 +1117,6 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
 
 /** Stop all ACP sessions (called on app quit). Idempotent. */
 export async function stopAll(): Promise<void> {
-  const stopping: Promise<void>[] = [];
-  for (const [sessionId, runtime] of acpProcesses) {
-    revokeProjectAppAgentSession(sessionId);
-    stopUsageSession(sessionId);    taskRuntimeEvents.stop(sessionId);
-    log("CLEANUP", `Stopping ACP session ${sessionId.slice(0, 8)}`);
-    runtime.stopping = true;
-    for (const permission of runtime.pendingPermissions.values()) permission.resolve({ outcome: { outcome: "cancelled" } });
-    runtime.pendingPermissions.clear();
-    stopping.push(stopProcessAndWait(runtime.process));
-  }
-  for (const sessionId of acpSessions.keys()) { unregisterMemorySession(sessionId); revokeProjectAppAgentSession(sessionId); }
-  acpSessions.clear();
-  configBuffer.clear();
-  commandsBuffer.clear();
-  const results = await Promise.allSettled(stopping);
+  const results = await Promise.allSettled([...acpProcesses.keys()].map(sessionId => stopForDeletion(sessionId)));
   for (const result of results) if (result.status === "rejected") reportError("ACP_STOP_ERR", result.reason);
 }

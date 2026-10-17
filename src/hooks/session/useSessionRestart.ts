@@ -73,18 +73,23 @@ export function useSessionRestart({ refs, setters, engines, findProject, getProj
       let meta: InitialMeta = { isProcessing: false, isConnected: true, sessionInfo: null, totalCost: cost, contextUsage: usage };
       if (engineId === "acp") {
         if (!session.agentId) throw new Error(t("sessionRecoveryNoAgent"));
-        const probe = await window.claude.mcp.probe(servers); check();
-        setters.setAcpMcpStatuses(probe.map((r) => ({ name: r.name, status: toMcpStatusState(r.status), ...(r.error ? { error: r.error } : {}) })));
         const reloaded = await window.claude.acp.reloadSession(oldId, servers, cwd); check();
         if (reloaded.error) throw new Error(reloaded.error);
-        if (reloaded.supportsLoad) return reloaded.ok ? { ok: true } : { error: t("sessionRecoveryFailed") };
+        if (reloaded.supportsLoad) {
+          if (reloaded.ok) setters.setAcpMcpStatuses((reloaded.mcpStatuses ?? servers.map(server => ({ name: server.name, status: "unknown" }))).map(status => ({ name: status.name, status: toMcpStatusState(status.status) })));
+          return reloaded.ok ? { ok: true } : { error: t("sessionRecoveryFailed") };
+        }
         await stop(oldId); check();
-        const result = await window.claude.acp.start({ agentId: session.agentId, cwd, mcpServers: servers,
-          memoryContext: { projectId: session.projectId }, source: { projectId: session.projectId, runtimeSessionId: oldId } });
+        const result = session.agentSessionId
+          ? await window.claude.acp.reviveSession({ agentId: session.agentId, agentSessionId: session.agentSessionId, cwd, mcpServers: servers,
+              memoryContext: { projectId: session.projectId }, source: { projectId: session.projectId, runtimeSessionId: oldId } })
+          : await window.claude.acp.start({ agentId: session.agentId, cwd, mcpServers: servers,
+              memoryContext: { projectId: session.projectId }, source: { projectId: session.projectId, runtimeSessionId: oldId } });
         if ("sessionId" in result) ownedId = result.sessionId;
         if ("error" in result && result.error) throw new Error(result.error);
         if (!ownedId || ("authRequired" in result && result.authRequired)) throw new Error(t("sessionRecoveryFailed"));
         check();
+        setters.setAcpMcpStatuses("mcpStatuses" in result ? (result.mcpStatuses ?? []).map(status => ({ name: status.name, status: toMcpStatusState(status.status) })) : []);
         next = { ...session, id: ownedId, conversationId: session.conversationId ?? oldId,
           agentSessionId: "agentSessionId" in result ? result.agentSessionId ?? session.agentSessionId : session.agentSessionId };
         config = "configOptions" in result ? result.configOptions ?? [] : [];

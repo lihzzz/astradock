@@ -1443,6 +1443,7 @@ export function AppLayout() {
                             devFillEnabled={devFillEnabled}
                             handleSeedDevExampleSpaceData={handleSeedDevExampleSpaceData}
                             seedDevExampleConversation={manager.seedDevExampleConversation}
+                            onImportAcpSession={manager.importAcpSession}
                             grabbedElements={grabbedElements}
                             handleRemoveGrabbedElement={handleRemoveGrabbedElement}
                             lockedEngine={lockedEngine}
@@ -1657,6 +1658,7 @@ export function AppLayout() {
                   titleGenerating={manager.activeSession?.titleGenerating}
                   permissionMode={activePaneCtrl?.panePermissionMode}
                   acpPermissionBehavior={manager.activeSession?.engine === "acp" ? settings.acpPermissionBehavior : undefined}
+                  onImportAcpSession={manager.activeSession?.engine === "acp" ? manager.importAcpSession : undefined}
                   onToggleSidebar={sidebar.toggle}
                   showDevFill={devFillEnabled}
                   onSeedDevExampleConversation={manager.seedDevExampleConversation}

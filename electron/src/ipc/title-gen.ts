@@ -173,7 +173,7 @@ export function register(): void {
 
     log("TITLE_GEN", `engine=${engine ?? "claude"} session=${sessionId?.slice(0, 8) ?? "none"} msg="${truncatedMsg.slice(0, 80)}..."`);
 
-    // ACP path: create utility session on existing agent connection
+    // ACP path: verified text-only execution in a dedicated utility process
     if (engine === "acp" && sessionId) {
       try {
         const { acpUtilityPrompt } = await import("../lib/acp-utility-prompt");
@@ -261,7 +261,7 @@ export function register(): void {
         `engine=${engine ?? "claude"} diff_chars=${diff.length} diff_source=${diffSource} cwd=${cwd}`,
       );
 
-      // ACP path: create utility session on existing agent connection
+      // ACP path: verified text-only execution in a dedicated utility process
       if (engine === "acp" && sessionId) {
         try {
           const { acpUtilityPrompt } = await import("../lib/acp-utility-prompt");

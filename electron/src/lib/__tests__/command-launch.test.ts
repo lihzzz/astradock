@@ -112,3 +112,17 @@ describe("executable commands", () => {
     expect(JSON.parse(execFileExecutableSync(shim, ["--goto", "中文 folder/file.ts:5"], options))).toEqual({ args: ["--goto", "中文 folder/file.ts:5"], runAsNode: "1" });
   });
 });
+
+
+it.skipIf(process.platform !== "win32")("unwraps only the generated OpenCode native npm shim", () => {
+  const { cwd } = fixture();
+  const bin = path.join(cwd, "node_modules", "opencode-ai", "bin"); fs.mkdirSync(bin, { recursive: true });
+  const native = path.join(bin, "opencode.exe"); fs.writeFileSync(native, "fixture");
+  const shim = path.join(cwd, "opencode.cmd");
+  const source = '@ECHO off\r\nGOTO start\r\n:find_dp0\r\nSET dp0=%~dp0\r\nEXIT /b\r\n:start\r\nSETLOCAL\r\nCALL :find_dp0\r\n"%dp0%\\node_modules\\opencode-ai\\bin\\opencode.exe"   %*\r\n';
+  fs.writeFileSync(shim, source);
+  expect(resolveExecutableCommand(shim, ["acp", "--cwd", "中文 folder"]).command).toBe(native);
+  expect(resolveExecutableCommand(shim, ["acp", "--cwd", "中文 folder"]).args).toEqual(["acp", "--cwd", "中文 folder"]);
+  fs.writeFileSync(shim, source.replace("SETLOCAL", "SETLOCAL\r\nSET IMPORTANT=1"));
+  expect(resolveExecutableCommand(shim).command.toLowerCase()).toContain("cmd.exe");
+});

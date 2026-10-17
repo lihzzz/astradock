@@ -88,6 +88,18 @@ function resolveNodeShim(file: string): string | null {
   return null;
 }
 
+/** Only unwrap the known npm native shim; preserve arbitrary user batch logic. */
+function resolveOpenCodeShim(file: string): string | null {
+  if (path.basename(file).toLowerCase() !== "opencode.cmd") return null;
+  try {
+    const source = fs.readFileSync(file, "utf8").replace(/\r\n/g, "\n").trim();
+    const expected = '@ECHO off\nGOTO start\n:find_dp0\nSET dp0=%~dp0\nEXIT /b\n:start\nSETLOCAL\nCALL :find_dp0\n"%dp0%\\node_modules\\opencode-ai\\bin\\opencode.exe"   %*';
+    if (source !== expected) return null;
+    const binary = path.join(path.dirname(file), "node_modules", "opencode-ai", "bin", "opencode.exe");
+    return fs.statSync(binary).isFile() ? binary : null;
+  } catch { return null; }
+}
+
 // cmd.exe consumes the first layer, and a batch invocation consumes a second.
 // Escape both layers so whitespace, quotes, Unicode and literal shell characters survive.
 function quoteBatchArgument(value: string): string {
@@ -104,6 +116,8 @@ export function resolveExecutableCommand(command: string, args: string[] = [], o
   if (!file) throw new Error(`Executable not found: ${command}`);
   if (/\.(?:cjs|mjs|js)$/i.test(file)) return nodeCommand(file, args, options);
   if (platform === "win32" && /\.(cmd|bat)$/i.test(file)) {
+    const native = resolveOpenCodeShim(file);
+    if (native) return { command: native, args: [...args], env };
     const script = resolveNodeShim(file);
     if (script) return nodeCommand(script, args, options);
     const interpreter = environmentValue(env, "COMSPEC") ?? "cmd.exe";

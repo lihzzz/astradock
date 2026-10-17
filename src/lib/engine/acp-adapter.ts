@@ -197,11 +197,13 @@ export function normalizeToolResult(rawOutput: unknown, content?: unknown[]): Re
   }
 
   if (content) {
-    for (const item of content) {
-      if (isDiffContent(item)) {
-        result.filePath = item.path;
-        result.oldString = item.oldText;
-        result.newString = item.newText;
+    const diffs = content.filter(isDiffContent);
+    if (diffs.length) {
+      result.structuredPatch = diffs.map(item => ({ filePath: item.path, kind: item.oldText === null ? "add" : "update", oldString: item.oldText ?? "", newString: item.newText }));
+      if (diffs.length === 1) {
+        result.filePath = diffs[0].path;
+        result.oldString = diffs[0].oldText ?? "";
+        result.newString = diffs[0].newText;
       }
     }
     const textContent = content
@@ -233,8 +235,11 @@ export function normalizeToolResult(rawOutput: unknown, content?: unknown[]): Re
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
-function isDiffContent(item: unknown): item is { type: "diff"; path: string; oldText: string; newText: string } {
-  return typeof item === "object" && item !== null && (item as Record<string, unknown>).type === "diff";
+function isDiffContent(item: unknown): item is { type: "diff"; path: string; oldText: string | null; newText: string } {
+  return typeof item === "object" && item !== null && "type" in item && item.type === "diff"
+    && "path" in item && typeof item.path === "string"
+    && "newText" in item && typeof item.newText === "string"
+    && "oldText" in item && (item.oldText === null || typeof item.oldText === "string");
 }
 
 function extractACPContentText(item: unknown): string | null {

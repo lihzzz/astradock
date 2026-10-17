@@ -18,7 +18,7 @@ export interface McpServerConfig {
 
 // ── MCP runtime status ──
 
-export type McpServerStatusState = "connected" | "failed" | "needs-auth" | "pending" | "disabled";
+export type McpServerStatusState = "connected" | "failed" | "needs-auth" | "pending" | "disabled" | "unknown";
 
 export interface McpServerStatus {
   name: string;

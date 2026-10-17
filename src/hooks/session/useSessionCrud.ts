@@ -1,3 +1,4 @@
+import { acpHistoryMessages } from "@/lib/engine/acp-history";
 import { startTransition, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import type { ChatSession, McpServerConfig, PersistedSession, Project, ACPConfigOption } from "@/types";
@@ -520,6 +521,29 @@ export function useSessionCrud({
     [cacheSessionPayload, findProject, saveCurrentSession, seedBackgroundStore, switchSession],
   );
 
+  const importAcpSession = useCallback(async (sourceId: string, remote: { sessionId: string; title?: string | null }) => {
+    const viewId = activeSessionIdRef.current;
+    const source = sessionsRef.current.find(session => session.id === sourceId);
+    if (!source?.agentId || source.engine !== "acp") throw new Error("ACP source session not found");
+    const existing = sessionsRef.current.find(session => session.projectId === source.projectId && session.agentId === source.agentId && session.agentSessionId === remote.sessionId);
+    if (existing) { await switchSession(existing.id); return; }
+    const history = await window.claude.acp.readSession(sourceId, remote.sessionId);
+    if (history.error || !history.events) throw new Error(history.error ?? "ACP history unavailable");
+    if (!sessionsRef.current.some(session => session.id === sourceId) || !findProject(source.projectId)) throw new Error("Source session was removed during import");
+    const id = crypto.randomUUID();
+    const persisted: PersistedSession = {
+      id, conversationId: id, projectId: source.projectId, title: remote.title?.trim() || "Imported ACP session",
+      createdAt: Date.now(), totalCost: 0, engine: "acp", agentId: source.agentId, agentSessionId: remote.sessionId,
+      workspaceBinding: source.workspaceBinding, messages: acpHistoryMessages(history.events),
+    };
+    await saveSessionSmart(persisted);
+    cacheSessionPayload(persisted);
+    const session = toChatSession({ ...persisted, lastMessageAt: persisted.createdAt }, false);
+    sessionsRef.current = [session, ...sessionsRef.current];
+    setSessions(prev => [session, ...prev]);
+    if (activeSessionIdRef.current === viewId) await switchSession(id);
+  }, [activeSessionIdRef, cacheSessionPayload, findProject, setSessions, switchSession, sessionsRef]);
+
   // ── Switch draft engine/agent ──
 
   const setDraftAgent = useCallback((draftEngine: string, agentId: string, _cachedConfigOptions?: ACPConfigOption[], model?: string) => {
@@ -569,6 +593,7 @@ export function useSessionCrud({
     renameSession,
     deselectSession,
     importCCSession,
+    importAcpSession,
     setDraftAgent,
   };
 }

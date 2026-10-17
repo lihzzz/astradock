@@ -348,6 +348,10 @@ contextBridge.exposeInMainWorld("claude", {
       ipcRenderer.invoke("acp:permission_response", { sessionId, requestId, optionId }),
     setConfig: (sessionId: string, configId: string, value: string) =>
       ipcRenderer.invoke("acp:set-config", { sessionId, configId, value }),
+    getCapabilities: (sessionId: string) => ipcRenderer.invoke("acp:get-capabilities", sessionId),
+    listSessions: (sessionId: string, cursor?: string) => ipcRenderer.invoke("acp:list-sessions", { sessionId, cursor }),
+    readSession: (sessionId: string, agentSessionId: string) => ipcRenderer.invoke("acp:read-session", { sessionId, agentSessionId }),
+    forkSession: (sessionId: string) => ipcRenderer.invoke("acp:fork-session", { sessionId }),
     getConfigOptions: (sessionId: string) =>
       ipcRenderer.invoke("acp:get-config-options", sessionId),
     getAvailableCommands: (sessionId: string) =>

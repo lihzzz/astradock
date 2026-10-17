@@ -69,7 +69,6 @@ export function useDraftMaterialization({
     backgroundStoreRef,
     preStartedSessionIdRef,
     draftAcpSessionIdRef,
-    draftMcpStatusesRef,
     materializingRef,
     pendingAcpDraftPromptRef,
     acpAgentIdRef,
@@ -495,10 +494,8 @@ export function useDraftMaterialization({
           }
         }
         // Transition draftMcpStatuses (from probe) → acpMcpStatuses for the live session
-        setAcpMcpStatuses(draftMcpStatusesRef.current.length > 0
-          ? draftMcpStatusesRef.current
-          : mcpServers.map(s => ({ name: s.name, status: "connected" as const }))
-        );
+        // A client-side probe cannot attest the agent's own MCP connection.
+        setAcpMcpStatuses(mcpServers.map(s => ({ name: s.name, status: "unknown" as const })));
       } else if (draftEngine === "codex") {
         // Codex app-server path
         setSessions(prev => [{

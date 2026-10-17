@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { handleACPTurnComplete } from "./acp-handler";
+import { handleACPEvent, handleACPTurnComplete } from "./acp-handler";
 import type { InternalState } from "./session-store";
 
 function state(): InternalState {
@@ -28,4 +28,11 @@ describe("background ACP turn completion", () => {
 
     expect(current.messages).toHaveLength(0);
   });
+});
+
+
+it("treats background cost events as cumulative snapshots, including duplicate replay", () => {
+  const current = state();
+  for (const amount of [0.1, 0.3, 0.3]) handleACPEvent(current, { _sessionId: "main", sessionId: "agent", update: { sessionUpdate: "usage_update", cost: { amount, currency: "USD" } } });
+  expect(current.totalCost).toBe(0.3);
 });

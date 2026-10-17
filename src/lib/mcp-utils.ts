@@ -2,6 +2,6 @@ import type { McpServerStatusState } from "@/types";
 
 /** Validate a raw status string into a safe McpServerStatusState, defaulting to "failed". */
 export function toMcpStatusState(raw: string): McpServerStatusState {
-  const valid: McpServerStatusState[] = ["connected", "failed", "needs-auth", "pending", "disabled"];
+  const valid: McpServerStatusState[] = ["connected", "failed", "needs-auth", "pending", "disabled", "unknown"];
   return valid.includes(raw as McpServerStatusState) ? (raw as McpServerStatusState) : "failed";
 }

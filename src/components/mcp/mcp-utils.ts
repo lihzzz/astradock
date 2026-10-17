@@ -34,6 +34,7 @@ export const STATUS_CONFIG: Record<
   pending: { icon: CircleDashed, color: "text-muted-foreground animate-spin", label: "Connecting..." },
   "needs-auth": { icon: Lock, color: "text-amber-500", label: "Needs authentication" },
   failed: { icon: CircleX, color: "text-destructive", label: "Connection failed" },
+  unknown: { icon: CircleAlert, color: "text-muted-foreground", label: "Configured — agent connection unverified" },
   disabled: { icon: CircleAlert, color: "text-muted-foreground/50", label: "Disabled" },
 };
 

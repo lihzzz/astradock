@@ -288,16 +288,27 @@ describe("manual restarts", () => {
     expect(f.stop).toHaveBeenCalledWith(f.newId);
   });
 
-  it("does not restart or update ACP status after navigation during a probe", async () => {
-    const f = fixture("acp"); const probe = deferred<[]>(); f.api.mcp.probe.mockReturnValue(probe.promise);
+  it("does not restart or update ACP status after navigation during reload negotiation", async () => {
+    const f = fixture("acp"); const reload = deferred<{ supportsLoad: boolean }>(); f.api.acp.reloadSession.mockReturnValue(reload.promise);
     const pending = f.restart.restartAcpSession([]);
-    await vi.waitFor(() => expect(f.api.mcp.probe).toHaveBeenCalledOnce()); f.navigate(); probe.resolve([]);
-    expect((await pending).error).toBeDefined(); expect(f.api.acp.reloadSession).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(f.api.acp.reloadSession).toHaveBeenCalledOnce()); f.navigate(); reload.resolve({ supportsLoad: false });
+    expect((await pending).error).toBeDefined(); expect(f.stop).not.toHaveBeenCalled();
     expect(f.setters.setAcpMcpStatuses).not.toHaveBeenCalled();
+    expect(f.api.mcp.probe).not.toHaveBeenCalled();
   });
 
   it("does not rewind files for a checkpoint absent from the source snapshot", async () => {
     const f = fixture("claude"); await f.restart.fullRevertSession("missing-checkpoint");
     expect(f.api.revertFiles).not.toHaveBeenCalled(); expect(f.api.start).not.toHaveBeenCalled();
   });
+});
+
+
+it("restarts ACP with the original backing session after MCP reload requires a new connection", async () => {
+  const f = fixture("acp");
+  const result = await f.restart.restartAcpSession([]);
+  expect(result.error).toBeUndefined();
+  expect(f.api.acp.reviveSession).toHaveBeenCalledWith(expect.objectContaining({ agentSessionId: "agent-thread", mcpServers: [] }));
+  expect(f.api.acp.start).not.toHaveBeenCalled();
+  expect(f.api.mcp.probe).not.toHaveBeenCalled();
 });

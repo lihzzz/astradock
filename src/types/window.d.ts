@@ -300,12 +300,16 @@ declare global {
         authenticate: (sessionId: string, methodId: string) => Promise<ACPAuthenticateResult>;
         prompt: (sessionId: string, text: string, images?: unknown[]) => Promise<IpcResult>;
         stop: (sessionId: string) => Promise<IpcResult>;
-        reloadSession: (sessionId: string, mcpServers?: McpServerConfig[], cwd?: string) => Promise<IpcResult & { supportsLoad?: boolean }>;
+        reloadSession: (sessionId: string, mcpServers?: McpServerConfig[], cwd?: string) => Promise<IpcResult & { supportsLoad?: boolean; mcpStatuses?: ACPStatusInfo[] }>;
         reviveSession: (options: { agentId: string; cwd: string; agentSessionId?: string; mcpServers?: McpServerConfig[]; memoryContext?: { projectId: string }; source: SessionResumeSource }) => Promise<{ sessionId?: string; agentSessionId?: string; usedLoad?: boolean; configOptions?: ACPConfigOption[]; mcpStatuses?: ACPStatusInfo[]; error?: string }>;
         cancel: (sessionId: string) => Promise<IpcResult>;
         abortPendingStart: () => Promise<{ ok?: boolean }>;
         respondPermission: (sessionId: string, requestId: string, optionId: string) => Promise<IpcResult>;
         setConfig: (sessionId: string, configId: string, value: string) => Promise<{ configOptions?: ACPConfigOption[]; error?: string }>;
+        getCapabilities: (sessionId: string) => Promise<{ capabilities: import("@agentclientprotocol/sdk").AgentCapabilities; agentName?: string }>;
+        listSessions: (sessionId: string, cursor?: string) => Promise<{ sessions?: import("@agentclientprotocol/sdk").SessionInfo[]; nextCursor?: string | null; error?: string }>;
+        readSession: (sessionId: string, agentSessionId: string) => Promise<{ events?: import("@agentclientprotocol/sdk").SessionNotification[]; error?: string }>;
+        forkSession: (sessionId: string) => Promise<{ agentSessionId?: string; cwd?: string; error?: string }>;
         getConfigOptions: (sessionId: string) => Promise<{ configOptions?: ACPConfigOption[] }>;
         getAvailableCommands: (sessionId: string) => Promise<{ commands?: ACPAvailableCommand[] }>;
         onEvent: (callback: (data: ACPSessionEvent) => void) => () => void;

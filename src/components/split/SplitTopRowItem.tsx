@@ -6,6 +6,7 @@
  * and chat pane delegation — all as proper module-level functions and components.
  */
 
+import type { ACPSessionBrowserProps } from "@/components/ACPSessionBrowser";
 import React from "react";
 import { motion } from "motion/react";
 import { normalizeRatios } from "@/hooks/useSettings";
@@ -90,6 +91,8 @@ export interface SplitTopRowItemProps {
   showThinking: boolean;
   acpPermissionBehavior: "ask" | "auto_accept" | "allow_all";
   setAcpPermissionBehavior: (behavior: "ask" | "auto_accept" | "allow_all") => void;
+
+  onImportAcpSession?: ACPSessionBrowserProps["onImport"];
 
   // Agents & dev
   agents: InstalledAgent[];
@@ -528,6 +531,7 @@ function SplitTopRowItemInner(props: SplitTopRowItemProps) {
         });
       },
       onManageACPs: props.onManageACPs,
+      onImportAcpSession: props.onImportAcpSession,
       onToolDragEnd: resetSplitToolDrag,
       onChatPaneDragOver: splitToolDrag ? (event: React.DragEvent<HTMLDivElement>) => {
         event.preventDefault();

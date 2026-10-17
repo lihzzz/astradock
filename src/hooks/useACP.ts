@@ -19,6 +19,7 @@ import { suppressNextSessionCompletion } from "@/lib/notification-utils";
 import { captureException } from "@/lib/analytics/analytics";
 import { createSystemMessage, createUserMessage, nextId } from "@/lib/message-factory";
 import { isRetryableUpstreamError } from "@/lib/session/retry";
+import { reduceAcpUsage } from "@/lib/engine/acp-usage";
 import { useEngineBase } from "./useEngineBase";
 
 interface UseACPOptions {
@@ -59,6 +60,7 @@ export function useACP({ sessionId, initialMessages, initialConfigOptions, initi
 
   const [configOptions, setConfigOptions] = useState<ACPConfigOption[]>(initialConfigOptions ?? []);
   const [configOptionsLoading, setConfigOptionsLoading] = useState(false);
+  const configRequestRevision = useRef(0);
   const [slashCommands, setSlashCommands] = useState<SlashCommand[]>(initialSlashCommands ?? []);
   const [authRequired, setAuthRequired] = useState(false);
   const [authMethods, setAuthMethods] = useState<ACPAuthMethod[]>([]);
@@ -84,6 +86,7 @@ export function useACP({ sessionId, initialMessages, initialConfigOptions, initi
 
   // Engine-specific reset — runs after base reset via the same sessionId dependency
   useEffect(() => {
+    configRequestRevision.current++;
     acpPermissionRef.current = initialRawAcpPermission ?? null;
     activeTaskRef.current = null;
     setConfigOptions(initialConfigOptions ?? []);
@@ -345,25 +348,14 @@ export function useACP({ sessionId, initialMessages, initialConfigOptions, initi
       setConfigOptionsLoading(false);
     } else if (kind === "usage_update") {
       const uu = update as Extract<typeof update, { sessionUpdate: "usage_update" }>;
-      if (uu.size != null || uu.used != null) {
-        setContextUsage(prev => ({
-          inputTokens: uu.used ?? prev?.inputTokens ?? 0,
-          outputTokens: prev?.outputTokens ?? 0,
-          cacheReadTokens: prev?.cacheReadTokens ?? 0,
-          cacheCreationTokens: prev?.cacheCreationTokens ?? 0,
-          contextWindow: uu.size ?? prev?.contextWindow ?? 0,
-        }));
-      }
-      if (uu.cost) {
-        acpLog("COST", { amount: uu.cost.amount, currency: uu.cost.currency });
-        setTotalCost(prev => prev + uu.cost!.amount);
-      }
+      setContextUsage(prev => reduceAcpUsage({ totalCost: 0, contextUsage: prev }, uu).contextUsage);
+      setTotalCost(prev => reduceAcpUsage({ totalCost: prev, contextUsage: null }, uu).totalCost);
     } else if (kind === "session_info_update") {
       const si = update as Extract<typeof update, { sessionUpdate: "session_info_update" }>;
       acpLog("SESSION_INFO", { title: si.title });
     } else if (kind === "current_mode_update") {
       const cm = update as Extract<typeof update, { sessionUpdate: "current_mode_update" }>;
-      acpLog("MODE_UPDATE", { modeId: cm.currentModeId });
+      setConfigOptions(prev => prev.map(option => option.category === "mode" ? { ...option, currentValue: cm.currentModeId } : option));
     } else if (kind === "available_commands_update") {
       const acu = update as ACPAvailableCommandsUpdate;
       acpLog("COMMANDS_UPDATE", { count: acu.availableCommands?.length });
@@ -381,25 +373,30 @@ export function useACP({ sessionId, initialMessages, initialConfigOptions, initi
 
   useEffect(() => {
     if (!sessionId) return;
+    let disposed = false;
     acpLog("SESSION_CONNECTED", { sessionId: sessionId.slice(0, 8) });
     setIsConnected(true);
     setConfigOptionsLoading((initialConfigOptions?.length ?? 0) === 0);
 
     // Fetch any config options buffered in main process during the DRAFT→active transition
     // (events may have arrived before this listener was subscribed)
+    const fetchRevision = configRequestRevision.current;
     window.claude.acp.getConfigOptions(sessionId).then(result => {
+      if (disposed || sessionIdRef.current !== sessionId || fetchRevision !== configRequestRevision.current) return;
       if (result?.configOptions?.length) {
         acpLog("CONFIG_FETCHED", { count: result.configOptions.length });
         setConfigOptions(result.configOptions as ACPConfigOption[]);
       }
       setConfigOptionsLoading(false);
     }).catch(() => {
+      if (disposed || sessionIdRef.current !== sessionId) return;
       setConfigOptionsLoading(false);
       /* session may have been stopped */
     });
 
     // Fetch any available commands buffered in main process during the DRAFT→active transition
     window.claude.acp.getAvailableCommands(sessionId).then(result => {
+      if (disposed || sessionIdRef.current !== sessionId) return;
       if (result?.commands?.length) {
         acpLog("COMMANDS_FETCHED", { count: result.commands.length });
         setSlashCommands(result.commands.map(cmd => ({
@@ -505,6 +502,7 @@ export function useACP({ sessionId, initialMessages, initialConfigOptions, initi
     });
 
     return () => {
+      disposed = true;
       unsubEvent(); unsubPermission(); unsubTurnComplete(); unsubExit();
       cancelPendingFlush();
     };
@@ -637,7 +635,9 @@ export function useACP({ sessionId, initialMessages, initialConfigOptions, initi
   const setConfig = useCallback(async (configId: string, value: string) => {
     if (!sessionId) return { error: "ACP session not found." };
     acpLog("CONFIG_SET", { session: sessionId.slice(0, 8), configId, value });
+    const revision = ++configRequestRevision.current;
     const result = await window.claude.acp.setConfig(sessionId, configId, value);
+    if (sessionIdRef.current !== sessionId || configRequestRevision.current !== revision) return result;
     if (result.configOptions) {
       setConfigOptions(result.configOptions);
     }

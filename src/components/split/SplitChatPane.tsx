@@ -10,6 +10,7 @@
  * BottomComposer; only the outer wrapper and tool strip differ.
  */
 
+import type { ACPSessionBrowserProps } from "@/components/ACPSessionBrowser";
 import React, { useMemo } from "react";
 import { motion } from "motion/react";
 import type { ChatSession, EngineId, InstalledAgent, TodoItem, BackgroundAgent } from "@/types";
@@ -62,6 +63,8 @@ export interface SplitChatPaneProps {
   showThinking: boolean;
   acpPermissionBehavior: "ask" | "auto_accept" | "allow_all";
   onAcpPermissionBehaviorChange: (behavior: "ask" | "auto_accept" | "allow_all") => void;
+
+  onImportAcpSession?: ACPSessionBrowserProps["onImport"];
 
   // Agents
   agents: InstalledAgent[];
@@ -152,6 +155,7 @@ function SplitChatPaneInner({
   agents,
   showDevFill,
   onSeedDevExampleConversation,
+  onImportAcpSession,
   onSeedDevExampleSpaceData,
   grabbedElements,
   onRemoveGrabbedElement,
@@ -249,6 +253,7 @@ function SplitChatPaneInner({
               titleGenerating={session?.titleGenerating}
               permissionMode={paneController.panePermissionMode}
               acpPermissionBehavior={paneController.paneEngine === "acp" ? acpPermissionBehavior : undefined}
+              onImportAcpSession={paneController.paneEngine === "acp" ? onImportAcpSession : undefined}
               onToggleSidebar={displayIndex === 0 ? onToggleSidebar : () => {}}
               showDevFill={isActiveSessionPane ? showDevFill : false}
               onSeedDevExampleConversation={isActiveSessionPane ? onSeedDevExampleConversation : undefined}

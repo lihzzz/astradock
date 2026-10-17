@@ -1,3 +1,5 @@
+import { ACPSessionBrowser } from "@/components/ACPSessionBrowser";
+import type { ACPSessionBrowserProps } from "@/components/ACPSessionBrowser";
 import { memo, useState } from "react";
 import { ChevronDown, Info, Loader2, PanelLeft, Target, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,6 +38,7 @@ interface ChatHeaderProps {
   permissionMode?: string;
   acpPermissionBehavior?: AcpPermissionBehavior;
   onToggleSidebar: () => void;
+  onImportAcpSession?: ACPSessionBrowserProps["onImport"];
   showDevFill?: boolean;
   onSeedDevExampleConversation?: () => void;
   onSeedDevExampleSpaceData?: () => void;
@@ -66,6 +69,7 @@ export const ChatHeader = memo(function ChatHeader({
   permissionMode,
   acpPermissionBehavior,
   onToggleSidebar,
+  onImportAcpSession,
   showDevFill,
   onSeedDevExampleConversation,
   onSeedDevExampleSpaceData,
@@ -171,6 +175,7 @@ export const ChatHeader = memo(function ChatHeader({
       {/* Session info, split view toggle, and pane close */}
       {(chatSessionId || showGoal || showDevSeedButton || hasDetails || onClosePane) && (
         <div className="ms-auto flex shrink-0 items-center gap-1.5">
+          {chatSessionId && onImportAcpSession && <ACPSessionBrowser sessionId={chatSessionId} isProcessing={isProcessing} onImport={onImportAcpSession} />}
           {chatSessionId && <SessionTokenUsage key={chatSessionId} sessionId={chatSessionId} isProcessing={isProcessing} />}
           {onClosePane && (
             <Tooltip>

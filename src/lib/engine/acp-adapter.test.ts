@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveToolName, normalizeToolInput } from "./acp-adapter";
+import { deriveToolName, normalizeToolInput, normalizeToolResult } from "./acp-adapter";
 
 describe("ACP OpenCode tool compatibility", () => {
   it.each(["read", "edit"])("preserves Windows absolute paths in parsed %s commands", (kind) => {
@@ -35,4 +35,17 @@ describe("ACP OpenCode tool compatibility", () => {
       new_string: "after",
     });
   });
+});
+
+// Preserve every ACP diff for the shared multi-file renderer and file tracking.
+it("retains multiple ACP diff files including creations and deletions", () => {
+  const result = normalizeToolResult(undefined, [
+    { type: "diff", path: "a.ts", oldText: null, newText: "new" },
+    { type: "diff", path: "b.ts", oldText: "old", newText: "" },
+  ]);
+  expect(result?.structuredPatch).toEqual([
+    { filePath: "a.ts", kind: "add", oldString: "", newString: "new" },
+    { filePath: "b.ts", kind: "update", oldString: "old", newString: "" },
+  ]);
+  expect(result?.filePath).toBeUndefined();
 });

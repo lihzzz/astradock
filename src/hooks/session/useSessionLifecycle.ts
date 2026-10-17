@@ -103,6 +103,7 @@ export function useSessionLifecycle({
     renameSession,
     deselectSession,
     importCCSession,
+    importAcpSession,
     setDraftAgent,
   } = useSessionCrud({
     refs,
@@ -468,6 +469,7 @@ export function useSessionLifecycle({
     renameSession,
     deselectSession,
     importCCSession,
+    importAcpSession,
     setDraftAgent,
     setActiveModel,
     setSessionModel,
