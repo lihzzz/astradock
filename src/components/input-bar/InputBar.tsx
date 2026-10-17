@@ -6,6 +6,7 @@ import {
   useCallback,
   useMemo,
   useEffect,
+  useLayoutEffect,
   memo,
   type KeyboardEvent,
 } from "react";
@@ -73,6 +74,7 @@ import { useMentionAutocomplete } from "./useMentionAutocomplete";
 import { CommandPicker } from "./CommandPicker";
 import { useCommandAutocomplete } from "./CommandPicker";
 import { InputHistoryDialog } from "./InputHistoryDialog";
+import { composerDrafts, getComposerDraftKey } from "@/lib/chat/composer-drafts";
 
 const EMPTY_INPUT_HISTORY: string[] = [];
 
@@ -148,7 +150,13 @@ export interface InputBarProps {
   onDraftStateChange?: (hasDraft: boolean) => void;
 }
 
-export const InputBar = memo(function InputBar({
+// Remount transient UI (history, autocomplete, dialogs and dictation) on session
+// changes. The editable document itself is retained in the session draft cache.
+export const InputBar = memo(function InputBar(props: InputBarProps) {
+  return <SessionInputBar key={getComposerDraftKey(props.inputHistorySessionId)} {...props} />;
+});
+
+const SessionInputBar = memo(function SessionInputBar({
   onSend,
   onClear,
   onStop,
@@ -249,7 +257,39 @@ export const InputBar = memo(function InputBar({
     historyDraftRef.current = null;
   }, [inputHistoryLength, inputHistorySessionId]);
 
-  // ── Derived engine state ──
+  // Save and restore the editable document across session/pane changes.
+  const draftKey = getComposerDraftKey(inputHistorySessionId);
+  const attachmentsRef = useRef(attachments);
+  useLayoutEffect(() => {
+    attachmentsRef.current = attachments;
+  }, [attachments]);
+
+  useLayoutEffect(() => {
+    const el = editableRef.current;
+    if (!el) return;
+    // Read at commit time: the previous pane may have just saved this draft
+    // while moving between single-pane and split layouts.
+    const draft = composerDrafts.get(draftKey);
+    el.innerHTML = draft?.html ?? "";
+    const restoredHasContent = draft?.hasContent ?? false;
+    hasContentRef.current = restoredHasContent;
+    setHasContent(restoredHasContent);
+    attachmentsRef.current = draft?.attachments ?? [];
+    setAttachments(attachmentsRef.current);
+
+    return () => {
+      composerDrafts.save(draftKey, {
+        html: el.innerHTML,
+        hasContent: hasContentRef.current,
+        attachments: attachmentsRef.current,
+      });
+    };
+  }, [draftKey]);
+
+  useEffect(() => {
+    onDraftStateChange?.(hasContent || attachments.length > 0);
+  }, [hasContent, attachments.length, onDraftStateChange]);
+
   const isACPAgent = selectedAgent != null && selectedAgent.engine === "acp";
   const isCodexAgent = selectedAgent != null && selectedAgent.engine === "codex";
   const showACPConfigOptions = isACPAgent && (acpConfigOptions?.length ?? 0) > 0;
@@ -351,10 +391,13 @@ export const InputBar = memo(function InputBar({
 
   const clearComposer = useCallback(
     (el: HTMLDivElement) => {
+      if (!el.isConnected) return;
       el.innerHTML = "";
       hasContentRef.current = false;
       setHasContent(false);
+      attachmentsRef.current = [];
       setAttachments([]);
+      composerDrafts.delete(draftKey);
       onPredictionDismissed?.();
       onDraftStateChange?.(false);
       historyIndexRef.current = inputHistoryRef.current.length;
@@ -362,12 +405,13 @@ export const InputBar = memo(function InputBar({
       mention.closeMentions();
       command.setShowCommands(false);
     },
-    [command.setShowCommands, mention.closeMentions, onDraftStateChange, onPredictionDismissed],
+    [command.setShowCommands, mention.closeMentions, onDraftStateChange, onPredictionDismissed, draftKey],
   );
 
   // ── Image attachments ──
 
   const addImageFiles = useCallback(async (files: FileList | globalThis.File[]) => {
+    const target = editableRef.current;
     const validFiles = Array.from(files).filter(isAcceptedImage);
     if (validFiles.length === 0) return;
     onPredictionDismissed?.();
@@ -382,6 +426,7 @@ export const InputBar = memo(function InputBar({
         fileName: file.name,
       });
     }
+    if (!target?.isConnected) return;
     setAttachments((prev) => [...prev, ...newAttachments]);
   }, [onPredictionDismissed]);
 
@@ -481,7 +526,7 @@ export const InputBar = memo(function InputBar({
         hasContext = true;
       }
 
-      if (isSessionFrozen(inputHistorySessionId ?? null)) return;
+      if (!el.isConnected || isSessionFrozen(inputHistorySessionId ?? null)) return;
       if (hasContext) {
         const contextBlock = contextParts.join("\n\n");
         const fullMessage = contextBlock
@@ -535,6 +580,7 @@ export const InputBar = memo(function InputBar({
           Array.from(deepMentionPaths),
         );
 
+        if (!el.isConnected) return;
         if (sizeInfo.estimatedTokens > 50_000) {
           setDeepFolderInfo(sizeInfo);
           setShowDeepFolderConfirm(true);
@@ -554,6 +600,7 @@ export const InputBar = memo(function InputBar({
       }
     }
 
+    if (!el.isConnected) return;
     await performSend(el, fullText, mentionPaths, deepMentionPaths, hasGrabs);
   }, [
     attachments,
