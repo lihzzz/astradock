@@ -169,8 +169,6 @@ export function ToolIslandContent({
     case "fingerprint":
       return (
         <FingerprintProbePanel
-          key={sessionId ?? "no-session"}
-          scopeId={sessionId}
           sessionId={activeEngine === "codex" && hasLiveSession ? sessionId : null}
           cwd={projectPath}
           headerControls={headerControls}

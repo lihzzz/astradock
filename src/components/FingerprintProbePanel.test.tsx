@@ -4,6 +4,7 @@ import type { ReactNode, SetStateAction } from "react";
 import type { CodexFingerprintProbeResult } from "@/types";
 import type { CodexModel } from "@shared/types/codex";
 import { reportError } from "@/lib/analytics/analytics";
+import { fingerprintProbeStore } from "@/stores/fingerprint-probe-store";
 import { FingerprintProbePanel } from "./FingerprintProbePanel";
 
 const harness = vi.hoisted(() => ({
@@ -14,7 +15,6 @@ const harness = vi.hoisted(() => ({
   stateIndex: 0,
   refIndex: 0,
   effectIndex: 0,
-  writes: 0,
   selects: [] as Array<{ value: string; onValueChange: (value: string) => void }>,
   run: null as (() => void) | null,
 }));
@@ -30,7 +30,6 @@ vi.mock("react", async (importOriginal) => ({
     };
     harness.states[index] = slot;
     return [slot.value as T, (update: SetStateAction<T>) => {
-      harness.writes += 1;
       slot.value = typeof update === "function" ? (update as (current: T) => T)(slot.value as T) : update;
     }];
   },
@@ -98,30 +97,27 @@ function createResult(overrides: Partial<CodexFingerprintProbeResult> = {}): Cod
 
 const listModels = vi.fn();
 const fingerprintProbe = vi.fn();
-let scopeSequence = 0;
-let testScope: string;
-
-function renderPanel(sessionId: string | null = null, cwd: string | undefined = "/project", scopeId = `${testScope}:${sessionId ?? "none"}`): string {
+function renderPanel(sessionId: string | null = null, cwd: string | undefined = "/project"): string {
   harness.stateIndex = 0;
   harness.refIndex = 0;
   harness.effectIndex = 0;
   harness.selects = [];
   harness.run = null;
-  return renderToStaticMarkup(<FingerprintProbePanel scopeId={scopeId} sessionId={sessionId} cwd={cwd} />);
+  return renderToStaticMarkup(<FingerprintProbePanel sessionId={sessionId} cwd={cwd} />);
 }
 
 async function settle(): Promise<void> {
   await new Promise<void>((resolve) => setImmediate(resolve));
 }
 
-async function mount(sessionId: string | null = null, cwd: string | undefined = "/project", scopeId = `${testScope}:${sessionId ?? "none"}`): Promise<void> {
-  renderPanel(sessionId, cwd, scopeId);
+async function mount(sessionId: string | null = null, cwd: string | undefined = "/project"): Promise<void> {
+  renderPanel(sessionId, cwd);
   for (const effect of harness.effects) {
     const cleanup = effect();
     if (cleanup) harness.cleanups.push(cleanup);
   }
   await settle();
-  renderPanel(sessionId, cwd, scopeId);
+  renderPanel(sessionId, cwd);
 }
 
 function unmount(): void {
@@ -139,12 +135,11 @@ async function run(): Promise<void> {
 }
 
 beforeEach(() => {
-  testScope = `probe-test-${++scopeSequence}`;
+  fingerprintProbeStore.setState(fingerprintProbeStore.getInitialState(), true);
   harness.states = [];
   harness.refs = [];
   harness.effects = [];
   harness.cleanups = [];
-  harness.writes = 0;
   listModels.mockReset().mockResolvedValue({ models: [model] });
   fingerprintProbe.mockReset().mockResolvedValue(createResult());
   vi.stubGlobal("window", { claude: { codex: { listModels, fingerprintProbe } } });
@@ -214,7 +209,7 @@ describe("FingerprintProbePanel", () => {
     expect(html).not.toContain("valid previous sample");
   });
 
-  it("inherits a live session's parameters and passes its session and project scope", async () => {
+  it("inherits a live session's parameters and passes its session and working directory", async () => {
     await mount("live-session");
     harness.selects[0].onValueChange("current");
     const html = renderPanel("live-session");
@@ -303,37 +298,89 @@ describe("FingerprintProbePanel", () => {
     expect(harness.run).not.toBeNull();
   });
 
-  it("keeps background completion in its originating session and restores it when returning", async () => {
+  it("shares a running probe and its completion across sessions without retargeting or duplicating it", async () => {
     let resolveProbe: (result: CodexFingerprintProbeResult) => void = () => { throw new Error("Probe not started"); };
     fingerprintProbe.mockImplementation(() => new Promise<CodexFingerprintProbeResult>((resolve) => { resolveProbe = resolve; }));
-    await mount("session-a");
+    await mount("session-b", "/other-project");
     harness.selects[0].onValueChange("current");
+    renderPanel("session-b", "/other-project");
+    const startInB = harness.run;
+    unmount();
+    await mount("session-a");
     renderPanel("session-a");
     harness.run?.();
     unmount();
-    await mount("session-b");
-    const writes = harness.writes;
-    expect(renderPanel("session-b")).not.toContain("Running");
+    await mount("session-b", "/other-project");
+    expect(renderPanel("session-b", "/other-project")).toContain("Running");
+    expect(harness.run).toBeNull();
+    startInB?.();
+    expect(fingerprintProbe).toHaveBeenCalledTimes(1);
+    expect(fingerprintProbe).toHaveBeenCalledWith({ model: "gpt-5.4", sessionId: "session-a", cwd: "/project" });
     resolveProbe(createResult({ mode: "fork", parentThreadId: "session-a" }));
     await settle();
-    expect(harness.writes).toBe(writes);
-    expect(renderPanel("session-b")).not.toContain("server-model-label");
+    const html = renderPanel("session-b", "/other-project");
+    expect(html).not.toContain("Running");
+    expect(html).toContain("server-model-label");
+    expect(html).toContain("Source session:");
+    expect(html).toContain("session-a");
+    expect(harness.selects[0].value).toBe("current");
+    fingerprintProbe.mockResolvedValue(createResult({ mode: "fork", parentThreadId: "session-b" }));
+    await run();
+    expect(fingerprintProbe).toHaveBeenLastCalledWith({ model: "gpt-5.4", sessionId: "session-b", cwd: "/other-project" });
     unmount();
     await mount("session-a");
     expect(renderPanel("session-a")).toContain("server-model-label");
+    expect(renderPanel("session-a")).toContain("session-b");
     expect(harness.selects[0].value).toBe("current");
   });
 
-  it("isolates fresh probe state between non-Codex sessions and project directories", async () => {
-    await mount(null, "/project", "claude-session");
+  it("shares fresh probe settings and results across engines and project directories", async () => {
+    const alternateModel: CodexModel = {
+      ...model, id: "alternate-model", displayName: "Alternate model",
+      supportedReasoningEfforts: [...model.supportedReasoningEfforts, { reasoningEffort: "low", description: "Low" }],
+    };
+    listModels.mockResolvedValue({ models: [model, alternateModel] });
+    fingerprintProbe.mockResolvedValue(createResult({ selectedModel: "alternate-model", reasoningEffort: "low" }));
+    await mount("codex-session");
+    harness.selects[1].onValueChange("alternate-model");
+    renderPanel("codex-session");
+    harness.selects[2].onValueChange("low");
+    renderPanel("codex-session");
     await run();
-    expect(renderPanel(null, "/project", "claude-session")).toContain("server-model-label");
+    expect(renderPanel(null, "/other-project")).toContain("server-model-label");
+    expect(harness.selects[1].value).toBe("alternate-model");
+    expect(harness.selects[2].value).toBe("low");
+    expect(listModels).toHaveBeenCalledTimes(1);
     unmount();
-    await mount(null, "/project", "acp-session");
-    expect(renderPanel(null, "/project", "acp-session")).not.toContain("server-model-label");
+    await mount(null, "/other-project");
+    expect(renderPanel(null, "/other-project")).toContain("server-model-label");
+    expect(harness.selects[1].value).toBe("alternate-model");
+    expect(harness.selects[2].value).toBe("low");
+    await run();
+    expect(fingerprintProbe).toHaveBeenLastCalledWith({ model: "alternate-model", cwd: "/other-project", effort: "low" });
     unmount();
-    await mount(null, "/other-project", "claude-session");
-    expect(renderPanel(null, "/other-project", "claude-session")).not.toContain("server-model-label");
+    await mount(null, undefined);
+    expect(renderPanel(null, undefined)).toContain("server-model-label");
+  });
+
+  it("retains shared current-session results but requires a live session for another run", async () => {
+    fingerprintProbe.mockResolvedValue(createResult({ mode: "fork", parentThreadId: "session-a" }));
+    await mount("session-a");
+    harness.selects[0].onValueChange("current");
+    renderPanel("session-a");
+    await run();
+    unmount();
+    await mount();
+    const html = renderPanel();
+    expect(html).toContain("server-model-label");
+    expect(html).toContain("session-a");
+    expect(html).toContain("Select a live Codex session");
+    expect(harness.run).toBeNull();
+    expect(harness.selects[0].value).toBe("current");
+    harness.selects[0].onValueChange("fresh");
+    renderPanel();
+    await run();
+    expect(fingerprintProbe).toHaveBeenLastCalledWith({ model: "gpt-5.4", cwd: "/project", effort: "high" });
   });
 
   it.each(["failed", "missing"])("retains results but disables fresh reruns if model refresh is %s", async (refresh) => {

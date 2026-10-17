@@ -8,12 +8,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PanelHeader } from "@/components/PanelHeader";
 import { reportError } from "@/lib/analytics/analytics";
-import { getFingerprintProbeStore } from "@/stores/fingerprint-probe-store";
+import { fingerprintProbeStore } from "@/stores/fingerprint-probe-store";
 import type { CodexFingerprintProbeResult, CodexFingerprintVerdict } from "@/types";
 import type { CodexModel } from "@shared/types/codex";
 
 interface FingerprintProbePanelProps {
-  scopeId: string | null;
   sessionId: string | null;
   cwd: string | undefined;
   headerControls?: React.ReactNode;
@@ -46,19 +45,12 @@ function formatPercent(value: number | null | undefined): string {
   return value == null ? "—" : `${(value * 100).toFixed(1)}%`;
 }
 
-// Remount view-local model loading at the session/project boundary. Probe
-// state lives outside the view and is restored when the same scope reopens.
-export const FingerprintProbePanel = memo(function FingerprintProbePanel(props: FingerprintProbePanelProps) {
-  return <FingerprintProbePanelContent key={JSON.stringify([props.scopeId, props.sessionId, props.cwd])} {...props} />;
-});
-
-function FingerprintProbePanelContent({ scopeId, sessionId, cwd, headerControls }: FingerprintProbePanelProps) {
-  const probeStore = getFingerprintProbeStore({ scopeId, sessionId, cwd });
+export const FingerprintProbePanel = memo(function FingerprintProbePanel({ sessionId, cwd, headerControls }: FingerprintProbePanelProps) {
   const {
     selectedModel, setSelectedModel, selectedEffort, setSelectedEffort,
     probeTarget, running, result, latestAttempt, probeError,
     changeTarget: setProbeTarget, runProbe,
-  } = useStore(probeStore);
+  } = useStore(fingerprintProbeStore);
   const [models, setModels] = useState<CodexModel[]>([]);
   const [modelsLoading, setModelsLoading] = useState(true);
   const [modelsError, setModelsError] = useState<string | null>(null);
@@ -74,7 +66,7 @@ function FingerprintProbePanelContent({ scopeId, sessionId, cwd, headerControls 
         } else {
           setModelsError(null);
           setModels(response.models ?? []);
-          if (!probeStore.getState().selectedModel) {
+          if (!fingerprintProbeStore.getState().selectedModel) {
             setSelectedModel(response.models.find((model) => model.isDefault)?.id ?? response.models[0]?.id ?? "");
           }
         }
@@ -89,7 +81,7 @@ function FingerprintProbePanelContent({ scopeId, sessionId, cwd, headerControls 
     return () => {
       cancelled = true;
     };
-  }, [probeStore, setSelectedModel]);
+  }, [setSelectedModel]);
 
   const currentModel = models.find((model) => model.id === selectedModel);
   const effortOptions = currentModel?.supportedReasoningEfforts ?? [];
@@ -179,7 +171,9 @@ function FingerprintProbePanelContent({ scopeId, sessionId, cwd, headerControls 
               </>
             ) : (
               <p className="text-[10px] leading-relaxed text-muted-foreground">
-                Inherits this session's model, provider, and reasoning effort. Samples run in temporary branches of this session.
+                {sessionId == null
+                  ? "Select a live Codex session to probe, or switch to Fresh session."
+                  : "Inherits this session's model, provider, and reasoning effort. Samples run in temporary branches of this session."}
               </p>
             )}
             <Button size="sm" onClick={startProbe} disabled={!canRun || running}>
@@ -189,6 +183,7 @@ function FingerprintProbePanelContent({ scopeId, sessionId, cwd, headerControls 
             <p className="text-[10px] leading-relaxed text-muted-foreground/60">
               Compares three short model responses with the local fingerprint bank using your Codex account.
               {probeTarget === "fresh" ? " This tests fresh sessions." : " This tests the current session."}
+              {" Settings, progress, and results are shared across all sessions."}
             </p>
             {modelsError && probeTarget === "fresh" && <p className="text-[10px] text-red-500">{modelsError}</p>}
             {probeError && (
@@ -238,7 +233,7 @@ function FingerprintProbePanelContent({ scopeId, sessionId, cwd, headerControls 
       </ScrollArea>
     </div>
   );
-}
+});
 
 function FingerprintResultSummary({ result, previous }: { result: CodexFingerprintProbeResult; previous: boolean }) {
   const strongMatch = result.verdict.verdict === "MATCH" && result.verdict.confidence === "high";
@@ -257,11 +252,12 @@ function FingerprintResultSummary({ result, previous }: { result: CodexFingerpri
         <div className="min-w-0 flex-1 space-y-1">
           <p className="text-xs font-semibold text-foreground">{result.verdict.message}</p>
           <p className="text-[10px] leading-relaxed text-muted-foreground">
-            {result.mode === "fork" ? "Current session" : "Fresh sessions"} · {analysis?.usedOutputs ?? 0} valid samples · {(result.elapsedMs / 1000).toFixed(1)}s
+            {result.mode === "fork" ? "Session fork" : "Fresh sessions"} · {analysis?.usedOutputs ?? 0} valid samples · {(result.elapsedMs / 1000).toFixed(1)}s
           </p>
         </div>
       </div>
       <dl className="grid gap-1 text-[10px] text-muted-foreground">
+        {result.parentThreadId && <div><dt className="inline">Source session: </dt><dd className="inline wrap-break-word font-mono text-foreground/80">{result.parentThreadId}</dd></div>}
         <div><dt className="inline">Expected model: </dt><dd className="inline wrap-break-word font-mono text-foreground/80">{result.selectedModel}</dd></div>
         <div><dt className="inline">Server-reported model: </dt><dd className="inline wrap-break-word font-mono text-foreground/80">{result.actualModel ?? "Not reported"}</dd></div>
         <div><dt className="inline">Statistical prediction: </dt><dd className="inline wrap-break-word font-mono text-foreground/80">{analysis?.prediction ?? "Unavailable"}</dd>{analysis && ` · ${formatPercent(analysis.probability)}`}</div>
