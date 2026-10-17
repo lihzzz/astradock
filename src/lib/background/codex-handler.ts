@@ -1,7 +1,7 @@
 import { applyCodexSubagentUpdate, startsCodexAgentCard } from "@/lib/engine/codex-agent-cards";
 import type { CodexSessionEvent } from "@/types";
 import type { InternalState } from "./session-store";
-import { codexItemToToolName, codexItemToToolInput, codexItemToToolResult, codexPlanToTodos } from "@/lib/engine/codex-adapter";
+import { codexItemMetadata, settleCodexTools, codexItemToToolName, codexItemToToolInput, codexItemToToolResult, codexPlanToTodos } from "@/lib/engine/codex-adapter";
 import { ensureACPStreamingMsg, finalizeACPStreamingMsg } from "./acp-handler";
 import type { PermissionRequest } from "@/types";
 import type { ItemStartedNotification } from "@shared/types/codex-protocol/v2/ItemStartedNotification";
@@ -17,6 +17,23 @@ import { parseThreadGoal } from "@shared/lib/codex-goal";
 import { createSystemMessage } from "@/lib/message-factory";
 import { isRetryableUpstreamError } from "@/lib/session/retry";
 import type { TurnCompletedNotification } from "@shared/types/codex-protocol/v2/TurnCompletedNotification";
+
+/** Rebind by persisted item identity after switching away from the active hook. */
+function bindCodexAssistant(state: InternalState, itemId: string, turnId: string) {
+  const existing = state.messages.find(message => message.role === "assistant" && message.codexItemId === itemId);
+  if (existing) {
+    if (state.currentStreamingMsgId !== existing.id) finalizeACPStreamingMsg(state);
+    state.currentStreamingMsgId = existing.id;
+    return existing;
+  }
+  const current = state.messages.find(message => message.id === state.currentStreamingMsgId);
+  if (current?.content && current.codexItemId !== itemId) finalizeACPStreamingMsg(state);
+  ensureACPStreamingMsg(state);
+  const target = state.messages.find(message => message.id === state.currentStreamingMsgId)!;
+  target.codexItemId = itemId;
+  target.turnId = turnId;
+  return target;
+}
 
 /**
  * Process a Codex notification for a background session, mutating `state` in place.
@@ -73,6 +90,7 @@ export function handleCodexEvent(
       finalizeACPStreamingMsg(state); // reuse — same pattern
       state.isProcessing = false;
       const turn = (params as TurnCompletedNotification).turn;
+      if (turn.status !== "inProgress") state.messages = settleCodexTools(state.messages, turn.id, turn.status);
       if (turn.status === "failed") {
         const errorText = turn.error?.message || "Turn failed";
         state.messages.push(createSystemMessage(errorText, true, isRetryableUpstreamError(errorText)));
@@ -80,7 +98,7 @@ export function handleCodexEvent(
       return { processingChanged: true, isProcessing: false };
 
     case "error": {
-      const errorParams = params as { error: { message?: string }; willRetry?: boolean };
+      const errorParams = params as { error: { message?: string }; willRetry?: boolean; turnId?: string };
       if (errorParams.willRetry) {
         // Codex core is auto-retrying — keep it visible when switching back.
         state.reconnectMessage = errorParams.error.message || "Reconnecting…";
@@ -88,14 +106,17 @@ export function handleCodexEvent(
       }
       const errorText = errorParams.error.message || "Unknown error";
       state.isProcessing = false;
+      finalizeACPStreamingMsg(state);
+      state.messages = settleCodexTools(state.messages, errorParams.turnId ?? null, "failed");
       state.messages.push(createSystemMessage(errorText, true, isRetryableUpstreamError(errorText)));
       return { processingChanged: true, isProcessing: false };
     }
 
     case "item/started": {
-      const { item } = params as ItemStartedNotification;
+      const { item, turnId } = params as ItemStartedNotification;
       if (item.type === "agentMessage" || item.type === "reasoning") {
-        ensureACPStreamingMsg(state);
+        const target = bindCodexAssistant(state, item.id, turnId);
+        Object.assign(target, codexItemMetadata(item, turnId));
       } else {
         // Non-assistant item is a hard boundary — finalize streaming first
         finalizeACPStreamingMsg(state);
@@ -110,6 +131,7 @@ export function handleCodexEvent(
             content: "",
             toolName,
             toolInput: codexItemToToolInput(item),
+            ...codexItemMetadata(item, turnId),
             timestamp: Date.now(),
           });
         }
@@ -118,11 +140,12 @@ export function handleCodexEvent(
     }
 
     case "item/completed": {
-      const { item } = params as ItemCompletedNotification;
+      const { item, turnId } = params as ItemCompletedNotification;
       if (item.type === "agentMessage") {
         const text = item.text || undefined;
-        const target = state.messages.find(m => m.id === state.currentStreamingMsgId);
-        if (target && text) target.content = text;
+        const target = bindCodexAssistant(state, item.id, turnId);
+        Object.assign(target, codexItemMetadata(item, turnId, true));
+        if (text) target.content = text;
         finalizeACPStreamingMsg(state);
       } else if (item.type === "reasoning") {
         // Mark thinking as complete on the current streaming message
@@ -173,13 +196,11 @@ export function handleCodexEvent(
         const msg = state.messages.find(m => m.id === msgId);
         if (msg) {
           msg.toolInput = codexItemToToolInput(item);
-          const result = codexItemToToolResult(item);
+          const metadata = codexItemMetadata(item, turnId, true);
+          Object.assign(msg, metadata);
+          const result = codexItemToToolResult(item, msg.toolResult);
           if (result) msg.toolResult = result;
-          const isError =
-            (item.type === "commandExecution" && (item.status === "failed" || item.status === "declined")) ||
-            (item.type === "fileChange" && (item.status === "failed" || item.status === "declined")) ||
-            (item.type === "mcpToolCall" && item.status === "failed");
-          if (isError) msg.toolError = true;
+          msg.toolError = metadata.toolState?.status === "failed" || metadata.toolState?.status === "declined" || undefined;
         }
         state.parentToolMap.delete(item.id);
       }
@@ -187,10 +208,9 @@ export function handleCodexEvent(
     }
 
     case "item/agentMessage/delta": {
-      const { delta } = params as AgentMessageDeltaNotification;
+      const { delta, itemId, turnId } = params as AgentMessageDeltaNotification;
       if (delta) {
-        ensureACPStreamingMsg(state);
-        const target = state.messages.find(m => m.id === state.currentStreamingMsgId);
+        const target = bindCodexAssistant(state, itemId, turnId);
         if (target) {
           if (target.thinking && !target.thinkingComplete) target.thinkingComplete = true;
           target.content += delta;
@@ -201,10 +221,9 @@ export function handleCodexEvent(
 
     case "item/reasoning/summaryTextDelta":
     case "item/reasoning/textDelta": {
-      const { delta } = params as ReasoningTextDeltaNotification;
+      const { delta, itemId, turnId } = params as ReasoningTextDeltaNotification;
       if (delta) {
-        ensureACPStreamingMsg(state);
-        const target = state.messages.find(m => m.id === state.currentStreamingMsgId);
+        const target = bindCodexAssistant(state, itemId, turnId);
         if (target) target.thinking = (target.thinking ?? "") + delta;
       }
       break;

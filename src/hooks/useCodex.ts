@@ -24,6 +24,8 @@ import type { AccountUpdatedNotification } from "@shared/types/codex-protocol/v2
 import {
   CodexStreamingBuffer,
   codexItemToToolName,
+  codexItemMetadata,
+  settleCodexTools,
   codexItemToToolInput,
   codexItemToToolResult,
   codexPlanToTodos,
@@ -187,6 +189,7 @@ export function useCodex({
     // arriving after switch-back can find their tool_call messages
     if (initialMessages) {
       for (const msg of initialMessages) {
+        if (msg.role === "assistant" && msg.codexItemId) assistantItemMapRef.current.set(msg.codexItemId, msg.id);
         if (msg.role === "tool_call" && msg.id.startsWith("codex-tool-")) {
           const itemId = msg.id.replace("codex-tool-", "");
           itemMapRef.current.set(itemId, msg.id);
@@ -286,7 +289,7 @@ export function useCodex({
   }, []);
 
   const bindAssistantItem = useCallback((itemId: string): string => {
-    const msgId = ensureStreamingAssistantMessage();
+    const msgId = assistantItemMapRef.current.get(itemId) ?? ensureStreamingAssistantMessage();
     assistantItemMapRef.current.set(itemId, msgId);
     activeAssistantItemIdRef.current = itemId;
     rebindBufferToMessage(msgId);
@@ -447,8 +450,9 @@ export function useCodex({
           setAuthRequired(true);
         }
         setIsProcessing(false);
+        finalizeStreamingAssistant();
         setMessages((prev) => [
-          ...prev,
+          ...settleCodexTools(prev, errorParams.turnId, "failed"),
           createSystemMessage(errorText, true, isRetryableUpstreamError(errorText)),
         ]);
         break;
@@ -461,7 +465,11 @@ export function useCodex({
     const item = params.item;
 
     if (item.type === "agentMessage" || item.type === "reasoning") {
-      bindAssistantItem(item.id);
+      // Separate commentary/final answers while allowing reasoning to precede text.
+      if (bufferRef.current.getText() && activeAssistantItemIdRef.current !== item.id) finalizeStreamingAssistant();
+      const msgId = bindAssistantItem(item.id);
+      setMessages(prev => prev.map(message => message.id === msgId
+        ? { ...message, ...codexItemMetadata(item, params.turnId) } : message));
       return;
     }
 
@@ -484,6 +492,7 @@ export function useCodex({
           content: "",
           toolName,
           toolInput: codexItemToToolInput(item),
+          ...codexItemMetadata(item, params.turnId),
           timestamp: Date.now(),
         },
       ]);
@@ -507,6 +516,7 @@ export function useCodex({
             m.id === mappedMsgId
               ? {
                   ...m,
+                  ...codexItemMetadata(item, params.turnId, true),
                   content: finalText ?? bufferedTextForItem ?? m.content,
                   ...(m.thinking ? { thinkingComplete: true } : {}),
                   isStreaming: false,
@@ -521,6 +531,7 @@ export function useCodex({
             id: nextId("codex-msg"),
             role: "assistant",
             content: finalText,
+            ...codexItemMetadata(item, params.turnId, true),
             timestamp: Date.now(),
             isStreaming: false,
           },
@@ -616,37 +627,14 @@ export function useCodex({
     // itemMapRef was cleared after a session switch
     const msgId = itemMapRef.current.get(item.id) ?? `codex-tool-${item.id}`;
 
-    const toolResult = codexItemToToolResult(item);
-    const isError =
-      (item.type === "commandExecution" && (item.status === "failed" || item.status === "declined")) ||
-      (item.type === "fileChange" && (item.status === "failed" || item.status === "declined")) ||
-      (item.type === "mcpToolCall" && item.status === "failed");
-
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === msgId
-          ? {
-              ...m,
-              toolInput: codexItemToToolInput(item),
-              toolResult: toolResult ?? m.toolResult,
-              toolError: isError || undefined,
-              // For command execution, also include accumulated output
-              ...(item.type === "commandExecution" && commandOutputRef.current.has(item.id)
-                ? {
-                    toolResult: {
-                      type: "text",
-                      stdout: commandOutputRef.current.get(item.id)! +
-                        (item.exitCode != null ? `\nExit code: ${item.exitCode}` : "") +
-                        (item.durationMs != null ? `\nDuration: ${item.durationMs}ms` : ""),
-                      ...(item.exitCode != null ? { exitCode: item.exitCode } : {}),
-                      ...(item.durationMs != null ? { durationMs: item.durationMs } : {}),
-                    },
-                  }
-                : {}),
-            }
-          : m,
-      ),
-    );
+    const metadata = codexItemMetadata(item, params.turnId, true);
+    setMessages(prev => prev.map(message => message.id === msgId ? {
+      ...message,
+      ...metadata,
+      toolInput: codexItemToToolInput(item),
+      toolResult: codexItemToToolResult(item, message.toolResult) ?? message.toolResult,
+      toolError: metadata.toolState?.status === "failed" || metadata.toolState?.status === "declined" || undefined,
+    } : message));
 
     itemMapRef.current.delete(item.id);
     commandOutputRef.current.delete(item.id);
@@ -725,6 +713,7 @@ export function useCodex({
 
     // Check for failed turn
     const { turn } = params;
+    if (turn.status !== "inProgress") setMessages(prev => settleCodexTools(prev, turn.id, turn.status));
     if (turn.status === "failed") {
       const msg = turn.error?.message || "Turn failed";
       setMessages((prev) => [
@@ -879,6 +868,8 @@ export function useCodex({
     setIsConnected(false);
     setIsProcessing(false);
     setReconnectMessage(null);
+    finalizeStreamingAssistant();
+    setMessages(prev => settleCodexTools(prev, null, "interrupted"));
     if (data.code !== 0 && data.code !== null) {
       setMessages((prev) => [
         ...prev,

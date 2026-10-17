@@ -10,6 +10,7 @@ import type {
 import type { ACPSessionEvent, ACPPermissionEvent, CodexSessionEvent } from "@/types";
 import { handleClaudeEvent } from "./claude-handler";
 import { handleACPEvent as acpHandler, handleACPTurnComplete as acpTurnComplete } from "./acp-handler";
+import { settleCodexTools } from "@/lib/engine/codex-adapter";
 import { handleCodexEvent as codexHandler } from "./codex-handler";
 
 export interface BackgroundSessionState {
@@ -274,6 +275,7 @@ export class BackgroundSessionStore {
     if (!state) return;
     state.isConnected = false;
     state.isCompacting = false;
+    state.messages = settleCodexTools(state.messages, null, "interrupted");
     // Dead process = dead permission — clear both
     state.pendingPermission = null;
     state.rawAcpPermission = null;

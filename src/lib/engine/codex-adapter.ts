@@ -5,7 +5,7 @@
  * Each item type maps to a UIMessage role + toolName for the existing ToolCall UI.
  */
 
-import type { TodoItem, ImageAttachment, ToolResultImage, ToolUseResult, CodexThreadItem } from "@/types";
+import type { UIMessage, TodoItem, ImageAttachment, ToolResultImage, ToolUseResult, CodexThreadItem } from "@/types";
 import type { FileUpdateChange } from "@shared/types/codex-protocol/v2/FileUpdateChange";
 import type { PatchChangeKind } from "@shared/types/codex-protocol/v2/PatchChangeKind";
 import type { TurnPlanStep } from "@shared/types/codex-protocol/v2/TurnPlanStep";
@@ -22,6 +22,43 @@ interface CodexWebSearchToolPayload {
   queries?: string[];
   url?: string;
   pattern?: string;
+}
+
+/** Preserve protocol semantics separately from the legacy tool renderer name. */
+export function codexItemMetadata(
+  item: CodexThreadItem,
+  turnId: string,
+  completed = false,
+): Pick<UIMessage, "codexItemId" | "turnId" | "phase" | "toolState" | "commandExecution"> {
+  const identity = { codexItemId: item.id, turnId };
+  if (item.type === "agentMessage") return { ...identity, phase: item.phase };
+  if (item.type === "commandExecution") return {
+    ...identity,
+    commandExecution: { actions: item.commandActions, cwd: item.cwd, processId: item.processId },
+    toolState: {
+      status: item.status,
+      ...(item.durationMs != null ? { durationMs: item.durationMs } : {}),
+      ...(item.exitCode != null ? { exitCode: item.exitCode } : {}),
+    },
+  };
+  if (item.type === "fileChange" || item.type === "mcpToolCall") return {
+    ...identity,
+    toolState: { status: item.status, ...(item.type === "mcpToolCall" && item.durationMs != null ? { durationMs: item.durationMs } : {}) },
+  };
+  if (codexItemToToolName(item)) return { ...identity, toolState: { status: completed ? "completed" : "inProgress" } };
+  return identity;
+}
+
+/** Close only outstanding Codex tools when a turn ends without item/completed. */
+export function settleCodexTools(
+  messages: UIMessage[],
+  turnId: string | null,
+  status: "inProgress" | "completed" | "failed" | "interrupted",
+): UIMessage[] {
+  if (status === "inProgress") return messages;
+  return messages.map(message => message.codexItemId && (turnId === null || message.turnId === turnId) && message.toolState?.status === "inProgress"
+    ? { ...message, toolState: { ...message.toolState, status: status === "failed" ? "failed" : "interrupted" } }
+    : message);
 }
 
 // ── Item type → tool name mapping ──
@@ -114,22 +151,20 @@ export function codexItemToToolInput(item: CodexThreadItem): Record<string, unkn
 // ── Item → tool result mapping ──
 
 /** Extract structured tool result from a completed Codex item. */
-export function codexItemToToolResult(item: CodexThreadItem): ToolUseResult | undefined {
+export function codexItemToToolResult(item: CodexThreadItem, previousResult?: ToolUseResult): ToolUseResult | undefined {
   switch (item.type) {
     case "commandExecution": {
-      const lines: string[] = [];
-      if (item.aggregatedOutput) lines.push(item.aggregatedOutput);
-      if (item.exitCode != null) lines.push(`Exit code: ${item.exitCode}`);
-      if (item.durationMs != null) lines.push(`Duration: ${item.durationMs}ms`);
-      if (lines.length === 0) return undefined;
-
+      // Keep transport output separate from presentation metadata. This also makes
+      // duplicate completions idempotent when the server omits aggregatedOutput.
+      const output = item.aggregatedOutput ?? previousResult?.stdout;
       return {
         type: "text",
-        stdout: lines.join("\n"),
+        stdout: typeof output === "string" ? output : "",
         ...(item.exitCode != null ? { exitCode: item.exitCode } : {}),
         ...(item.durationMs != null ? { durationMs: item.durationMs } : {}),
       };
     }
+
     case "fileChange": {
       const parsedChanges = (item.changes ?? []).map((change: FileUpdateChange) => {
         const kind = getPatchChangeKind(change.kind);

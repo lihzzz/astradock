@@ -9,6 +9,7 @@ import type { UIMessage } from "@/types";
 import { ToolCall } from "./ToolCall";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { getToolLabel, getToolIcon, getToolColor } from "@/components/lib/tool-metadata";
+import { getToolGroupSummary, getCommandActivity, getToolStatus } from "@/lib/chat/tool-activity";
 import { formatCompactSummary } from "@/components/lib/tool-formatting";
 import { useChatPersistedState } from "@/components/chat-ui-state";
 import { ToolGlyph } from "@/components/lib/ToolGlyph";
@@ -33,18 +34,20 @@ interface ToolGroupBlockProps {
   revealMessageId?: string;
 }
 
-const GROUP_HEADER_BASE_CLASS = "relative flex w-full items-center gap-2 py-1 text-[13px] leading-4 text-muted-foreground";
-const GROUP_HEADER_BUTTON_CLASS = `${GROUP_HEADER_BASE_CLASS} cursor-pointer overflow-hidden text-start transition-colors hover:text-foreground`;
+const GROUP_HEADER_BASE_CLASS = "relative flex w-full items-center gap-2 rounded-md px-2 py-2 text-[13px] leading-5 text-muted-foreground";
+const GROUP_HEADER_BUTTON_CLASS = `${GROUP_HEADER_BASE_CLASS} cursor-pointer overflow-hidden text-start transition-colors hover:bg-foreground/[0.03] hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring`;
 const MORPH_BASE_MS = 640;
 const MORPH_STAGGER_MS = 32;
 
 function ToolGroupHeaderContent({
   toolIcons,
   toolSummary,
+  toolDetail,
   isOpen,
 }: {
   toolIcons: Array<{ Icon: typeof AlertCircle; color: string }> | null;
   toolSummary: string;
+  toolDetail: string;
   isOpen: boolean;
 }) {
   return (
@@ -58,13 +61,14 @@ function ToolGroupHeaderContent({
           </span>
         )}
 
-        <span className="min-w-0 truncate font-medium text-foreground/60">
-          {toolSummary}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-medium text-foreground/80">{toolSummary}</span>
+          {toolDetail && <span className="mt-1 block truncate text-xs text-muted-foreground" title={toolDetail}>{toolDetail}</span>}
         </span>
       </div>
 
       <ChevronRight
-        className={`h-3 w-3 shrink-0 text-foreground/30 opacity-0 group-hover:opacity-100 transition-all duration-200 ${
+        className={`h-3 w-3 shrink-0 text-muted-foreground transition-all duration-200 ${
           isOpen ? "rotate-90" : ""
         }`}
       />
@@ -163,50 +167,15 @@ export const ToolGroupBlock = memo(function ToolGroupBlock({
     };
   }, [isMorphing, morphDurationMs]);
 
-  // Build categorized summary: "Edited 3 files, read 2 files, ran 1 command, ran 2 searches, and used 1 tool"
-  const toolSummary = useMemo(() => {
-    const EDIT_TOOLS = new Set(["Edit", "Write", "NotebookEdit"]);
-    const READ_TOOLS = new Set(["Read"]);
-    const COMMAND_TOOLS = new Set(["Bash"]);
-    const SEARCH_TOOLS = new Set(["Grep", "Glob", "WebSearch"]);
-
-    let editCount = 0;
-    let readCount = 0;
-    let commandCount = 0;
-    let searchCount = 0;
-    let otherCount = 0;
-
-    for (const t of tools) {
-      const name = t.toolName ?? "";
-      if (EDIT_TOOLS.has(name)) editCount++;
-      else if (READ_TOOLS.has(name)) readCount++;
-      else if (COMMAND_TOOLS.has(name)) commandCount++;
-      else if (SEARCH_TOOLS.has(name)) searchCount++;
-      else otherCount++;
-    }
-
-    const parts: string[] = [];
-    if (editCount > 0) parts.push(`edited ${editCount} file${editCount !== 1 ? "s" : ""}`);
-    if (readCount > 0) parts.push(`read ${readCount} file${readCount !== 1 ? "s" : ""}`);
-    if (commandCount > 0) parts.push(`ran ${commandCount} command${commandCount !== 1 ? "s" : ""}`);
-    if (searchCount > 0) parts.push(`ran ${searchCount} search${searchCount !== 1 ? "es" : ""}`);
-    if (otherCount > 0) parts.push(`used ${otherCount} tool${otherCount !== 1 ? "s" : ""}`);
-
-    if (parts.length === 0) return "";
-    let result: string;
-    if (parts.length === 1) result = parts[0];
-    else if (parts.length === 2) result = `${parts[0]} and ${parts[1]}`;
-    else result = `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
-
-    return result.charAt(0).toUpperCase() + result.slice(1);
-  }, [tools]);
+  const summary = useMemo(() => getToolGroupSummary(tools), [tools]);
+  const toolSummary = summary.label;
 
   const toolIcons = useMemo(() => {
     if (!showToolIcons) return null;
     const seen = new Set<typeof AlertCircle>();
     const unique: Array<{ Icon: typeof AlertCircle; color: string }> = [];
     for (const t of tools) {
-      const Icon = t.toolError ? AlertCircle : getToolIcon(t.toolName ?? "");
+      const Icon = t.toolError ? AlertCircle : getToolIcon(getCommandActivity(t)?.toolName ?? t.toolName ?? "");
       if (seen.has(Icon)) continue;
       seen.add(Icon);
       unique.push({
@@ -219,9 +188,9 @@ export const ToolGroupBlock = memo(function ToolGroupBlock({
 
   const morphRows = useMemo(() => {
     return tools.map((tool) => {
-      const toolName = tool.toolName ?? "";
+      const toolName = getCommandActivity(tool)?.toolName ?? tool.toolName ?? "";
       const isError = !!tool.toolError;
-      const isRunning = !tool.toolResult && !isError;
+      const isRunning = getToolStatus(tool) === "inProgress";
       const Icon = isError ? AlertCircle : getToolIcon(toolName);
       const label = isError
         ? `Failed to ${getToolLabel(toolName, "failure") ?? "run tool"}`
@@ -257,7 +226,7 @@ export const ToolGroupBlock = memo(function ToolGroupBlock({
               className={`tool-group-morph-header ${morphStarted ? "tool-group-morph-header-in" : ""}`}
             >
               <div className={GROUP_HEADER_BASE_CLASS}>
-                <ToolGroupHeaderContent toolIcons={toolIcons} toolSummary={toolSummary} isOpen={false} />
+                <ToolGroupHeaderContent toolIcons={toolIcons} toolSummary={toolSummary} toolDetail={summary.detail} isOpen={false} />
               </div>
             </div>
 
@@ -336,7 +305,7 @@ export const ToolGroupBlock = memo(function ToolGroupBlock({
             className={`group ${GROUP_HEADER_BUTTON_CLASS}`}
             aria-expanded={isOpen}
           >
-            <ToolGroupHeaderContent toolIcons={toolIcons} toolSummary={toolSummary} isOpen={isOpen} />
+            <ToolGroupHeaderContent toolIcons={toolIcons} toolSummary={toolSummary} toolDetail={summary.detail} isOpen={isOpen} />
           </button>
           {groupContent}
         </div>
@@ -351,7 +320,7 @@ export const ToolGroupBlock = memo(function ToolGroupBlock({
           <CollapsibleTrigger
             className={`group ${GROUP_HEADER_BUTTON_CLASS}`}
           >
-            <ToolGroupHeaderContent toolIcons={toolIcons} toolSummary={toolSummary} isOpen={isOpen} />
+            <ToolGroupHeaderContent toolIcons={toolIcons} toolSummary={toolSummary} toolDetail={summary.detail} isOpen={isOpen} />
           </CollapsibleTrigger>
           <CollapsibleContent className="tool-group-collapse">
             {groupContent}

@@ -576,7 +576,8 @@ export const MessageBubble = memo(function MessageBubble({
 
   return (
     <div
-      className={cn("group/assistant flex justify-start", CHAT_ROW_CLASS)}
+      className={cn("group/assistant flex justify-start", CHAT_ROW_CLASS, message.phase === "final_answer" && "mt-3")}
+      data-message-phase={message.phase ?? undefined}
       data-continuation={isContinuation || undefined}
       onContextMenu={handleRememberContextMenu}
     >
@@ -592,7 +593,8 @@ export const MessageBubble = memo(function MessageBubble({
                 </span>
               </div>
             ) : null}
-              <div className={assistantTurnDividerLabel ? "inline-block min-w-0 max-w-full" : undefined}>
+              <div className={cn(assistantTurnDividerLabel && "inline-block min-w-0 max-w-full", message.phase === "commentary" && "border-s-2 border-border ps-3")}>
+                {message.phase && <div className="mb-1.5 text-[11px] font-medium tracking-wide text-muted-foreground">{message.phase === "commentary" ? "Progress" : "Response"}</div>}
                 {showThinking && message.thinking && (
                   <ThinkingBlock
                     thinking={message.thinking}
@@ -607,6 +609,7 @@ export const MessageBubble = memo(function MessageBubble({
                     className={cn(
                       "flow-root prose dark:prose-invert prose-sm max-w-none text-foreground [&_li::marker]:text-foreground dark:[&_li::marker]:text-foreground/70",
                       CHAT_PROSE_EDGE_CLASS,
+                      message.phase === "commentary" && "text-muted-foreground prose-headings:text-muted-foreground prose-strong:text-foreground/80",
                     )}
                   >
                     <IsStreamingMarkdownContext.Provider value={!!message.isStreaming}>
@@ -634,6 +637,7 @@ export const MessageBubble = memo(function MessageBubble({
     </div>
   );
 }, (prev, next) =>
+  prev.message.phase === next.message.phase &&
   prev.message.content === next.message.content &&
   prev.message.thinking === next.message.thinking &&
   prev.message.isStreaming === next.message.isStreaming &&

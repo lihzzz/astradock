@@ -68,8 +68,8 @@ function estimateRowHeightBase(row: RowDescriptor): number {
   if (row.kind === "turn_summary") return 48;
 
   if (row.kind === "tool_group") {
-    // Collapsed group header ~44px
-    return 44;
+    // Activity label plus the always-visible target summary.
+    return 64;
   }
 
   // row.kind === "message"
@@ -87,9 +87,8 @@ function estimateRowHeightBase(row: RowDescriptor): number {
       return Math.min(1200, 88 + lines * LINE_HEIGHT_PX);
     }
 
-    // Collapsed tool: header only ~36px.
-    // Expanded edit/write: header + diff/content, but most tools are collapsed in history.
-    return 36;
+    // Two-line activity header; full logs/diffs are measured after expansion.
+    return 64;
   }
 
   if (msg.role === "user") {

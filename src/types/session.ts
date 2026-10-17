@@ -26,7 +26,23 @@ export interface SubagentToolStep {
   toolError?: boolean;
 }
 
+export interface ToolExecutionState {
+  status: "inProgress" | "completed" | "failed" | "declined" | "interrupted";
+  durationMs?: number;
+  exitCode?: number;
+}
+
 export interface UIMessage {
+  /** Absent in older sessions and engines without phase-aware messages. */
+  phase?: import("@shared/types/codex-protocol/MessagePhase").MessagePhase | null;
+  codexItemId?: string;
+  turnId?: string;
+  toolState?: ToolExecutionState;
+  commandExecution?: {
+    actions: import("@shared/types/codex-protocol/v2/CommandAction").CommandAction[];
+    cwd: string;
+    processId: string | null;
+  };
   id: string;
   role: "user" | "assistant" | "tool_call" | "tool_result" | "system" | "summary";
   content: string;

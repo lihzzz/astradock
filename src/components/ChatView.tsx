@@ -8,6 +8,8 @@ import { getAgentIcon } from "@/lib/engine-icons";
 import { useAgentContext } from "./AgentContext";
 import { MessageBubble } from "./MessageBubble";
 import { SummaryBlock } from "./SummaryBlock";
+import { createChatStructureTracker } from "@/lib/chat/structure";
+import { getToolStatus } from "@/lib/chat/tool-activity";
 import { ToolCall } from "./ToolCall";
 import { ToolGroupBlock } from "./ToolGroupBlock";
 import { TurnChangesSummary } from "./TurnChangesSummary";
@@ -519,18 +521,11 @@ function ChatViewContent({
     return ids;
   }, [nonQueuedMessages, queuedMessages]);
 
-  // ── Structural identity key for expensive derived data ──
-  // Primitive string key so useMemo can do stable dependency comparison.
-  // Recomputes turn summaries, divider labels, and tool groups only when
-  // message structure actually changes (new message, tool result arrives, processing toggles).
-  const structKey = useMemo(() => {
-    let toolResultCount = 0;
-    for (let i = nonQueuedMessages.length - 1; i >= Math.max(0, nonQueuedMessages.length - 10); i--) {
-      if (nonQueuedMessages[i].role === "tool_call" && nonQueuedMessages[i].toolResult) toolResultCount++;
-    }
-    const lastId = nonQueuedMessages[nonQueuedMessages.length - 1]?.id ?? "";
-    return `${nonQueuedMessages.length}:${lastId}:${toolResultCount}:${isProcessing}`;
-  }, [nonQueuedMessages, isProcessing]);
+  // Retain a structural revision across streaming frames. Explicit lifecycle,
+  // phase and completed-result changes invalidate grouped snapshots, not deltas.
+  const structureTrackerRef = useRef<ReturnType<typeof createChatStructureTracker> | null>(null);
+  if (!structureTrackerRef.current) structureTrackerRef.current = createChatStructureTracker();
+  const structKey = structureTrackerRef.current(nonQueuedMessages, isProcessing);
 
   // ── Turn summaries (rerender-derived-state-no-effect) ──
   const turnSummaryByEndIndex = useMemo(() => {
@@ -621,7 +616,7 @@ function ChatViewContent({
     }
     const result = !nonQueuedMessages.some((m) =>
       (m.role === "assistant" && m.isStreaming && (m.content || m.thinking)) ||
-      (m.role === "tool_call" && !m.toolResult),
+      (m.role === "tool_call" && getToolStatus(m) === "inProgress"),
     );
     cachedProcessingRef.current = { processing: true, value: result };
     return result;

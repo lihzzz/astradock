@@ -2,11 +2,14 @@ import type { UIMessage, SubagentToolStep } from "@/types";
 import { getMcpCompactSummary } from "@/components/McpToolContent";
 import { getTodoItems } from "@/lib/chat/todo-utils";
 import { getDistinctPatchPaths, getStructuredPatches } from "@/lib/diff/patch-utils";
+import { getCommandActivity } from "@/lib/chat/tool-activity";
 import { getFileName } from "@shared/lib/file-paths";
 
 // ── Compact summary for collapsed tool line ──
 
 export function formatCompactSummary(message: UIMessage): string {
+  const semantic = getCommandActivity(message);
+  if (semantic) return semantic.summary;
   const input = message.toolInput;
   const toolName = message.toolName ?? "";
   const result = message.toolResult;

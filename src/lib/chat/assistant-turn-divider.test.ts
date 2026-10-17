@@ -88,3 +88,11 @@ describe("computeAssistantTurnDividerLabels", () => {
     expect(computeAssistantTurnDividerLabels(messages, true).size).toBe(0);
   });
 });
+
+
+it("does not treat explicit commentary as a final answer", () => {
+  const commentary: UIMessage = { ...makeAssistant("progress", "Checking", 10_000), phase: "commentary" };
+  expect(computeAssistantTurnDividerLabels([makeToolCall("tool", 0), commentary], false).size).toBe(0);
+  const answer: UIMessage = { ...makeAssistant("final", "Done", 20_000), phase: "final_answer" };
+  expect([...computeAssistantTurnDividerLabels([makeToolCall("tool", 0), answer, commentary], false).keys()]).toEqual(["final"]);
+});

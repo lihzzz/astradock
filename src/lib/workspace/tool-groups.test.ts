@@ -76,3 +76,26 @@ describe("Codex subagent cards", () => {
     expect(groups.groups.size).toBe(2);
   });
 });
+
+
+describe("activity boundaries", () => {
+  const read = (id: string): UIMessage => ({ ...makeToolCall(id, "Read", 0), toolResult: { content: "done" } });
+  it.each(["failed", "declined", "interrupted", "inProgress"] as const)("never folds %s tools into completed activity", status => {
+    const attention: UIMessage = { ...read("attention"), toolState: { status } };
+    const result = computeToolGroups([read("a"), read("b"), attention, read("c"), read("d")], false, false);
+    expect(result.groups.size).toBe(2);
+    expect(result.groupedIndices.has(2)).toBe(false);
+  });
+  it("keeps actual command execution independent from exploration", () => {
+    const command: UIMessage = { ...read("command"), toolName: "Bash", toolState: { status: "completed" }, commandExecution: { cwd: "/repo", processId: null, actions: [{ type: "unknown", command: "pnpm test" }] } };
+    const result = computeToolGroups([read("a"), read("b"), command, read("c"), read("d")], false, false);
+    expect(result.groupedIndices.has(2)).toBe(false);
+  });
+  it("never merges tools across user turns or error notices", () => {
+    for (const role of ["user", "system", "summary"] as const) {
+      const boundary: UIMessage = { id: "boundary", role, content: "notice", timestamp: 1 };
+      expect(computeToolGroups([read("a"), boundary, read("b")], false, false).groups.size).toBe(0);
+    }
+    expect(computeToolGroups([{ ...read("a"), turnId: "one" }, { ...read("b"), turnId: "two" }], false, false).groups.size).toBe(0);
+  });
+});

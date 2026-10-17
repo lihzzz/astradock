@@ -1,4 +1,5 @@
 import type { UIMessage } from "@/types";
+import { getCommandActivity, getToolStatus, needsToolAttention } from "@/lib/chat/tool-activity";
 
 // ── Types ──
 
@@ -25,12 +26,15 @@ export interface ToolGroupInfo {
 
 // ── Tool names excluded from grouping ──
 
-const EXCLUDED_TOOL_NAMES = new Set(["task", "agent", "codexagent", "exitplanmode", "askuserquestion"]);
-const EDIT_BOUNDARY_TOOL_NAMES = new Set(["edit", "write"]);
+const EXCLUDED_TOOL_NAMES = new Set(["task", "agent", "codexagent", "exitplanmode", "askuserquestion", "todowrite"]);
+const EDIT_BOUNDARY_TOOL_NAMES = new Set(["edit", "write", "notebookedit"]);
 
 function isGroupableToolCall(msg: UIMessage): boolean {
   if (msg.role !== "tool_call") return false;
   const name = (msg.toolName ?? "").toLowerCase();
+  if (needsToolAttention(msg) || (msg.toolState && getToolStatus(msg) === "inProgress")) return false;
+  // Executing a command is not the same as exploring code. Keep tests/builds visible.
+  if (msg.commandExecution && !getCommandActivity(msg)) return false;
   return !EXCLUDED_TOOL_NAMES.has(name);
 }
 
@@ -99,6 +103,10 @@ export function computeToolGroups(
 
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
+    if (msg.role === "user" || msg.role === "system" || msg.role === "summary"
+      || (currentTools.length > 0 && msg.turnId && currentTools[0].turnId && msg.turnId !== currentTools[0].turnId)) {
+      finalizeGroup();
+    }
 
     if (isGroupableToolCall(msg)) {
       if (avoidGroupingEdits && isEditBoundaryToolCall(msg)) {
@@ -121,7 +129,7 @@ export function computeToolGroups(
       // Excluded tool (Task, Agent, interactive) — acts as a group boundary
       finalizeGroup();
     }
-    // tool_result, system, summary — transparent, don't affect grouping
+    // tool_result is transparent; user/system/summary boundaries were handled above.
   }
 
   // Handle trailing group (tools at end of messages)

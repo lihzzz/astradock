@@ -7,7 +7,9 @@ import {
 } from "@/components/ui/collapsible";
 import type { UIMessage } from "@/types";
 import { getToolIcon, getToolLabel, getToolColor } from "@/components/lib/tool-metadata";
-import { formatCompactSummary } from "@/components/lib/tool-formatting";
+import { getCommandActivity, getToolStatus, needsToolAttention } from "@/lib/chat/tool-activity";
+import { ToolActivitySummary } from "./tool-renderers/ToolActivitySummary";
+import { formatCompactSummary, formatDuration } from "@/components/lib/tool-formatting";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import { TaskTool } from "./tool-renderers/TaskTool";
 import { CodexAgentTool } from "./tool-renderers/CodexAgentTool";
@@ -44,7 +46,6 @@ export const ToolCall = memo(function ToolCall({
 }: ToolCallProps) {
   const normalizedToolName = (message.toolName ?? "").toLowerCase();
   const isTask = normalizedToolName === "task" || normalizedToolName === "agent";
-  const isWideTool = normalizedToolName === "edit" || normalizedToolName === "write" || normalizedToolName === "notebookedit";
   const content = message.codexAgent
     ? <CodexAgentTool data={message.codexAgent} messageId={message.id} />
     : isTask
@@ -65,7 +66,7 @@ export const ToolCall = memo(function ToolCall({
 
   return (
     <div className={`flex justify-start ${CHAT_ROW_CLASS}`}>
-      <div className={`${CHAT_ROW_WIDTH_CLASS} ${isWideTool || message.codexAgent ? "w-full" : ""}`}>
+      <div className={`${CHAT_ROW_WIDTH_CLASS} w-full`}>
         {content}
       </div>
     </div>
@@ -77,12 +78,7 @@ export const ToolCall = memo(function ToolCall({
   prev.showToolIcons === next.showToolIcons &&
   prev.coloredToolIcons === next.coloredToolIcons &&
   prev.disableCollapseAnimation === next.disableCollapseAnimation &&
-  prev.message.codexAgent === next.message.codexAgent &&
-  prev.message.toolInput === next.message.toolInput &&
-  prev.message.toolResult === next.message.toolResult &&
-  prev.message.toolError === next.message.toolError &&
-  prev.message.subagentSteps === next.message.subagentSteps &&
-  prev.message.subagentStatus === next.message.subagentStatus,
+  prev.message === next.message,
 );
 
 // ── Regular tool (Read, Write, Edit, Bash, Grep, Glob, etc.) ──
@@ -104,6 +100,11 @@ const RegularTool = memo(function RegularTool({
   coloredToolIcons,
   disableCollapseAnimation,
 }: RegularToolProps) {
+  const status = getToolStatus(message);
+  const isRunning = status === "inProgress";
+  const isError = needsToolAttention(message);
+  const semantic = getCommandActivity(message);
+  const displayToolName = semantic?.toolName ?? message.toolName ?? "";
   const isPlanTool = message.toolName === "ExitPlanMode";
   const isInteractive = isPlanTool || message.toolName === "AskUserQuestion";
   const isEditToolCall = message.toolName === "Edit" || message.toolName === "Write";
@@ -111,17 +112,17 @@ const RegularTool = memo(function RegularTool({
   // loading a large session doesn't render every Edit/Write diff. Live tools mount
   // result-less and still expand per the user's setting.
   const hasResult = !!message.toolResult;
-  const defaultExpanded = isPlanTool || (isEditToolCall && expandEditToolCallsByDefault && !hasResult);
+  const defaultExpanded = isInteractive || isError
+    || (!!message.commandExecution && isRunning && !semantic)
+    || (isEditToolCall && expandEditToolCallsByDefault && isRunning);
   const skipAutoExpandOnResult = isEditToolCall || isInteractive;
   const isWideTool = message.toolName === "Edit" || message.toolName === "Write" || message.toolName === "NotebookEdit";
   const [storedExpanded, setExpanded, hasStoredExpanded] = useChatPersistedState(
     `tool:${message.id}`,
     defaultExpanded,
   );
-  const expanded = isPlanTool || storedExpanded;
-  const isRunning = !hasResult;
-  const isError = !!message.toolError;
-  const Icon = getToolIcon(message.toolName ?? "");
+  const expanded = isInteractive || storedExpanded;
+  const Icon = getToolIcon(displayToolName);
   const summary = formatCompactSummary(message);
   const isEditOrWrite = message.toolName === "Edit" || message.toolName === "Write" || message.toolName === "NotebookEdit";
   const diffStats = useMemo(
@@ -129,73 +130,76 @@ const RegularTool = memo(function RegularTool({
     [isEditOrWrite, hasResult, message],
   );
 
-  // Track whether toolResult was present at mount (persisted session → skip auto-expand)
-  const initialHadResult = useRef(hasResult);
-  // Track whether user manually toggled the collapsible (cancel auto-collapse)
+  // Completed history stays collapsed; partial output is still a live activity.
+  const initialWasComplete = useRef(!isRunning);
+  // Track whether user manually toggled the collapsible (preserve their disclosure choice)
   const userToggled = useRef(false);
-  const autoCollapseTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // Auto-expand on result arrival, then auto-collapse after 2s
+  // Surface new errors, but never override an explicit disclosure choice.
   useEffect(() => {
-    if (!autoExpandTools) return () => clearTimeout(autoCollapseTimer.current);
-    if (!hasResult || initialHadResult.current || skipAutoExpandOnResult || hasStoredExpanded || userToggled.current) return;
+    if (isError && !userToggled.current && !hasStoredExpanded) setExpanded(true);
+  }, [isError, hasStoredExpanded, setExpanded]);
+
+  // Explicit auto-expand preference stays open until the user closes it.
+  useEffect(() => {
+    if (!autoExpandTools || isRunning || isError || !hasResult || initialWasComplete.current
+      || skipAutoExpandOnResult || hasStoredExpanded || userToggled.current) return;
     setExpanded(true);
-    autoCollapseTimer.current = setTimeout(() => {
-      if (!userToggled.current) setExpanded(false);
-    }, 2000);
-    return () => clearTimeout(autoCollapseTimer.current);
-  }, [autoExpandTools, hasResult, hasStoredExpanded, setExpanded, skipAutoExpandOnResult]);
+  }, [autoExpandTools, isRunning, isError, hasResult, hasStoredExpanded, setExpanded, skipAutoExpandOnResult]);
 
   const handleOpenChange = (open: boolean) => {
-    if (isPlanTool) return;
+    if (isInteractive) return;
     userToggled.current = true;
-    clearTimeout(autoCollapseTimer.current);
     setExpanded(open);
   };
 
+  const activityLabel = status === "declined" ? "Declined"
+    : status === "interrupted" ? "Stopped"
+    : isError ? `Failed to ${getToolLabel(displayToolName, "failure") ?? "run tool"}`
+    : getToolLabel(displayToolName, isRunning ? "active" : "past") ?? displayToolName;
+
   const triggerContent = (
-    <div className="relative flex min-w-0 flex-1 items-center gap-[6.4px]">
-      {showToolIcons && (isError ? (
-        <ToolGlyph Icon={AlertCircle} className="text-red-400/70" />
-      ) : (
-        <ToolGlyph Icon={Icon} className={coloredToolIcons ? getToolColor(message.toolName ?? "") : "text-foreground/40"} />
-      ))}
-      {isRunning ? (
-        <TextShimmer as="span" className="shrink-0 whitespace-nowrap font-medium" duration={1.8} spread={1.5}>
-          {getToolLabel(message.toolName ?? "", "active") ?? message.toolName ?? "Running"}
-        </TextShimmer>
-      ) : (
-        <span className={`shrink-0 whitespace-nowrap font-medium ${isError ? "text-red-400/70" : "text-foreground/60"}`}>
-          {isError
-            ? `Failed to ${getToolLabel(message.toolName ?? "", "failure")}`
-            : (getToolLabel(message.toolName ?? "", "past") ?? message.toolName)}
-        </span>
-      )}
-      <span className="min-w-0 truncate text-foreground/40">{summary}</span>
-      {diffStats && (
-        <span className="shrink-0 inline-flex items-center gap-1 text-[11px] tabular-nums">
-          {diffStats.added > 0 && <span className="text-emerald-400/70">+{diffStats.added}</span>}
-          {diffStats.removed > 0 && <span className="text-red-400/70">-{diffStats.removed}</span>}
-        </span>
-      )}
+    <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+        {showToolIcons && <ToolGlyph Icon={isError ? AlertCircle : Icon} className={isError ? "text-destructive" : coloredToolIcons ? getToolColor(displayToolName) : "text-muted-foreground"} />}
+        {isRunning ? (
+          <TextShimmer as="span" className="font-medium" duration={1.8} spread={1.5}>{activityLabel}</TextShimmer>
+        ) : (
+          <span className={isError ? "font-medium text-destructive" : "font-medium text-foreground/80"}>{activityLabel}</span>
+        )}
+        {message.toolState && (
+          <span data-tool-status={status} className="ms-auto inline-flex shrink-0 items-center gap-2 text-[11px] tabular-nums text-muted-foreground">
+            <span className={isError ? "text-destructive" : undefined}>{status === "inProgress" ? "Running" : status === "completed" ? "Completed" : status === "declined" ? "Declined" : status === "interrupted" ? "Stopped" : "Failed"}</span>
+            {message.toolState.durationMs != null && <span>{formatDuration(message.toolState.durationMs)}</span>}
+            {message.toolState.exitCode != null && message.toolState.exitCode !== 0 && <span>exit {message.toolState.exitCode}</span>}
+          </span>
+        )}
+        {diffStats && (
+          <span className="inline-flex shrink-0 items-center gap-1 text-[11px] tabular-nums">
+            {diffStats.added > 0 && <span className="text-emerald-600 dark:text-emerald-400">+{diffStats.added}</span>}
+            {diffStats.removed > 0 && <span className="text-destructive">-{diffStats.removed}</span>}
+          </span>
+        )}
+      </div>
+      {summary && <div className={showToolIcons ? "ms-5 mt-1 truncate text-xs text-muted-foreground" : "mt-1 truncate text-xs text-muted-foreground"} title={summary}>{summary}</div>}
     </div>
   );
 
-  const trigger = isPlanTool ? (
-    <div className="relative flex w-full items-center gap-2 py-1 text-start text-[13px] leading-4 text-muted-foreground overflow-hidden">
+  const trigger = isInteractive ? (
+    <div className="relative flex w-full items-center gap-2 rounded-md px-2 py-2 text-start text-[13px] leading-5 text-muted-foreground overflow-hidden">
       {triggerContent}
     </div>
   ) : (
     <button
       type="button"
       onClick={() => handleOpenChange(!expanded)}
-      className="group relative flex w-full items-center gap-2 py-1 text-start text-[13px] leading-4 text-muted-foreground hover:text-foreground transition-colors cursor-pointer overflow-hidden"
+      className="group relative flex w-full items-center gap-2 rounded-md px-2 py-2 text-start text-[13px] leading-5 text-muted-foreground hover:bg-foreground/[0.03] hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer overflow-hidden"
       aria-expanded={expanded}
     >
       {triggerContent}
-      {hasResult && (
+      {!isInteractive && (
         <ChevronRight
-          className={`ms-auto h-3 w-3 shrink-0 text-foreground/30 opacity-0 group-hover:opacity-100 transition-all duration-200 ${
+          className={`ms-auto h-3 w-3 shrink-0 text-muted-foreground transition-all duration-200 ${
             expanded ? "rotate-90" : ""
           }`}
         />
@@ -203,10 +207,11 @@ const RegularTool = memo(function RegularTool({
     </button>
   );
 
-  if (isPlanTool) {
+  if (isInteractive) {
     return (
       <div className={isWideTool ? "block w-full min-w-0" : undefined}>
         {trigger}
+        <ToolActivitySummary message={message} />
         <div className={`${CHAT_COLLAPSIBLE_CONTENT_CLASS} ${isWideTool ? "w-full min-w-0" : ""}`}>
           <ExpandedToolContent message={message} />
         </div>
@@ -220,6 +225,7 @@ const RegularTool = memo(function RegularTool({
     return (
       <div className={isWideTool ? "block w-full min-w-0" : undefined}>
         {trigger}
+        <ToolActivitySummary message={message} />
         {expanded && (
           <div className={`${CHAT_COLLAPSIBLE_CONTENT_CLASS} ${isWideTool ? "w-full min-w-0" : ""}`}>
             <ExpandedToolContent message={message} />
@@ -236,6 +242,7 @@ const RegularTool = memo(function RegularTool({
       className={isWideTool ? "block w-full min-w-0" : undefined}
     >
       <CollapsibleTrigger asChild>{trigger}</CollapsibleTrigger>
+      <ToolActivitySummary message={message} />
       <CollapsibleContent className={`${CHAT_COLLAPSIBLE_CONTENT_CLASS} ${isWideTool ? "w-full min-w-0" : ""}`}>
         <div className={isWideTool ? "w-full min-w-0" : undefined}>
           <ExpandedToolContent message={message} />
@@ -249,7 +256,5 @@ const RegularTool = memo(function RegularTool({
   prev.showToolIcons === next.showToolIcons &&
   prev.coloredToolIcons === next.coloredToolIcons &&
   prev.disableCollapseAnimation === next.disableCollapseAnimation &&
-  prev.message.toolInput === next.message.toolInput &&
-  prev.message.toolResult === next.message.toolResult &&
-  prev.message.toolError === next.message.toolError,
+  prev.message === next.message,
 );

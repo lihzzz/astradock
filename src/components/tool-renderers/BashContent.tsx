@@ -39,6 +39,7 @@ export function BashContent({ message }: { message: UIMessage }) {
   return (
     <div className="text-xs">
       <div className="rounded-md bg-foreground/[0.04] font-mono text-[11px] whitespace-pre-wrap wrap-break-word">
+        {message.commandExecution?.cwd && <div className="border-b border-border/50 px-3 py-1.5 text-muted-foreground" title={message.commandExecution.cwd}>Working directory: {message.commandExecution.cwd}</div>}
         {/* Command */}
         {!!command && (
           <div className="px-3 py-2">
@@ -53,7 +54,7 @@ export function BashContent({ message }: { message: UIMessage }) {
         {hasOutput && (
           <>
             <div className="mx-3 h-px bg-foreground/[0.06]" />
-            <div className="max-h-48 overflow-auto px-3 py-2 text-foreground/45">
+            <div className="max-h-48 overflow-auto px-3 py-2 text-foreground/75">
               {renderAnsi(displayText)}
             </div>
           </>

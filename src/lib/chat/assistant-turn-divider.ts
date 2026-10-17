@@ -5,7 +5,7 @@ function isAssistantActivity(message: UIMessage): boolean {
 }
 
 function isRenderableAssistantText(message: UIMessage): boolean {
-  return message.role === "assistant" && !!message.content;
+  return message.role === "assistant" && !!message.content && message.phase !== "commentary";
 }
 
 function isTurnActivity(message: UIMessage): boolean {
