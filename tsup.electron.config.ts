@@ -27,6 +27,8 @@ export default defineConfig({
     "@trycua/cua-driver",
     "@trycua/cua-driver/electron",
   ],
-  noExternal: ["@modelcontextprotocol/sdk"],
+  // The unpacked Computer Use helper cannot resolve dependencies inside app.asar.
+  // Bundle Zod (including its v3/v4 subpaths) alongside the MCP SDK.
+  noExternal: ["@modelcontextprotocol/sdk", "zod"],
   treeshake: true,
 });

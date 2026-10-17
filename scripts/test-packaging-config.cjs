@@ -138,3 +138,67 @@ for (const [platform, nodePlatform] of [["win", "win32"], ["mac", "darwin"], ["l
     }
   });
 }
+
+test("unpacked Computer Use helper runs without the application's node_modules", { timeout: 30000 }, async (t) => {
+  const { build } = require("tsup");
+  const { spawnSync } = require("node:child_process");
+  const { Client } = require("@modelcontextprotocol/sdk/client/index.js");
+  const { StdioClientTransport } = require("@modelcontextprotocol/sdk/client/stdio.js");
+  // Keep this outside the repository so Node cannot fall back to dev dependencies.
+  // Only the native driver is stubbed; MCP and all its JS dependencies must bundle.
+  const root = await fixture(t, ["package.json"]);
+  const unpacked = path.join(root, "resources", "app.asar.unpacked");
+  const outDir = path.join(unpacked, "electron", "dist");
+  await build({
+    config: path.resolve(__dirname, "../tsup.electron.config.ts"),
+    entry: { "computer-use-mcp": path.resolve(__dirname, "../electron/src/computer-use-mcp.ts") },
+    outDir,
+    clean: false,
+    silent: true,
+  });
+
+  const metadata = { driverVersion: "fixture-driver", contractVersion: "fixture-contract", embedded: true };
+  const tool = { name: "fixture_echo", inputSchema: { type: "object", properties: { value: { type: "string" } }, required: ["value"] } };
+  const driverDir = path.join(unpacked, "node_modules", "@trycua", "cua-driver");
+  await fs.mkdir(driverDir, { recursive: true });
+  await fs.writeFile(path.join(driverDir, "package.json"), JSON.stringify({
+    name: "@trycua/cua-driver", type: "module", exports: { ".": "./index.js" },
+  }));
+  await fs.writeFile(path.join(driverDir, "index.js"), [
+    "export const CuaDriver = { create: async () => ({",
+    "  metadata: async () => (" + JSON.stringify(metadata) + "),",
+    "  listToolsJson: async () => JSON.stringify(" + JSON.stringify({ tools: [tool] }) + "),",
+    "  callTool: async (name, args) => ({ text: JSON.stringify({ name, args: JSON.parse(args) }), images: [], isError: false }),",
+    "  shutdown: async () => {}, uniffiDestroy: () => {},",
+    "}) };",
+  ].join("\n"));
+
+  const helper = path.join(outDir, "computer-use-mcp.js");
+  const env = { ...process.env, NODE_PATH: "", NODE_OPTIONS: "" };
+  const health = spawnSync(process.execPath, [helper, "--health"], {
+    cwd: root, env, encoding: "utf8", timeout: 10000, windowsHide: true,
+  });
+  assert.ifError(health.error);
+  assert.equal(health.status, 0, health.stderr);
+  assert.deepEqual(JSON.parse(health.stdout), metadata);
+
+  // Exercise normal startup too: health alone does not construct the MCP server.
+  const transport = new StdioClientTransport({
+    command: process.execPath, args: [helper], cwd: root, env, stderr: "pipe",
+  });
+  let stderr = "";
+  transport.stderr.on("data", (chunk) => { stderr += chunk; });
+  const client = new Client({ name: "computer-use-packaging-test", version: "1.0.0" });
+  try {
+    await client.connect(transport, { timeout: 5000 });
+    assert.equal(client.getServerVersion().name, "harnss-cua");
+    const { tools } = await client.listTools({}, { timeout: 5000 });
+    assert.deepEqual(tools, [tool]);
+    const result = await client.callTool({ name: tool.name, arguments: { value: "bundled" } }, undefined, { timeout: 5000 });
+    assert.equal(result.isError, false);
+    assert.deepEqual(result.content, [{ type: "text", text: JSON.stringify({ name: tool.name, args: { value: "bundled" } }) }]);
+    assert.equal(stderr, "");
+  } finally {
+    await client.close();
+  }
+});
