@@ -11,6 +11,15 @@ export interface UsageTokenTotals {
   cacheCreationTokens: number;
 }
 
+export interface SessionTokenUsage extends UsageTokenTotals {
+  /** Missing engine reports must not be presented as zero consumption. */
+  reported: boolean;
+  trackingStartedAt: number;
+  mainTokens: number;
+  subagentTokens: number;
+  subagentCount: number;
+}
+
 export interface UsageTokenEntry extends UsageTokenTotals {
   timestamp: number;
   engine: EngineId;

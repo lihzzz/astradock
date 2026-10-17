@@ -39,7 +39,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await usage.shutdownUsage().catch(() => undefined);
   vi.useRealTimers();
-  await fs.rm(mocks.directory, { recursive: true, force: true });
+  await fs.rm(mocks.directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 25 });
 });
 
 async function register() {
@@ -53,6 +53,20 @@ async function query(range: unknown = 7, sender: unknown = mocks.sender) {
 }
 
 describe("local usage IPC", () => {
+  it("returns scoped session tokens and rejects invalid IDs or foreign clients", async () => {
+    await register();
+    const tokens = await import("../lib/token-usage");
+    tokens.recordAcpTokenUsage("turn", { totalTokens: 42, inputTokens: 30, outputTokens: 12 }, "chat");
+    tokens.bindSessionTokenUsage("revived", "chat");
+    const sessionQuery = mocks.handlers.get("usage:session-tokens")!;
+    expect(await sessionQuery({ sender: mocks.sender }, "revived")).toMatchObject({ data: { totalTokens: 42, reported: true } });
+    expect(await sessionQuery({ sender: mocks.sender }, "other")).toMatchObject({ data: { reported: false } });
+    for (const id of [null, {}, "", "x".repeat(257)]) {
+      expect(await sessionQuery({ sender: mocks.sender }, id)).toHaveProperty("error");
+    }
+    expect(await sessionQuery({ sender: {} }, "chat")).toHaveProperty("error");
+  });
+
   it.each([1, 7, 30, 90])("supports a %s-day report with engine token totals", async (range) => {
     await fs.writeFile(path.join(mocks.directory, "usage-tokens.json"), JSON.stringify({
       version: 1, trackingStartedAt: now - 86_400_000,

@@ -40,7 +40,7 @@ import { withComputerUseMcpServer } from "../lib/computer-use-runtime";
 import { withHindsightMcpServers, registerMemorySession, unregisterMemorySession, beforeMemorySend, observeAcpUpdate, completeMemoryTurn } from "../lib/memory/service";
 import { cancelProjectAppAgentPermissions, registerProjectAppAgentSession, revokeProjectAppAgentSession, withProjectAppMcpServer } from "../lib/project-apps/agent-bridge";
 import { beginUsageTurn, endUsageTurn, stopUsageSession } from "../lib/usage";
-import { recordAcpTokenUsage } from "../lib/token-usage";
+import { bindSessionTokenUsage, recordAcpTokenUsage } from "../lib/token-usage";
 import { finishAcpTaskTurn } from "../lib/tasks/engine-events";
 import { taskRuntimeEvents } from "../lib/tasks/runtime-events";
 import { stopProcessAndWait } from "@shared/lib/process-stop";
@@ -605,6 +605,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     try {
       if (options.source) runtimeLease = await getSessionRepository().bindRuntime(options.source, "acp", runtimeId, () => stopForDeletion(runtimeId));
       else if (options.memoryContext?.projectId) runtimeLease = await getSessionRepository().bindProjectRuntime(options.memoryContext.projectId, runtimeId, () => stopForDeletion(runtimeId));
+      bindSessionTokenUsage(runtimeId, options.source?.runtimeSessionId);
       connResult = await createAcpConnection(
         agentDef as { binary: string; args?: string[]; env?: Record<string, string>; name: string },
         options.cwd,
@@ -771,6 +772,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     const analyticsProperties = buildAcpAnalyticsProperties(agentDef);
     try {
       runtimeLease = await getSessionRepository().bindRuntime(options.source, "acp", runtimeId, () => stopForDeletion(runtimeId));
+      bindSessionTokenUsage(runtimeId, options.source.runtimeSessionId);
       const connResult = await createAcpConnection(
         agentDef as { binary: string; args?: string[]; env?: Record<string, string>; name: string },
         options.cwd,
@@ -860,7 +862,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
       });
 
       log("ACP_TURN_COMPLETE", `session=${sessionId.slice(0, 8)} stopReason=${result.stopReason} usage=${JSON.stringify(result.usage ?? null)}`);
-      recordAcpTokenUsage(usageTurnId, result.usage);
+      recordAcpTokenUsage(usageTurnId, result.usage, sessionId);
       void completeMemoryTurn(sessionId);
       finishAcpTaskTurn(sessionId, result.stopReason);
 

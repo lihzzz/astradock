@@ -243,6 +243,7 @@ function SplitChatPaneInner({
               isProcessing={paneState.isProcessing}
               model={paneController.paneHeaderModel}
               sessionId={paneState.sessionInfo?.sessionId}
+              chatSessionId={session?.id ?? null}
               totalCost={paneState.totalCost}
               title={session?.title}
               titleGenerating={session?.titleGenerating}

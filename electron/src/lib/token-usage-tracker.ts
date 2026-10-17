@@ -2,6 +2,7 @@ import type { EngineId } from "@shared/types/engine";
 import type { UsageTokenEntry, UsageTokens, UsageTokenTotals } from "@shared/types/usage";
 
 type TokenRecorder = (engine: EngineId, totals: UsageTokenTotals, timestamp: number) => void;
+type SubagentTokenRecorder = (agentId: string, tokens: number) => void;
 export interface CodexTokenBaselines {
   get(threadId: string): UsageTokenTotals | undefined;
   set(threadId: string, totals: UsageTokenTotals): void;
@@ -139,11 +140,29 @@ export class ClaudeTokenObserver {
   private assistantMessages = new Map<string, UsageTokenTotals>();
   private assistantMain = emptyTokenTotals();
   private assistantAgents = emptyTokenTotals();
+  private agentAssistantTotals = new Map<string, number>();
+  private agentReportedTotals = new Map<string, number>();
 
-  constructor(private record: TokenRecorder, private resumed: boolean) {}
+  constructor(private record: TokenRecorder, private resumed: boolean, private recordSubagent?: SubagentTokenRecorder) {}
 
   observe(event: unknown, timestamp = Date.now()): void {
     if (!isRecord(event)) return;
+    if (event.type === "system" && typeof event.tool_use_id === "string") {
+      if (event.subtype === "task_started" && (event.task_type === "local_agent" || typeof event.subagent_type === "string")) {
+        this.reportAgentTotal(event.tool_use_id, 0);
+      }
+      if (event.subtype === "task_notification" && isRecord(event.usage) && typeof event.usage.total_tokens === "number") {
+        this.reportAgentTotal(event.tool_use_id, cleanTokenCount(event.usage.total_tokens));
+      }
+    }
+    if (event.type === "user" && isRecord(event.tool_use_result) && typeof event.tool_use_result.totalTokens === "number"
+      && isRecord(event.message) && Array.isArray(event.message.content)) {
+      for (const block of event.message.content) {
+        if (isRecord(block) && block.type === "tool_result" && typeof block.tool_use_id === "string") {
+          this.reportAgentTotal(block.tool_use_id, cleanTokenCount(event.tool_use_result.totalTokens));
+        }
+      }
+    }
     if (event.type === "assistant" && isRecord(event.message) && (event.parent_tool_use_id || (this.resumed && !this.modelPrevious))) {
       const message = event.message;
       const totals = normalizeClaudeTokenUsage(message.usage);
@@ -153,6 +172,11 @@ export class ClaudeTokenObserver {
       const maximum = maximumTotals(totals, previous);
       const delta = positiveDifference(maximum, previous);
       this.assistantMessages.set(message.id, maximum);
+      if (typeof event.parent_tool_use_id === "string") {
+        const total = cleanTokenCount((this.agentAssistantTotals.get(event.parent_tool_use_id) ?? 0) + delta.totalTokens);
+        this.agentAssistantTotals.set(event.parent_tool_use_id, total);
+        this.reportAgentTotal(event.parent_tool_use_id, total);
+      }
       if (event.parent_tool_use_id && this.resultsObserved > 0) {
         // Background agents can finish after the last main-loop result. Persist
         // their consumption now and subtract it from the next model snapshot.
@@ -203,22 +227,51 @@ export class ClaudeTokenObserver {
     // Retain a reported zero for the first result, without adding duplicate snapshots.
     if (this.resultsObserved === 1) this.record("claude", delta, timestamp);
   }
+
+  private reportAgentTotal(agentId: string, tokens: number): void {
+    const previous = this.agentReportedTotals.get(agentId);
+    const maximum = Math.max(previous ?? 0, tokens);
+    this.agentReportedTotals.set(agentId, maximum);
+    if (previous === undefined || maximum > previous) this.recordSubagent?.(agentId, maximum - (previous ?? 0));
+  }
 }
 
-/** Only the selected thread is observed; subagent threads have independent counters. */
+/** Observe the selected thread and explicitly owned children, each with its own counter. */
 export class CodexTokenObserver {
   private previous: UsageTokenTotals | undefined;
   private turns = new Set<string>();
   private snapshots = new Set<string>();
   private loadedBaseline = false;
   private hasLiveUsage = false;
+  private children = new Map<string, CodexTokenObserver>();
 
-  constructor(private record: TokenRecorder, private resumed: boolean, private baselines: CodexTokenBaselines) {
+  constructor(private record: TokenRecorder, private resumed: boolean, private baselines: CodexTokenBaselines,
+    private recordSubagent?: SubagentTokenRecorder, private agentId?: string) {
     this.previous = resumed ? undefined : emptyTokenTotals();
   }
 
   observe(method: string, params: unknown, threadId: string | null, timestamp = Date.now()): void {
-    if (!isRecord(params) || !threadId || params.threadId !== threadId) return;
+    if (!isRecord(params) || !threadId) return;
+    if (method === "thread/started" && isRecord(params.thread)) {
+      const thread = params.thread;
+      const source = isRecord(thread.source) ? thread.source.subAgent : undefined;
+      const spawn = isRecord(source) ? source.thread_spawn : undefined;
+      const parentId = typeof thread.parentThreadId === "string" ? thread.parentThreadId
+        : isRecord(spawn) ? spawn.parent_thread_id : undefined;
+      if (parentId === threadId && typeof thread.id === "string" && thread.id !== threadId) {
+        this.addChild(thread.id);
+      }
+    }
+    if (params.threadId !== threadId) {
+      for (const [childId, child] of this.children) child.observe(method, params, childId, timestamp);
+      return;
+    }
+    if ((method === "item/started" || method === "item/completed") && isRecord(params.item)) {
+      const item = params.item;
+      if (item.type === "collabAgentToolCall" && item.tool === "spawnAgent" && Array.isArray(item.receiverThreadIds)) {
+        for (const id of item.receiverThreadIds) if (typeof id === "string" && id !== threadId) this.addChild(id);
+      }
+    }
     if (!this.loadedBaseline) {
       if (this.resumed) this.previous = this.baselines.get(threadId);
       this.loadedBaseline = true;
@@ -250,6 +303,17 @@ export class CodexTokenObserver {
     this.previous = current;
     this.hasLiveUsage = true;
     this.baselines.set(threadId, current);
-    if (delta && (hasTokens(delta) || this.snapshots.size === 1)) this.record("codex", delta, timestamp);
+    if (delta && (hasTokens(delta) || this.snapshots.size === 1)) {
+      this.record("codex", delta, timestamp);
+      if (this.agentId) this.recordSubagent?.(this.agentId, delta.totalTokens);
+    }
+  }
+
+  private addChild(threadId: string): void {
+    if (this.children.has(threadId)) return;
+    this.recordSubagent?.(threadId, 0);
+    // Forked threads can inherit their parent's counter. The first live `last`
+    // report is the safe baseline when no historical notification was supplied.
+    this.children.set(threadId, new CodexTokenObserver(this.record, true, this.baselines, this.recordSubagent, threadId));
   }
 }

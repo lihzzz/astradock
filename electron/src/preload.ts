@@ -485,6 +485,7 @@ contextBridge.exposeInMainWorld("claude", {
   },
   usage: {
     get: (days: number) => ipcRenderer.invoke("usage:get", days),
+    getSessionTokens: (sessionId: string) => ipcRenderer.invoke("usage:session-tokens", sessionId),
     activity: (start: number, end: number) => ipcRenderer.send("usage:activity", start, end),
   },
   shortcuts: { getStatus: () => ipcRenderer.invoke("shortcuts:get-status") },

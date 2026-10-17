@@ -1651,6 +1651,7 @@ export function AppLayout() {
                   isProcessing={manager.isProcessing}
                   model={activePaneCtrl?.paneHeaderModel}
                   sessionId={manager.sessionInfo?.sessionId}
+                  chatSessionId={manager.activeSession?.id ?? null}
                   totalCost={manager.totalCost}
                   title={manager.activeSession?.title}
                   titleGenerating={manager.activeSession?.titleGenerating}

@@ -19,7 +19,7 @@ import { captureEvent } from "../lib/posthog";
 import { withComputerUseMcpServer } from "../lib/computer-use-runtime";
 import { withHindsightMcpServers, registerMemorySession, unregisterMemorySession, beforeMemorySend, observeClaudeEvent, completeMemoryTurn } from "../lib/memory/service";
 import { beginUsageTurn, endUsageTurn, stopUsageSession } from "../lib/usage";
-import { createClaudeTokenObserver } from "../lib/token-usage";
+import { bindSessionTokenUsage, createClaudeTokenObserver } from "../lib/token-usage";
 import { observeClaudeTaskEvent } from "../lib/tasks/engine-events";
 import { taskRuntimeEvents } from "../lib/tasks/runtime-events";
 import { getSessionRepository } from "../lib/session-service";
@@ -292,7 +292,8 @@ function startEventLoop(
   // Maps tool_use_id → tool name, populated from assistant events so tool_result events can
   // reference the name when capturing analytics.
   const toolNameMap = new Map<string, string>();
-  const tokenObserver = createClaudeTokenObserver(!!session.startOptions?.resume && !session.startOptions.forkSession);
+  // Forks also inherit cumulative modelUsage from their source transcript.
+  const tokenObserver = createClaudeTokenObserver(!!session.startOptions?.resume, sessionId);
   let deltaCounter = 0;
   (async () => {
     try {
@@ -576,6 +577,7 @@ async function startSession(options: StartOptions, getMainWindow: () => BrowserW
     if (options.resume && !options.source) throw new Error("A saved source is required to resume a session");
     if (options.source) runtimeLease = await getSessionRepository().bindRuntime(options.source, "claude", sessionId, () => stopForDeletion(sessionId));
     else if (options.memoryContext?.projectId) runtimeLease = await getSessionRepository().bindProjectRuntime(options.memoryContext.projectId, sessionId, () => stopForDeletion(sessionId));
+    bindSessionTokenUsage(sessionId, options.source?.runtimeSessionId);
     const query = await getSDK();
     runtimeLease?.assertActive();
     if (sessions.has(sessionId)) throw new Error("Claude session is already running");

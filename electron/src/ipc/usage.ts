@@ -6,10 +6,20 @@ import { UsageHistory } from "../lib/usage-history";
 import { flushUsage, getUsageTracker, startUsageTracking } from "../lib/usage";
 import { log } from "../lib/logger";
 import { reportError } from "../lib/error-utils";
-import { getTokenUsage } from "../lib/token-usage";
+import { getSessionTokenUsage, getTokenUsage } from "../lib/token-usage";
 
 export function register(getMainWindow: () => BrowserWindow | null): void {
   let history: UsageHistory | undefined;
+  ipcMain.handle("usage:session-tokens", (event, sessionId: unknown) => {
+    if (event.sender !== getMainWindow()?.webContents) return { error: "Unknown usage client" };
+    if (typeof sessionId !== "string" || !sessionId || sessionId.length > 256) return { error: "Invalid session ID" };
+    try {
+      return { data: getSessionTokenUsage(sessionId) };
+    } catch (error) {
+      reportError("SESSION_TOKEN_USAGE_READ_ERR", error);
+      return { error: "Could not read session token usage" };
+    }
+  });
   ipcMain.handle("usage:get", async (event, range: unknown) => {
     if (event.sender !== getMainWindow()?.webContents) return { error: "Unknown usage client" };
     if (range !== 1 && range !== 7 && range !== 30 && range !== 90) return { error: "Invalid usage range" };

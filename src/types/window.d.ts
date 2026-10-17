@@ -9,7 +9,7 @@ import type { InstalledAgent } from "@shared/types/registry";
 import type { AppSettings, EngineBinaryScanResult, MacBackgroundEffect, ThemeOption } from "@shared/types/settings";
 import type { MemoryRecallState, MemoryDocument, MemoryFact, MemoryGoldenReport, MemoryProjectConfig, MemoryStatusResult } from "@shared/types/memory";
 import type { SkillsListResult } from "@shared/types/skills";
-import type { UsageRange, UsageReport } from "@shared/types/usage";
+import type { SessionTokenUsage, UsageRange, UsageReport } from "@shared/types/usage";
 import type {
   ACPSessionEvent,
   ACPPermissionEvent,
@@ -445,6 +445,7 @@ declare global {
       };
       usage: {
         get: (days: UsageRange) => Promise<{ data?: UsageReport; error?: string }>;
+        getSessionTokens: (sessionId: string) => Promise<{ data?: SessionTokenUsage; error?: string }>;
         activity: (start: number, end: number) => void;
       };
       shortcuts: { getStatus: () => Promise<OperationResult<ShortcutStatus[]>> };

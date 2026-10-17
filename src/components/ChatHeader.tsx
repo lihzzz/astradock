@@ -7,6 +7,7 @@ import { isMac } from "@/lib/utils";
 import type { AcpPermissionBehavior, CodexThreadGoal } from "@/types";
 import { CodexGoalDialog, CodexGoalStatus } from "@/components/codex";
 import { useI18n } from "@/lib/i18n";
+import { SessionTokenUsage } from "@/components/SessionTokenUsage";
 
 const PERMISSION_MODE_LABELS: Record<string, string> = {
   plan: "Plan",
@@ -28,6 +29,7 @@ interface ChatHeaderProps {
   isProcessing: boolean;
   model?: string;
   sessionId?: string;
+  chatSessionId: string | null;
   totalCost: number;
   title?: string;
   titleGenerating?: boolean;
@@ -57,6 +59,7 @@ export const ChatHeader = memo(function ChatHeader({
   isProcessing,
   model,
   sessionId,
+  chatSessionId,
   totalCost,
   title,
   titleGenerating,
@@ -166,8 +169,9 @@ export const ChatHeader = memo(function ChatHeader({
       ) : null}
 
       {/* Session info, split view toggle, and pane close */}
-      {(showGoal || showDevSeedButton || hasDetails || onClosePane) && (
-        <div className="ms-auto flex items-center gap-1.5">
+      {(chatSessionId || showGoal || showDevSeedButton || hasDetails || onClosePane) && (
+        <div className="ms-auto flex shrink-0 items-center gap-1.5">
+          {chatSessionId && <SessionTokenUsage key={chatSessionId} sessionId={chatSessionId} isProcessing={isProcessing} />}
           {onClosePane && (
             <Tooltip>
               <TooltipTrigger asChild>

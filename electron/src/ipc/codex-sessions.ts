@@ -25,7 +25,7 @@ import {
 import { getHindsightCodexMcpOverrides, registerMemorySession, unregisterMemorySession, beforeMemorySend, observeCodexNotification, completeMemoryTurn } from "../lib/memory/service";
 import { cancelProjectAppAgentPermissions, registerProjectAppAgentSession, revokeProjectAppAgentSession, getProjectAppMcpServer } from "../lib/project-apps/agent-bridge";
 import { beginUsageTurn, endUsageTurn, stopUsageSession } from "../lib/usage";
-import { createCodexTokenObserver } from "../lib/token-usage";
+import { bindSessionTokenUsage, createCodexTokenObserver } from "../lib/token-usage";
 import { observeCodexTaskEvent } from "../lib/tasks/engine-events";
 import { taskRuntimeEvents } from "../lib/tasks/runtime-events";
 import { getSessionRepository } from "../lib/session-service";
@@ -425,7 +425,8 @@ function setupCodexHandlers(
   getMainWindow: () => BrowserWindow | null,
   resumed: boolean,
 ): void {
-  const tokenObserver = createCodexTokenObserver(resumed);
+  bindSessionTokenUsage(internalId);
+  const tokenObserver = createCodexTokenObserver(resumed, internalId);
   rpc.onStderr = (text) => {
     log("codex", `[stderr:${internalId.slice(0, 8)}] ${text.slice(0, 500)}`);
   };
@@ -1079,6 +1080,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
 
       try {
         runtimeLease = await getSessionRepository().bindRuntime(data.source, "codex", internalId, () => stopForDeletion(internalId));
+        bindSessionTokenUsage(internalId, data.source.runtimeSessionId);
         const codexPath = await getCodexBinaryPath();
         runtimeLease.assertActive();
         log("codex",` Resuming thread ${data.threadId} in new process (session=${internalId})`);
