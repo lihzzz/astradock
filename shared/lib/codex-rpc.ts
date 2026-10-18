@@ -6,6 +6,7 @@
  */
 
 import type { ChildProcess } from "child_process";
+import { StringDecoder } from "node:string_decoder";
 import { stopProcessAndWait } from "./process-stop";
 import type { RequestId } from "../types/codex-protocol/RequestId";
 
@@ -60,6 +61,8 @@ export class CodexRpcClient {
   private nextId = 1;
   private pendingRequests = new Map<RequestId, PendingRequest>();
   private lineBuffer = "";
+  private readonly stdoutDecoder = new StringDecoder("utf8");
+  private readonly stderrDecoder = new StringDecoder("utf8");
   private destroyed = false;
   private log: LogFn;
   private reportError: ReportErrorFn;
@@ -77,9 +80,16 @@ export class CodexRpcClient {
     this.log = options.log;
     this.reportError = options.reportError;
 
-    proc.stdout?.on("data", (chunk: Buffer) => this.handleData(chunk));
+    // Pipe chunks can end in the middle of a multi-byte character. Decode the
+    // stream before splitting JSONL; Buffer.toString() per chunk loses bytes.
+    proc.stdout?.on("data", (chunk: Buffer) => this.handleText(this.stdoutDecoder.write(chunk)));
+    proc.stdout?.on("end", () => this.handleText(this.stdoutDecoder.end()));
     proc.stderr?.on("data", (chunk: Buffer) => {
-      const text = chunk.toString().trim();
+      const text = this.stderrDecoder.write(chunk).trim();
+      if (text) this.onStderr?.(text);
+    });
+    proc.stderr?.on("end", () => {
+      const text = this.stderrDecoder.end().trim();
       if (text) this.onStderr?.(text);
     });
     proc.on("exit", (code, signal) => {
@@ -166,8 +176,9 @@ export class CodexRpcClient {
     this.proc.stdin.write(line);
   }
 
-  private handleData(chunk: Buffer): void {
-    this.lineBuffer += chunk.toString();
+  private handleText(text: string): void {
+    if (!text) return;
+    this.lineBuffer += text;
     const lines = this.lineBuffer.split("\n");
     this.lineBuffer = lines.pop()!; // keep incomplete trailing line
 

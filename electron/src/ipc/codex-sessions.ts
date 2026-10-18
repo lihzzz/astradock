@@ -12,6 +12,7 @@ import crypto from "crypto";
 import { log } from "../lib/logger";
 import { safeSend } from "../lib/safe-send";
 import { CodexRpcClient } from "../lib/codex-rpc";
+import { getCodexShellInstructionOverrides } from "../lib/codex-shell-instructions";
 import { CodexSubagentTracker, codexNotificationThreadId, isCodexSubagentItem } from "@shared/lib/codex-subagents";
 import { getCodexBinaryPath, getCodexBinaryStatus, getCodexHome, getCodexVersion, scanCodexBinaries } from "../lib/codex-binary";
 import { getAppSetting } from "../lib/app-settings";
@@ -341,7 +342,10 @@ async function ensureCodexThread(session: CodexSession): Promise<string> {
     if (session.model) threadParams.model = session.model;
     if (session.approvalPolicy) threadParams.approvalPolicy = session.approvalPolicy;
     if (session.sandbox) threadParams.sandbox = session.sandbox;
+    Object.assign(threadParams, await getCodexShellInstructionOverrides(session.rpc, session.cwd));
+    assertCodexSessionActive(session);
     const threadResult = await session.rpc.request<CodexThreadStartResponse>("thread/start", threadParams);
+    assertCodexSessionActive(session);
     session.threadId = threadResult.thread.id;
     session.fingerprintSettings = { model: threadResult.model, effort: threadResult.reasoningEffort, provider: threadResult.modelProvider };
     log("codex", ` Thread lazily started: session=${shortId(session.internalId, 12)} thread=${shortId(session.threadId, 12)}`);
@@ -670,6 +674,8 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
         if (options.personality) threadParams.personality = options.personality;
         // collaborationMode is set per-turn via turn/start, not on thread/start
 
+        Object.assign(threadParams, await getCodexShellInstructionOverrides(rpc, options.cwd));
+        assertCodexSessionActive(session);
         const threadResult = await rpc.request<CodexThreadStartResponse>("thread/start", threadParams);
         assertCodexSessionActive(session);
         session.threadId = threadResult.thread.id;
@@ -1147,6 +1153,8 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
         if (data.approvalPolicy) threadParams.approvalPolicy = data.approvalPolicy;
         if (data.sandbox) threadParams.sandbox = data.sandbox;
 
+        Object.assign(threadParams, await getCodexShellInstructionOverrides(rpc, data.cwd));
+        assertCodexSessionActive(session);
         const threadResult = await rpc.request<CodexThreadResumeResponse>("thread/resume", threadParams);
         assertCodexSessionActive(session);
         session.threadId = threadResult.thread.id;

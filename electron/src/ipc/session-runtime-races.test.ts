@@ -12,6 +12,7 @@ import * as acp from "./acp-sessions";
 import * as processStop from "@shared/lib/process-stop";
 import { safeSend } from "../lib/safe-send";
 import { beginUsageTurn, endUsageTurn } from "../lib/usage";
+import { WINDOWS_SHELL_INSTRUCTIONS } from "../lib/codex-shell-instructions";
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown;
 const state = vi.hoisted(() => ({
@@ -19,6 +20,8 @@ const state = vi.hoisted(() => ({
   handlers: new Map<string, Handler>(),
   children: [] as ChildProcess[],
   requests: [] as string[],
+  rpcRequests: [] as Array<{ method: string; params: unknown }>,
+  authRequired: false,
   pause: "",
   getSDK: vi.fn(),
   claudeBinary: vi.fn<() => Promise<string>>(),
@@ -83,13 +86,15 @@ vi.mock("child_process", async (importOriginal) => {
     input.on('line', line => {
       const message = JSON.parse(line);
       if (message.id === undefined || !message.method) return;
-      process.send({ method: message.method });
+      process.send({ method: message.method, params: message.params });
       if (message.method === process.env.PAUSED_METHOD) return;
       let result = {};
       if (message.method === 'initialize') result = { protocolVersion: 1, agentCapabilities: { loadSession: true } };
       if (message.method === 'thread/resume' || message.method === 'thread/start') result = { thread: { id: 'thread' } };
       if (message.method === 'model/list') result = { data: [], nextCursor: null };
-      if (message.method === 'account/read') result = { account: null, requiresOpenaiAuth: false };
+      if (message.method === 'config/read') result = { config: { developer_instructions: 'Fixture project rules' } };
+      if (message.method === 'turn/start') result = { turn: { id: 'turn' } };
+      if (message.method === 'account/read') result = { account: null, requiresOpenaiAuth: process.env.AUTH_REQUIRED === '1' };
       if (message.method === 'thread/goal/get') result = { goal: null };
       if (message.method === 'session/new') result = { sessionId: 'agent-thread' };
       process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: message.id, result }) + '\\n');
@@ -97,11 +102,14 @@ vi.mock("child_process", async (importOriginal) => {
   `;
   return { ...actual, spawn: () => {
     const child = actual.spawn(process.execPath, ["-e", fixture], {
-      stdio: ["pipe", "pipe", "pipe", "ipc"], env: { ...process.env, PAUSED_METHOD: state.pause },
+      stdio: ["pipe", "pipe", "pipe", "ipc"], env: { ...process.env, PAUSED_METHOD: state.pause, AUTH_REQUIRED: state.authRequired ? "1" : "" },
     });
     state.children.push(child);
     child.on("message", (message: unknown) => {
-      if (typeof message === "object" && message !== null && "method" in message && typeof message.method === "string") state.requests.push(message.method);
+      if (isRecord(message) && typeof message.method === "string") {
+        state.requests.push(message.method);
+        state.rpcRequests.push({ method: message.method, params: message.params });
+      }
     });
     return child;
   } };
@@ -153,6 +161,7 @@ async function remove() {
 beforeEach(async () => {
   state.root = await fs.mkdtemp(path.join(os.tmpdir(), "harnss-runtime-race-"));
   state.children = []; state.requests = []; state.pause = "";
+  state.rpcRequests = []; state.authRequired = false;
   state.getSDK.mockReset(); state.claudeBinary.mockReset(); state.codexBinary.mockReset();
   state.beforeSend.mockReset().mockImplementation(async (_id, text) => ({ text }));
   state.claudeBinary.mockResolvedValue("fixture"); state.codexBinary.mockResolvedValue("fixture");
@@ -409,5 +418,49 @@ describe("Codex subagent notification routing", () => {
     await invoke("codex:interrupt", result.sessionId);
     await vi.waitFor(() => expect(state.requests).toContain("turn/interrupt"));
     await codex.stopForDeletion(result.sessionId);
+  });
+});
+
+describe.skipIf(process.platform !== "win32")("Codex Windows encoding lifecycle", () => {
+  it.each(["new", "resume", "lazy"] as const)("adds UTF-8 rules for a %s thread without changing user input or plan instructions", async (flow) => {
+    state.authRequired = flow === "lazy";
+    if (flow === "resume") await save("codex");
+    const result = flow === "resume"
+      ? await resume("codex")
+      : await invoke("codex:start", { cwd: state.root });
+    expect(result.error).toBeUndefined();
+    if (flow === "lazy") expect(result.needsAuth).toBe(true);
+    const collaborationMode = { mode: "plan", settings: { model: "fixture", reasoning_effort: "medium", developer_instructions: null } };
+    expect(await invoke("codex:send", { sessionId: result.sessionId, text: "读取 CLAUDE.md", collaborationMode }))
+      .not.toHaveProperty("error");
+    await vi.waitFor(() => expect(state.requests).toContain("turn/start"));
+    const method = flow === "resume" ? "thread/resume" : "thread/start";
+    const thread = state.rpcRequests.find((request) => request.method === method);
+    expect(thread?.params).toMatchObject({ developerInstructions: `Fixture project rules\n\n${WINDOWS_SHELL_INSTRUCTIONS}` });
+    expect(state.rpcRequests).toContainEqual({ method: "config/read", params: { cwd: state.root, includeLayers: false } });
+    expect(state.rpcRequests.find((request) => request.method === "turn/start")?.params).toMatchObject({
+      input: [{ type: "text", text: "读取 CLAUDE.md" }], collaborationMode,
+    });
+  });
+
+  it("does not resume a deleted session after its instruction lookup settles", async () => {
+    await save("codex"); state.pause = "config/read";
+    const restoring = resume("codex");
+    await vi.waitFor(() => expect(state.requests).toContain("config/read"));
+    await remove();
+    expect(await restoring).toHaveProperty("error");
+    expect(state.requests).not.toContain("thread/resume");
+  });
+
+  it("does not lazily create a thread after its project is deleted during instruction lookup", async () => {
+    state.pause = "config/read"; state.authRequired = true;
+    const result = await invoke("codex:start", { cwd: state.root, memoryContext: { projectId: "project" } });
+    expect(result.needsAuth).toBe(true);
+    const sending = invoke("codex:send", { sessionId: result.sessionId, text: "read a file" });
+    await vi.waitFor(() => expect(state.requests).toContain("config/read"));
+    await getSessionRepository().removeProject("project", async () => {});
+    expect(await sending).toHaveProperty("error");
+    expect(state.requests).not.toContain("thread/start");
+    expect(state.requests).not.toContain("turn/start");
   });
 });
