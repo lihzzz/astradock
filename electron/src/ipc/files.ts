@@ -262,6 +262,14 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle("shell:show-item-in-folder", async (_event, filePath: string) => {
     try {
+      if (/^file:/i.test(filePath)) {
+        const decodedPath = fileUrlToPortablePath(filePath);
+        if (!decodedPath) return { error: "Invalid local file URL" };
+        filePath = decodedPath;
+      }
+      if (!path.isAbsolute(filePath)) return { error: "An absolute file path is required" };
+      filePath = path.normalize(filePath);
+      await fsPromises.stat(filePath);
       shell.showItemInFolder(filePath);
       return { ok: true };
     } catch (err) {

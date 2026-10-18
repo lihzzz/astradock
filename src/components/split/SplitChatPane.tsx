@@ -271,6 +271,7 @@ function SplitChatPaneInner({
             />
           </div>
           <ChatView
+            cwd={paneState.sessionInfo?.cwd ?? projectPath}
             spaceId={spaceId}
             messages={paneState.messages}
             isProcessing={paneState.isProcessing}

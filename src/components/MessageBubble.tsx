@@ -1,7 +1,7 @@
 import { lazy, memo, Suspense, useEffect, useState, useMemo, useCallback, createContext, useContext, type ReactNode, type MouseEvent as ReactMouseEvent } from "react";
 import { AlertCircle, Brain, ChevronDown, ChevronUp, Clock, Crosshair, File, Folder, Info, RotateCcw, Send, Undo2, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
-import { parseLocalFileLink } from "@shared/lib/file-paths";
+import { MarkdownFileLink } from "./MarkdownFileLink";
 import { markdownUrlTransform } from "@/lib/markdown-links";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -215,30 +215,7 @@ const IsBlockCodeContext = createContext(false);
 const IsStreamingMarkdownContext = createContext(false);
 
 const MD_COMPONENTS: Components = {
-  a({ href, children, ...props }) {
-    const onClick: React.MouseEventHandler<HTMLAnchorElement> = (event) => {
-      if (!href || href.startsWith("#")) return;
-      event.preventDefault();
-      const fileTarget = parseLocalFileLink(href);
-      if (fileTarget) {
-        void window.claude.openInEditor(fileTarget.filePath, fileTarget.line);
-        return;
-      }
-      void window.claude.openExternal(href);
-    };
-
-    return (
-      <a
-        {...props}
-        href={href}
-        onClick={onClick}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        {children}
-      </a>
-    );
-  },
+  a: MarkdownFileLink,
   code: CodeBlock,
   // Strip the <pre> wrapper but signal block context to CodeBlock
   pre({ children }) {

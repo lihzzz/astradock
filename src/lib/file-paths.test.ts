@@ -10,6 +10,8 @@ describe("portable local file links", () => {
     ["C:\\项目\\a.ts#L12", "C:\\项目\\a.ts", 12],
     ["\\\\server\\share\\a.ts:7", "\\\\server\\share\\a.ts", 7],
     ["/Users/me/a.ts:3:8", "/Users/me/a.ts", 3],
+    ["docs/remote-workbench/implementation-plan.md#L4", "docs/remote-workbench/implementation-plan.md", 4],
+    ["README.md#L4", "README.md", 4],
     ["./src/a.ts#L4", "./src/a.ts", 4],
     ["../src/a.ts:5", "../src/a.ts", 5],
     ["file:///C:/My%20Project/%E4%B8%AD%E6%96%87.ts#L6", "C:/My Project/中文.ts", 6],
@@ -20,7 +22,7 @@ describe("portable local file links", () => {
     expect(parseLocalFileLink(href)).toEqual({ filePath, line });
   });
 
-  it.each(["https://example.com/a.ts", "//example.com/a.ts", "javascript:alert(1)", "data:text/html,hi", "mailto:test@example.com", "file:///a%00.txt", "file:///a%2fb", "file:///a%ZZ", "C:/a\u0000.txt"])("does not interpret unsafe or non-file URL %s as a local path", (href) => {
+  it.each(["#section", "?page=2", "https://example.com/a.ts", "//example.com/a.ts", "javascript:alert(1)", "data:text/html,hi", "mailto:test@example.com", "file:///a%00.txt", "file:///a%2fb", "file:///a%ZZ", "C:/a\u0000.txt"])("does not interpret unsafe or non-file URL %s as a local path", (href) => {
     expect(parseLocalFileLink(href)).toBeNull();
   });
 

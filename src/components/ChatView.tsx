@@ -7,6 +7,7 @@ import { AgentIcon } from "./AgentIcon";
 import { getAgentIcon } from "@/lib/engine-icons";
 import { useAgentContext } from "./AgentContext";
 import { MessageBubble } from "./MessageBubble";
+import { ChatFileCwdContext } from "./MarkdownFileLink";
 import { SummaryBlock } from "./SummaryBlock";
 import { createChatStructureTracker } from "@/lib/chat/structure";
 import { getToolStatus } from "@/lib/chat/tool-activity";
@@ -326,6 +327,7 @@ const ChatMessageRow = memo(function ChatMessageRow({
 // ── ChatViewProps ──
 
 interface ChatViewProps {
+  cwd: string | undefined;
   messages: UIMessage[];
   isProcessing: boolean;
   showThinking: boolean;
@@ -423,7 +425,11 @@ export const ChatView = memo(function ChatView(props: ChatViewProps) {
   // spaceId ensures the spinner shows immediately when switching spaces (before the 60ms debounced
   // session switch fires). sessionId + messages[0]?.id handle same-space session switches.
   const contentKey = `${props.spaceId ?? "s"}-${props.sessionId ?? "__empty__"}-${messages[0]?.id ?? ""}`;
-  return <ChatViewContent key={contentKey} {...props} />;
+  return (
+    <ChatFileCwdContext.Provider value={props.cwd}>
+      <ChatViewContent key={contentKey} {...props} />
+    </ChatFileCwdContext.Provider>
+  );
 });
 
 // ── ChatViewContent (inner, module-level) ──

@@ -1682,6 +1682,7 @@ export function AppLayout() {
                 />
               )}
               <ChatView
+                cwd={manager.sessionInfo?.cwd ?? activeProjectPath}
                 spaceId={spaceManager.activeSpaceId}
                 messages={manager.messages}
                 isProcessing={manager.isProcessing}

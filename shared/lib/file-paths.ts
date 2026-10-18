@@ -61,7 +61,7 @@ function pathWithLine(value: string, decode = true): LocalFileLink | null {
   return { filePath, ...(line > 0 && Number.isSafeInteger(line) ? { line } : {}) };
 }
 
-/** Recognize only explicit local paths; ordinary relative and protocol-relative URLs stay URLs. */
+/** Chat-relative links refer to workspace files; schemes, fragments and web URLs stay URLs. */
 export function parseLocalFileLink(href: string): LocalFileLink | null {
   if (!href || CONTROL_CHARACTERS.test(href)) return null;
   if (/^file:/i.test(href)) {
@@ -74,7 +74,7 @@ export function parseLocalFileLink(href: string): LocalFileLink | null {
   }
   if (!/^[A-Za-z]:[\\/]/.test(href) && !href.startsWith("\\\\")
     && !(href.startsWith("/") && !href.startsWith("//"))
-    && !href.startsWith("./") && !href.startsWith("../")) return null;
+    && (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(href) || /^[#?]/.test(href) || href.startsWith("//"))) return null;
 
   return pathWithLine(href);
 }
