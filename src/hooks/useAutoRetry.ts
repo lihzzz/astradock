@@ -1,6 +1,7 @@
 /**
- * useAutoRetry — automatically resends the last user turn when a turn ends
- * with a retryable upstream error (network drops, timeouts, 5xx).
+ * useAutoRetry — automatically retries a turn when it ends
+ * with a retryable upstream error (network drops, timeouts, 5xx). Partial turns
+ * are continued instead of replaying the original prompt.
  *
  * Pure scheduling logic lives in lib/session/auto-retry.ts; this hook only
  * owns the timer and exposes countdown state for the UI. Budget: 3 attempts

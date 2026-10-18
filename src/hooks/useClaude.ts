@@ -34,7 +34,7 @@ import {
   buildSdkContent,
 } from "../lib/engine/protocol";
 import { createSystemMessage, createUserMessage, formatResultError, nextId } from "../lib/message-factory";
-import { isRetryableUpstreamError } from "../lib/session/retry";
+import { hasTurnProgress, isRetryableUpstreamError } from "../lib/session/retry";
 import { bgAgentStore } from "../lib/background/agent-store";
 import { suppressNextSessionCompletion } from "../lib/notification-utils";
 import { advancePermissionQueue, enqueuePermissionRequest } from "../lib/engine/permission-queue";
@@ -854,13 +854,17 @@ export function useClaude({ sessionId, initialMessages, initialMeta, initialPerm
       const target = streamId
         ? prev.find((m) => m.id === streamId)
         : prev.findLast((m) => m.role === "assistant" && m.isStreaming);
-      if (!target) return prev;
-      if (!target.content.trim() && !target.thinking) {
-        return prev.filter((m) => m.id !== target.id);
-      }
-      return prev.map((m) =>
-        m.id === target.id ? { ...m, isStreaming: false } : m,
-      );
+      const finalized = !target
+        ? prev
+        : !target.content.trim() && !target.thinking
+          ? prev.filter((m) => m.id !== target.id)
+          : prev.map((m) =>
+            m.id === target.id ? { ...m, isStreaming: false } : m,
+          );
+      const userIndex = finalized.findLastIndex((message) => message.role === "user" && !message.isQueued);
+      return userIndex >= 0 && hasTurnProgress(finalized, userIndex)
+        ? [...finalized, createSystemMessage("Turn interrupted.", false, false, true)]
+        : finalized;
     });
 
     // Reset streaming buffer for next turn

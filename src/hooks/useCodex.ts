@@ -34,7 +34,7 @@ import {
 import { suppressNextSessionCompletion } from "@/lib/notification-utils";
 import { captureException } from "@/lib/analytics/analytics";
 import { createSystemMessage, createUserMessage, nextId } from "@/lib/message-factory";
-import { isRetryableUpstreamError } from "@/lib/session/retry";
+import { hasTurnProgress, isRetryableUpstreamError } from "@/lib/session/retry";
 import { useEngineBase } from "./useEngineBase";
 import { parseThreadGoal } from "@shared/lib/codex-goal";
 import { applyCodexSubagentUpdate, startsCodexAgentCard } from "@/lib/engine/codex-agent-cards";
@@ -713,13 +713,21 @@ export function useCodex({
 
     // Check for failed turn
     const { turn } = params;
-    if (turn.status !== "inProgress") setMessages(prev => settleCodexTools(prev, turn.id, turn.status));
-    if (turn.status === "failed") {
-      const msg = turn.error?.message || "Turn failed";
-      setMessages((prev) => [
-        ...prev,
-        createSystemMessage(msg, true, isRetryableUpstreamError(msg)),
-      ]);
+    if (turn.status !== "inProgress") {
+      setMessages((prev) => {
+        const settled = settleCodexTools(prev, turn.id, turn.status);
+        if (turn.status === "interrupted") {
+          const userIndex = settled.findLastIndex((message) => message.role === "user" && !message.isQueued);
+          return userIndex >= 0 && hasTurnProgress(settled, userIndex)
+            ? [...settled, createSystemMessage("Turn interrupted.", false, false, true)]
+            : settled;
+        }
+        if (turn.status === "failed") {
+          const msg = turn.error?.message || "Turn failed";
+          return [...settled, createSystemMessage(msg, true, isRetryableUpstreamError(msg))];
+        }
+        return settled;
+      });
     }
   }, [finalizeStreamingAssistant]);
 

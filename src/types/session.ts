@@ -70,6 +70,8 @@ export interface UIMessage {
   isError?: boolean;
   /** When true, the failed turn can be submitted again from the chat. */
   retryable?: boolean;
+  /** When true, a manually interrupted turn can be continued from its current state. */
+  continuable?: boolean;
   /** SDK checkpoint UUID -- when present, files can be reverted to the state before this message */
   checkpointId?: string;
   /** When true, this user message is waiting in the queue -- not yet sent to the agent */

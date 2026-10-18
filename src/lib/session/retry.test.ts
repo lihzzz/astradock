@@ -27,6 +27,33 @@ describe("getRetryRequest", () => {
     });
   });
 
+  it("continues a turn that already produced assistant or tool progress", () => {
+    const messages = [
+      message({ id: "user-1", role: "user", content: "implement the feature" }),
+      message({ id: "tool-1", role: "tool_call", content: "", toolName: "Edit" }),
+      message({ id: "assistant-1", role: "assistant", content: "I started making the changes." }),
+      message({ id: "error-1", retryable: true }),
+    ];
+
+    expect(getRetryRequest(messages, "error-1")).toMatchObject({
+      content: "implement the feature",
+      continueFromPartial: true,
+    });
+  });
+
+  it("allows a manually interrupted turn to continue", () => {
+    const messages = [
+      message({ id: "user-1", role: "user", content: "finish the task" }),
+      message({ id: "assistant-1", role: "assistant", content: "Partial result" }),
+      message({ id: "interrupt-1", continuable: true }),
+    ];
+
+    expect(getRetryRequest(messages, "interrupt-1")).toMatchObject({
+      content: "finish the task",
+      continueFromPartial: true,
+    });
+  });
+
   it("ignores non-retryable errors and queued messages", () => {
     const messages = [
       message({ id: "queued", role: "user", content: "queued", isQueued: true }),

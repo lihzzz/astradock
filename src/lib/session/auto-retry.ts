@@ -15,7 +15,7 @@ export const AUTO_RETRY_DELAYS_MS = [4000, 10000, 20000] as const;
 /**
  * Errors older than this only get the manual Retry button. Prevents opening a
  * session with a stale failed turn (e.g. after an app restart) from suddenly
- * resending the message on its own.
+ * retrying the message on its own.
  */
 export const AUTO_RETRY_MAX_ERROR_AGE_MS = 2 * 60_000;
 
@@ -36,9 +36,9 @@ export function getTailRetryableError(messages: UIMessage[]): UIMessage | null {
 }
 
 /**
- * Identifies the user turn an error belongs to. Retries resend identical
- * content, so consecutive failures of the same turn share one signature and
- * draw from the same attempt budget.
+ * Identifies the user turn an error belongs to. Retries keep the original
+ * turn signature, including when a partial turn is resumed, so consecutive
+ * failures share one attempt budget.
  */
 export function turnSignature(request: RetryRequest): string {
   return `${request.content.length}:${request.content}\n${request.displayContent ?? ""}\n${request.images?.length ?? 0}`;
@@ -53,7 +53,7 @@ export interface AutoRetryPlan {
 
 /**
  * Decide whether the tail error should be auto-retried. Returns null when the
- * error is stale, has no resendable user turn, or the attempt budget is spent
+ * error is stale, has no retryable user turn, or the attempt budget is spent
  * (in which case only the manual Retry button remains).
  */
 export function planAutoRetry(

@@ -18,7 +18,7 @@ import { extractTaskSubagentSteps, getTaskStatus, isTaskToolName } from "@/lib/e
 import { suppressNextSessionCompletion } from "@/lib/notification-utils";
 import { captureException } from "@/lib/analytics/analytics";
 import { createSystemMessage, createUserMessage, nextId } from "@/lib/message-factory";
-import { isRetryableUpstreamError } from "@/lib/session/retry";
+import { hasTurnProgress, isRetryableUpstreamError } from "@/lib/session/retry";
 import { reduceAcpUsage } from "@/lib/engine/acp-usage";
 import { useEngineBase } from "./useEngineBase";
 
@@ -543,8 +543,8 @@ export function useACP({ sessionId, initialMessages, initialConfigOptions, initi
   }, [sessionId, pushSystemError]);
 
   /** Send a message without adding it to chat (used for queued messages already in the UI) */
-  const sendRaw = useCallback(async (text: string, images?: ImageAttachment[]) => {
-    if (!sessionId) return;
+  const sendRaw = useCallback(async (text: string, images?: ImageAttachment[]): Promise<boolean> => {
+    if (!sessionId) return false;
     acpLog("SEND_RAW", { session: sessionId.slice(0, 8), textLen: text.length });
     setIsProcessing(true);
     try {
@@ -553,13 +553,16 @@ export function useACP({ sessionId, initialMessages, initialConfigOptions, initi
         acpLog("SEND_RAW_ERROR", { session: sessionId.slice(0, 8), error: result.error });
         pushSystemError(`ACP prompt error: ${result.error}`, isRetryableUpstreamError(result.error ?? ""));
         setIsProcessing(false);
+        return false;
       }
+      return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       acpLog("SEND_RAW_ERROR", { session: sessionId.slice(0, 8), error: msg });
       captureException(err instanceof Error ? err : new Error(msg), { label: "ACP_SEND_RAW_ERR" });
       pushSystemError(`ACP prompt error: ${msg}`, isRetryableUpstreamError(msg));
       setIsProcessing(false);
+      return false;
     }
   }, [sessionId, pushSystemError]);
 
@@ -577,6 +580,12 @@ export function useACP({ sessionId, initialMessages, initialConfigOptions, initi
     suppressNextSessionCompletion(sessionId);
     finalizeStreamingMessage();
     closePendingTools();
+    setMessages((prev) => {
+      const userIndex = prev.findLastIndex((message) => message.role === "user" && !message.isQueued);
+      return userIndex >= 0 && hasTurnProgress(prev, userIndex)
+        ? [...prev, createSystemMessage("Turn interrupted.", false, false, true)]
+        : prev;
+    });
     setPendingPermission(null);
     setIsProcessing(false);
     setIsCompacting(false);

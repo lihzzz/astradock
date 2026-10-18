@@ -4,7 +4,11 @@ import { toMcpStatusState } from "../lib/mcp-utils";
 import { toChatSession } from "../lib/session/records";
 import { BackgroundSessionStore } from "../lib/background/session-store";
 import { createSystemMessage } from "../lib/message-factory";
-import { getRetryRequest, isRetryableUpstreamError } from "../lib/session/retry";
+import {
+  CONTINUE_INTERRUPTED_TURN_PROMPT,
+  getRetryRequest,
+  isRetryableUpstreamError,
+} from "../lib/session/retry";
 import { suppressNextSessionCompletion } from "../lib/notification-utils";
 import {
   DRAFT_ID,
@@ -17,6 +21,7 @@ import {
   type SharedSessionRefs,
   type SharedSessionSetters,
   type EngineHooks,
+  buildCodexCollabMode,
 } from "./session/types";
 import { useSessionPane } from "./session/useSessionPane";
 import { useMessageQueue } from "./session/useMessageQueue";
@@ -400,14 +405,70 @@ export function useSessionManager(
     // Disable this action before sending so a slow upstream cannot receive
     // duplicate requests from repeated clicks.
     engine.setMessages((prev) => prev.map((message) =>
-      message.id === errorMessageId ? { ...message, retryable: false } : message,
+      message.id === errorMessageId
+        ? { ...message, retryable: false, continuable: false }
+        : message,
     ));
     try {
-      await send(request.content, request.images, request.displayContent);
+      if (!request.continueFromPartial) {
+        await send(request.content, request.images, request.displayContent);
+        return;
+      }
+
+      // The failed turn already produced output/tool activity. Replaying the
+      // original user prompt can duplicate edits or other side effects, so
+      // continue the existing live session with a short resume instruction.
+      const activeId = activeSessionIdRef.current;
+      const continuation = CONTINUE_INTERRUPTED_TURN_PROMPT;
+      if (activeId !== DRAFT_ID && activeId && liveSessionIdsRef.current.has(activeId)) {
+        engine.setMessages((prev) => [
+          ...prev,
+          createSystemMessage("Continuing the interrupted task."),
+        ]);
+
+        let succeeded: boolean;
+        if (activeEngine === "codex") {
+          let collaborationMode: ReturnType<typeof buildCodexCollabMode>;
+          try {
+            collaborationMode = buildCodexCollabMode(
+              codexPlanModeEnabled,
+              sessionsRef.current.find((session) => session.id === activeId)?.model,
+            );
+          } catch (error) {
+            engine.setMessages((prev) => [
+              ...prev,
+              createSystemMessage(error instanceof Error ? error.message : String(error), true),
+            ]);
+            return;
+          }
+          const result = await codex.sendRaw(continuation, undefined, collaborationMode);
+          succeeded = result.ok;
+        } else {
+          const result = await engine.sendRaw(continuation);
+          succeeded = typeof result === "boolean" ? result : result.ok;
+        }
+        if (!succeeded && activeEngine !== "acp") {
+          engine.setMessages((prev) => [
+            ...prev,
+            createSystemMessage("Unable to continue the interrupted task.", true, true),
+          ]);
+        }
+        return;
+      }
+
+      // If the live process is gone, the normal send path revives the session
+      // first and then submits the continuation prompt to its transcript.
+      await send(continuation);
     } finally {
       retryInFlightRef.current.delete(errorMessageId);
     }
-  }, [engine, send]);
+  }, [
+    activeEngine,
+    codex,
+    codexPlanModeEnabled,
+    engine,
+    send,
+  ]);
 
   const seedDevExampleConversation = useCallback(async () => {
     if (!import.meta.env.DEV) return;

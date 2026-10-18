@@ -331,7 +331,7 @@ interface MessageBubbleProps {
   onSendQueuedNow?: (messageId: string) => void;
   /** Called when user removes a queued user message before it is sent */
   onUnqueueQueued?: (messageId: string) => void;
-  /** Called when a retryable system error should submit the failed user turn again. */
+  /** Called when a failed or interrupted turn should be retried/continued. */
   onRetry?: (errorMessageId: string) => void | Promise<void>;
   /** Scheduled auto-retry for this error — replaces the manual Retry button with a countdown. */
   autoRetry?: AutoRetryState | null;
@@ -404,6 +404,8 @@ export const MessageBubble = memo(function MessageBubble({
 
   if (message.role === "system") {
     const isError = message.isError;
+    const canRetry = !!onRetry && ((isError && message.retryable) || message.continuable);
+    const isContinuation = !!message.continuable;
     return (
       <div className={cn(
         "mx-auto max-w-3xl px-4 py-1 text-center text-xs",
@@ -412,21 +414,21 @@ export const MessageBubble = memo(function MessageBubble({
         <div className="inline-flex items-center gap-1.5">
           {isError ? <AlertCircle className="h-3 w-3" /> : <Info className="h-3 w-3" />}
           {message.content}
-          {isError && message.retryable && onRetry && (
+          {canRetry && (
             autoRetry?.errorMessageId === message.id ? (
               <AutoRetryCountdown
                 autoRetry={autoRetry}
-                onRetryNow={() => void onRetry(message.id)}
+                onRetryNow={() => void onRetry!(message.id)}
                 onCancel={onCancelAutoRetry}
               />
             ) : (
               <button
                 type="button"
                 className="ms-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] text-foreground/60 transition-colors hover:bg-foreground/[0.08] hover:text-foreground"
-                onClick={() => void onRetry(message.id)}
+                onClick={() => void onRetry!(message.id)}
               >
                 <RotateCcw className="h-3 w-3" />
-                Retry
+                {isContinuation ? "Continue" : "Retry"}
               </button>
             )
           )}
@@ -645,6 +647,7 @@ export const MessageBubble = memo(function MessageBubble({
   prev.message.images === next.message.images &&
   prev.message.isError === next.message.isError &&
   prev.message.retryable === next.message.retryable &&
+  prev.message.continuable === next.message.continuable &&
   prev.message.checkpointId === next.message.checkpointId &&
   prev.message.isQueued === next.message.isQueued &&
   prev.assistantTurnDividerLabel === next.assistantTurnDividerLabel &&
