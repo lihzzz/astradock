@@ -215,6 +215,15 @@ export type {
   CodexThreadGoalClearedNotification,
 } from "./codex";
 export type {
+  CodexCandyReasoningEffort,
+  CodexCandyTestRequest,
+  CodexCandyTestSample,
+  CodexCandyTestResult,
+  CodexCandyTestError,
+  CodexCandyTestResponse,
+} from "./codex-model-test";
+
+export type {
   CodexFingerprintProbeRequest,
   CodexFingerprintSamplePrompt,
   CodexFingerprintSample,

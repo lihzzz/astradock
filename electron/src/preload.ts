@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron";
 import type { CodexFingerprintProbeRequest } from "@shared/types/codex-fingerprint";
+import type { CodexCandyTestRequest } from "@shared/types/codex-model-test";
 import type { BackgroundEffectState } from "@shared/types/background-effect";
 import type { BatchJob, BatchPreparedRequest, BatchStartRequest, HistoryApi, HistoryIndexStatus, QuickCaptureApi, QuickCaptureTarget, QuickCaptureUpdate, SessionBatchApi, SessionResumeSource } from "@shared/types/productivity";
 import { applyBackgroundEffectClasses } from "@shared/lib/background-effect-classes";
@@ -400,6 +401,7 @@ contextBridge.exposeInMainWorld("claude", {
     listApps: (sessionId: string) => ipcRenderer.invoke("codex:list-apps", sessionId),
     listModels: () => ipcRenderer.invoke("codex:list-models"),
     fingerprintProbe: (options: CodexFingerprintProbeRequest) => ipcRenderer.invoke("codex:fingerprint-probe", options),
+    modelTest: (options: CodexCandyTestRequest) => ipcRenderer.invoke("codex:model-test", options),
     authStatus: () => ipcRenderer.invoke("codex:auth-status"),
     login: (sessionId: string, type: "apiKey" | "chatgpt", apiKey?: string) =>
       ipcRenderer.invoke("codex:login", { sessionId, type, apiKey }),

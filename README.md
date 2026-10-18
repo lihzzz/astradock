@@ -119,6 +119,19 @@ Codex 模型指纹探测支持新会话和当前会话两种目标；当前会�
 
 ### 开发与打包
 
+#### 打包版本规则
+
+**每次打包前必须升级 `package.json` 的 `version`，新版本必须高于上一次打包版本，禁止复用旧版本号。** 本地验证包和正式发布包都适用，覆盖 `pnpm dist`、`pnpm dist:fast`、`pnpm dist:mac`、`pnpm dist:win`、`pnpm dist:linux` 以及直接调用 `electron-builder` 的打包流程。
+
+默认递增 patch；新增功能或不兼容变更按语义化版本递增 minor / major。以 Windows 打包为例：
+
+```bash
+pnpm version patch --no-git-tag-version
+pnpm dist:win
+```
+
+版本以 `package.json` 为准，不能仅修改 Git tag 或产物文件名。正式发布时，Git tag 与发布版本也必须一致。
+
 #### 常用命令
 
 | 命令 | 用途 |
@@ -328,6 +341,19 @@ The Codex fingerprint probe can test fresh sessions or the current session. Curr
 <a id="en-dev"></a>
 
 ### Development and packaging
+
+#### Packaging version rule
+
+**Before every packaging run, increase `version` in `package.json` to a version higher than the previous packaged version. Never reuse a packaged version number.** This applies to local validation packages and official releases, including `pnpm dist`, `pnpm dist:fast`, `pnpm dist:mac`, `pnpm dist:win`, `pnpm dist:linux`, and direct `electron-builder` invocations.
+
+Use a patch increment by default; use minor / major increments for new features or breaking changes according to semantic versioning. For example, before packaging for Windows:
+
+```bash
+pnpm version patch --no-git-tag-version
+pnpm dist:win
+```
+
+`package.json` is the version source of truth; changing only a Git tag or artifact filename is insufficient. For official releases, the Git tag and release version must also match.
 
 #### Commands
 

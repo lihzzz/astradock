@@ -24,6 +24,15 @@ export type { ThreadItem as CodexThreadItem } from "./codex-protocol/v2/ThreadIt
 export type { ThreadStartParams as CodexThreadStartParams } from "./codex-protocol/v2/ThreadStartParams";
 export type { ThreadStartResponse as CodexThreadStartResponse } from "./codex-protocol/v2/ThreadStartResponse";
 export type {
+  CodexCandyReasoningEffort,
+  CodexCandyTestRequest,
+  CodexCandyTestSample,
+  CodexCandyTestResult,
+  CodexCandyTestError,
+  CodexCandyTestResponse,
+} from "./codex-model-test";
+
+export type {
   CodexFingerprintProbeRequest,
   CodexFingerprintSamplePrompt,
   CodexFingerprintSample,

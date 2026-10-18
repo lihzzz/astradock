@@ -1,6 +1,6 @@
 import { useI18n } from "@/lib/i18n";
 import { memo, useCallback, useMemo, useState } from "react";
-import { Brain, Terminal, Globe, GitBranch, FileText, FolderTree, ListTodo, Bot, Plug, Fingerprint, SquareArrowOutUpRight, ArrowDown, ArrowRight } from "lucide-react";
+import { Brain, Terminal, Globe, GitBranch, FileText, FolderTree, ListTodo, Bot, Plug, FlaskConical, SquareArrowOutUpRight, ArrowDown, ArrowRight } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
@@ -78,7 +78,7 @@ export const PANEL_TOOLS_MAP: Record<string, ToolDef> = {
   "project-files": { id: "project-files", label: "Project Files", icon: FolderTree },
   mcp: { id: "mcp", label: "MCP Servers", icon: Plug },
   memory: { id: "memory", label: "Long-term memory", icon: Brain },
-  fingerprint: { id: "fingerprint", label: "Fingerprint Probe", icon: Fingerprint },
+  fingerprint: { id: "fingerprint", label: "Model Tests", icon: FlaskConical },
 };
 
 const CONTEXTUAL_TOOLS: ToolDef[] = [

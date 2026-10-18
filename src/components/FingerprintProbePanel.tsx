@@ -16,6 +16,8 @@ interface FingerprintProbePanelProps {
   sessionId: string | null;
   cwd: string | undefined;
   headerControls?: React.ReactNode;
+  /** Render only the body when embedded in the unified Model Tests panel. */
+  embedded?: boolean;
 }
 
 const neutralStyle = "bg-foreground/[0.06] text-muted-foreground";
@@ -45,7 +47,7 @@ function formatPercent(value: number | null | undefined): string {
   return value == null ? "—" : `${(value * 100).toFixed(1)}%`;
 }
 
-export const FingerprintProbePanel = memo(function FingerprintProbePanel({ sessionId, cwd, headerControls }: FingerprintProbePanelProps) {
+export const FingerprintProbePanel = memo(function FingerprintProbePanel({ sessionId, cwd, headerControls, embedded = false }: FingerprintProbePanelProps) {
   const {
     selectedModel, setSelectedModel, selectedEffort, setSelectedEffort,
     probeTarget, running, result, latestAttempt, probeError,
@@ -111,12 +113,14 @@ export const FingerprintProbePanel = memo(function FingerprintProbePanel({ sessi
   const latestVerdict = latestAttempt?.verdict ?? result?.verdict;
 
   return (
-    <div className="flex h-full flex-col">
-      <PanelHeader icon={Fingerprint} label="Fingerprint Probe" iconClass="text-fuchsia-600/70 dark:text-fuchsia-200/50">
-        {headerControls}
-      </PanelHeader>
+    <div className={embedded ? "h-full" : "flex h-full flex-col"}>
+      {!embedded && (
+        <PanelHeader icon={Fingerprint} label="Fingerprint Probe" iconClass="text-fuchsia-600/70 dark:text-fuchsia-200/50">
+          {headerControls}
+        </PanelHeader>
+      )}
 
-      <ScrollArea className="flex-1 min-h-0">
+      <ScrollArea className={embedded ? "h-full min-h-0" : "flex-1 min-h-0"}>
         <div className="space-y-3 p-3">
           <div className="space-y-2 rounded-lg border border-border/50 bg-background/70 p-3">
             <div className="flex items-center justify-between gap-2">

@@ -611,6 +611,13 @@ Always search the web when needed for up-to-date API references, Electron APIs, 
 
 ## Release Conventions
 
+**Mandatory packaging version rule**:
+
+- Before every packaging run, increase `version` in `package.json` to a version higher than the previous packaged version. Never reuse a packaged version number.
+- This applies to local validation packages and official releases, including `pnpm dist`, `pnpm dist:fast`, `pnpm dist:mac`, `pnpm dist:win`, `pnpm dist:linux`, and direct `electron-builder` invocations.
+- Use a patch increment by default (`pnpm version patch --no-git-tag-version`); use minor / major increments for new features or breaking changes according to semantic versioning.
+- `package.json` is the version source of truth. Changing only a Git tag or artifact filename does not satisfy this rule. Official release tags and release versions must match the package version.
+
 **Title format**: `v{X.Y.Z} — Short descriptive phrase` (e.g., `v0.8.0 — Git Worktrees, ACP Utility Sessions & Streaming Polish`)
 
 **Release notes format**:
