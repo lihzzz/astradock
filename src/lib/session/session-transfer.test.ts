@@ -5,7 +5,6 @@ import {
   buildSessionTransferPrompt,
   buildTransferMarkdown,
   getHighestEffort,
-  TRANSFER_MARKDOWN_MAX_BYTES,
 } from "./session-transfer";
 
 const session: SessionMeta = {
@@ -21,39 +20,6 @@ const session: SessionMeta = {
 function msg(role: UIMessage["role"], content: string): UIMessage {
   return { id: Math.random().toString(36).slice(2), role, content, timestamp: 1 };
 }
-
-describe("buildTransferMarkdown", () => {
-  it("returns the full transcript when it fits", () => {
-    const { markdown, omittedCount } = buildTransferMarkdown(session, [
-      msg("user", "hello"),
-      msg("assistant", "hi"),
-    ]);
-    expect(markdown).toContain("# Refactor auth");
-    expect(markdown).toContain("## User\n\nhello");
-    expect(markdown).toContain("## Assistant\n\nhi");
-    expect(omittedCount).toBe(0);
-  });
-
-  it("keeps the first and most recent messages when truncating", () => {
-    const messages = [
-      msg("user", "ORIGINAL_REQUEST"),
-      ...Array.from({ length: 40 }, (_, i) => msg("assistant", `middle-${i} ${"x".repeat(400)}`)),
-      msg("assistant", "LATEST_ANSWER"),
-    ];
-    const { markdown, omittedCount } = buildTransferMarkdown(session, messages, 8 * 1024);
-    expect(omittedCount).toBeGreaterThan(0);
-    expect(markdown).toContain("ORIGINAL_REQUEST");
-    expect(markdown).toContain("LATEST_ANSWER");
-    expect(markdown).toContain("omitted");
-    expect(new TextEncoder().encode(markdown).byteLength).toBeLessThanOrEqual(8 * 1024);
-  });
-
-  it("never exceeds the default cap for huge transcripts", () => {
-    const messages = Array.from({ length: 200 }, (_, i) => msg("assistant", `m${i} ${"y".repeat(4000)}`));
-    const { markdown } = buildTransferMarkdown(session, messages);
-    expect(new TextEncoder().encode(markdown).byteLength).toBeLessThanOrEqual(TRANSFER_MARKDOWN_MAX_BYTES + 1024);
-  });
-});
 
 describe("getHighestEffort", () => {
   it("returns undefined for an empty list", () => {
@@ -75,18 +41,40 @@ describe("getHighestEffort", () => {
   });
 });
 
+describe("buildTransferMarkdown", () => {
+  it("exports all messages without the former inline prompt size cap", () => {
+    const messages = Array.from({ length: 200 }, (_, i) => msg("assistant", `message-${i} ${"x".repeat(4000)}`));
+    const markdown = buildTransferMarkdown(session, messages);
+    expect(new TextEncoder().encode(markdown).byteLength).toBeGreaterThan(240 * 1024);
+    for (const message of messages) expect(markdown).toContain(message.content);
+    expect(markdown).not.toContain("older message(s) omitted");
+  });
+
+  it("keeps actual prompts instead of display summaries and excludes queued messages", () => {
+    const markdown = buildTransferMarkdown(session, [
+      { ...msg("user", "Read C:/context/previous.md"), displayContent: "Transfer summary" },
+      msg("assistant", "Current progress"),
+      { ...msg("user", "Queued instruction"), isQueued: true },
+    ]);
+    expect(markdown).toContain("Read C:/context/previous.md");
+    expect(markdown).toContain("Current progress");
+    expect(markdown).not.toContain("Transfer summary");
+    expect(markdown).not.toContain("Queued instruction");
+  });
+});
+
 describe("buildSessionTransferPrompt", () => {
-  it("embeds takeover instructions and the transcript", () => {
-    const { prompt, messageCount, omittedCount } = buildSessionTransferPrompt({
-      session,
-      messages: [msg("user", "do X"), msg("assistant", "done X")],
-      projectPath: "E:/repo",
-    });
-    expect(prompt).toContain("taking over an ongoing work session");
-    expect(prompt).toContain("claude");
-    expect(prompt).toContain("E:/repo");
-    expect(prompt).toContain("## User\n\ndo X");
-    expect(messageCount).toBe(2);
-    expect(omittedCount).toBe(0);
+  const filePath = "C:/上下文目录/session context.md";
+  it.each([undefined, "", "   \n\t  "])("uses the exact default template for empty objectives (%j)", (objective) => {
+    expect(buildSessionTransferPrompt({ filePath, objective })).toBe(
+      `上一轮会话的完整上下文已导出到 ${filePath}。请先阅读该文件，了解之前的讨论内容、进展和当前状态，然后从中断处继续完成未完成的任务`,
+    );
+  });
+
+  it("uses the exact objective template and preserves internal newlines", () => {
+    const objective = "只实现第 2 步\n不要重复已完成的任务";
+    expect(buildSessionTransferPrompt({ filePath, objective: `  \n${objective}\n  ` })).toBe(
+      `上一轮会话的完整上下文已导出到 ${filePath}。请先阅读该文件，了解之前的讨论内容、进展和当前状态，沿用已有决策和进度，不重复已完成的工作，然后以这些上下文为基础完成以下工作：\n\n${objective}`,
+    );
   });
 });

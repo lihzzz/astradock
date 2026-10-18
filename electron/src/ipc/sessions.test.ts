@@ -246,3 +246,35 @@ describe("incremental JSONL append", () => {
     expect(loaded.messages.find((m) => m.id === "t1")).toMatchObject({ toolResult: { content: "v4" } });
   });
 });
+
+
+describe("session transfer context export", () => {
+  it("writes complete UTF-8 context to distinct persistent files", async () => {
+    const markdown = "# 完整上下文\n\n" + "会话内容".repeat(100000);
+    const first = await invoke("sessions:save-transfer-context", markdown);
+    const second = await invoke("sessions:save-transfer-context", "second snapshot");
+    function exportedPath(result: unknown): string {
+      if (typeof result !== "object" || result === null || !("filePath" in result) || typeof result.filePath !== "string") {
+        throw new Error("Export failed");
+      }
+      return result.filePath;
+    }
+    const firstPath = exportedPath(first);
+    const secondPath = exportedPath(second);
+    expect(firstPath).not.toBe(secondPath);
+    expect(path.isAbsolute(firstPath)).toBe(true);
+    expect(path.dirname(firstPath)).toBe(path.join(state.userData, "openacpui-data", "session-transfers"));
+    expect(await fs.promises.readFile(firstPath, "utf8")).toBe(markdown);
+    expect(await fs.promises.readFile(secondPath, "utf8")).toBe("second snapshot");
+  });
+
+  it.each([null, {}, "", "   "])("rejects invalid export content (%j)", async (value) => {
+    expect(await invoke("sessions:save-transfer-context", value)).toHaveProperty("error");
+  });
+
+  it("reports write failures instead of returning a nonexistent path", async () => {
+    await fs.promises.mkdir(path.join(state.userData, "openacpui-data"), { recursive: true });
+    await fs.promises.writeFile(path.join(state.userData, "openacpui-data", "session-transfers"), "not a directory");
+    expect(await invoke("sessions:save-transfer-context", "context")).toHaveProperty("error");
+  });
+});

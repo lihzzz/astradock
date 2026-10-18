@@ -257,6 +257,8 @@ contextBridge.exposeInMainWorld("claude", {
     search: (projectIds: string[], query: string) => ipcRenderer.invoke("sessions:search", { projectIds, query }),
     updateMeta: (projectId: string, sessionId: string, patch: { pinned?: boolean; folderId?: string | null; branch?: string; archived?: boolean }) =>
       ipcRenderer.invoke("sessions:update-meta", { projectId, sessionId, patch }),
+    saveTransferContext: (markdown: string) =>
+      ipcRenderer.invoke("sessions:save-transfer-context", markdown),
     exportMarkdown: (projectId: string, sessionId: string) =>
       ipcRenderer.invoke("sessions:export-markdown", { projectId, sessionId }),
   },

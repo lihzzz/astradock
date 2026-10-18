@@ -1,5 +1,6 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { ArrowRightLeft, ChevronDown, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -41,7 +42,7 @@ export interface TransferSessionMenuProps {
   currentModelId?: string;
   disabled?: boolean;
   busy?: boolean;
-  onTransfer: (target: SessionTransferTarget) => void;
+  onTransfer: (target: SessionTransferTarget, objective?: string) => void;
 }
 
 /**
@@ -60,6 +61,12 @@ export const TransferSessionMenu = memo(function TransferSessionMenu({
   onTransfer,
 }: TransferSessionMenuProps) {
   const { t } = useI18n();
+  const [pendingTarget, setPendingTarget] = useState<SessionTransferTarget | null>(null);
+  const [objective, setObjective] = useState("");
+  const selectTarget = (target: SessionTransferTarget) => {
+    setObjective("");
+    setPendingTarget(target);
+  };
   const acpAgents = agents.filter((agent) => agent.engine === "acp");
 
   const isCurrent = (engine: EngineId, model?: string, agentId?: string) => {
@@ -90,7 +97,7 @@ export const TransferSessionMenu = memo(function TransferSessionMenu({
       return (
         <DropdownMenuItem
           onClick={() =>
-            onTransfer({ engine, label: engineLabel })
+            selectTarget({ engine, label: engineLabel })
           }
         >
           {t("transferDefaultModel")}
@@ -106,7 +113,7 @@ export const TransferSessionMenu = memo(function TransferSessionMenu({
             key={m.id}
             disabled={active}
             onClick={() =>
-              onTransfer({ engine, model: m.id, label: `${engineLabel} · ${m.label}` })
+              selectTarget({ engine, model: m.id, label: `${engineLabel} · ${m.label}` })
             }
           >
             <div className="min-w-0">
@@ -138,7 +145,7 @@ export const TransferSessionMenu = memo(function TransferSessionMenu({
           <DropdownMenuSubContent className="w-44">
             <DropdownMenuItem
               onClick={() =>
-                onTransfer({
+                selectTarget({
                   engine,
                   model: m.id,
                   effort: maxEffort,
@@ -153,7 +160,7 @@ export const TransferSessionMenu = memo(function TransferSessionMenu({
               <DropdownMenuItem
                 key={effort}
                 onClick={() =>
-                  onTransfer({
+                  selectTarget({
                     engine,
                     model: m.id,
                     effort,
@@ -171,100 +178,142 @@ export const TransferSessionMenu = memo(function TransferSessionMenu({
   };
 
   return (
-    <DropdownMenu>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="xs"
-              className={TOOLBAR_BTN}
-              disabled={disabled || busy}
-              aria-label={t("transferSession")}
-            >
-              {busy ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <ArrowRightLeft className="size-3" />
+    <>
+      <DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="xs"
+                className={TOOLBAR_BTN}
+                disabled={disabled || busy}
+                aria-label={t("transferSession")}
+              >
+                {busy ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <ArrowRightLeft className="size-3" />
+                )}
+                {t("transferSession")}
+                <ChevronDown className="size-3" />
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <p className="max-w-64 text-xs">{t("transferDescription")}</p>
+          </TooltipContent>
+        </Tooltip>
+        <DropdownMenuContent
+          align="start"
+          className="w-64"
+          onCloseAutoFocus={(event) => { if (pendingTarget) event.preventDefault(); }}
+        >
+          <DropdownMenuLabel className="text-[10px] font-normal text-muted-foreground">
+            {t("transferDescription")}
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+
+          {/* Claude models */}
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <AgentIcon icon={ENGINE_ICONS.claude} size={14} className="shrink-0" />
+              Claude
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-56">
+              {renderModelItems(
+                "claude",
+                claudeModels.map((m) => ({
+                  id: m.value,
+                  label: m.displayName,
+                  description: m.description,
+                  efforts: m.supportsEffort ? (m.supportedEffortLevels ?? []) : [],
+                })),
+                "Claude",
               )}
-              {t("transferSession")}
-              <ChevronDown className="size-3" />
-            </Button>
-          </DropdownMenuTrigger>
-        </TooltipTrigger>
-        <TooltipContent side="top">
-          <p className="max-w-64 text-xs">{t("transferDescription")}</p>
-        </TooltipContent>
-      </Tooltip>
-      <DropdownMenuContent align="start" className="w-64">
-        <DropdownMenuLabel className="text-[10px] font-normal text-muted-foreground">
-          {t("transferDescription")}
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
 
-        {/* Claude models */}
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <AgentIcon icon={ENGINE_ICONS.claude} size={14} className="shrink-0" />
-            Claude
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-56">
-            {renderModelItems(
-              "claude",
-              claudeModels.map((m) => ({
-                id: m.value,
-                label: m.displayName,
-                description: m.description,
-                efforts: m.supportsEffort ? (m.supportedEffortLevels ?? []) : [],
-              })),
-              "Claude",
-            )}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
+          {/* Codex models */}
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <AgentIcon icon={ENGINE_ICONS.codex} size={14} className="shrink-0" />
+              Codex
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-56">
+              {renderModelItems(
+                "codex",
+                codexModels.map((m) => ({
+                  id: m.id,
+                  label: m.id + (m.isDefault ? ` (${t("transferDefaultModel")})` : ""),
+                  efforts: (m.supportedReasoningEfforts ?? []).map((e) => e.reasoningEffort),
+                })),
+                "Codex",
+              )}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
 
-        {/* Codex models */}
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <AgentIcon icon={ENGINE_ICONS.codex} size={14} className="shrink-0" />
-            Codex
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-56">
-            {renderModelItems(
-              "codex",
-              codexModels.map((m) => ({
-                id: m.id,
-                label: m.id + (m.isDefault ? ` (${t("transferDefaultModel")})` : ""),
-                efforts: (m.supportedReasoningEfforts ?? []).map((e) => e.reasoningEffort),
-              })),
-              "Codex",
-            )}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-
-        {/* ACP agents (model comes from the agent's own config) */}
-        {acpAgents.length > 0 && <DropdownMenuSeparator />}
-        {acpAgents.map((agent) => {
-          const active = isCurrent("acp", undefined, agent.id);
-          return (
-            <DropdownMenuItem
-              key={agent.id}
-              disabled={active}
-              onClick={() =>
-                onTransfer({
-                  engine: "acp",
-                  agentId: agent.id,
-                  cachedConfigOptions: agent.cachedConfigOptions,
-                  label: agent.name,
-                })
-              }
+          {/* ACP agents (model comes from the agent's own config) */}
+          {acpAgents.length > 0 && <DropdownMenuSeparator />}
+          {acpAgents.map((agent) => {
+            const active = isCurrent("acp", undefined, agent.id);
+            return (
+              <DropdownMenuItem
+                key={agent.id}
+                disabled={active}
+                onClick={() =>
+                  selectTarget({
+                    engine: "acp",
+                    agentId: agent.id,
+                    cachedConfigOptions: agent.cachedConfigOptions,
+                    label: agent.name,
+                  })
+                }
+              >
+                <AgentIcon icon={getAgentIcon(agent)} size={14} className="shrink-0" />
+                <span className="truncate">{agent.name}</span>
+                {currentSuffix(active)}
+              </DropdownMenuItem>
+            );
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Dialog open={pendingTarget !== null} onOpenChange={(open) => { if (!open) setPendingTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="size-4 shrink-0" />
+              {t("transferContinueTitle")}
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground wrap-break-word">{pendingTarget?.label}</p>
+            <DialogDescription>{t("transferObjectiveDescription")}</DialogDescription>
+          </DialogHeader>
+          <label className="space-y-1.5 text-sm">
+            <span className="font-medium">{t("transferObjectiveLabel")}</span>
+            <textarea
+              value={objective}
+              onChange={(event) => setObjective(event.target.value)}
+              rows={4}
+              className="flex w-full resize-y rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              placeholder={t("transferObjectivePlaceholder")}
+            />
+          </label>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingTarget(null)}>{t("cancel")}</Button>
+            <Button
+              disabled={disabled || busy || !pendingTarget}
+              onClick={() => {
+                if (!pendingTarget || disabled || busy) return;
+                const target = pendingTarget;
+                setPendingTarget(null);
+                onTransfer(target, objective.trim() || undefined);
+              }}
             >
-              <AgentIcon icon={getAgentIcon(agent)} size={14} className="shrink-0" />
-              <span className="truncate">{agent.name}</span>
-              {currentSuffix(active)}
-            </DropdownMenuItem>
-          );
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
+              {t("transferStartSession")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 });

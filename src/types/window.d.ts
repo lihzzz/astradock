@@ -187,6 +187,7 @@ declare global {
           branch?: string;
           archived?: boolean;
         }) => Promise<IpcResult>;
+        saveTransferContext: (markdown: string) => Promise<{ filePath: string } | { error: string }>;
         exportMarkdown: (projectId: string, sessionId: string) => Promise<{
           ok?: boolean;
           filePath?: string;

@@ -132,7 +132,7 @@ export interface InputBarProps {
   /** Open ACP Agents settings */
   onManageACPs?: () => void;
   /** Hand the current session (exported as Markdown) to another engine/model. */
-  onTransferSession?: (target: SessionTransferTarget) => void;
+  onTransferSession?: (target: SessionTransferTarget, objective?: string) => void;
   /** Transfer in progress -- shows a spinner on the transfer button. */
   transferBusy?: boolean;
   /** Disable transfer (e.g. the session has no messages yet). */

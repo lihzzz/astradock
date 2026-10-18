@@ -1,5 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
+import { getDataDir } from "../lib/data-dir";
 import fs from "node:fs/promises";
 import { reportError } from "../lib/error-utils";
 import { getSessionRepository, deleteConversation } from "../lib/session-service";
@@ -76,6 +78,21 @@ export function register(): void {
       }
       return result;
     } catch (error) { reportError("SESSIONS:SEARCH_ERR", error); return result; }
+  });
+
+  // Preserve each handoff as an immutable file: subsequent transfers must not
+  // overwrite context that an existing session may still need to read.
+  ipcMain.handle("sessions:save-transfer-context", async (_event, markdown: unknown) => {
+    try {
+      if (typeof markdown !== "string" || !markdown.trim()) {
+        throw new ProductivityError("INVALID_ARGUMENT");
+      }
+      const directory = path.join(getDataDir(), "session-transfers");
+      await fs.mkdir(directory, { recursive: true });
+      const filePath = path.join(directory, `${randomUUID()}.md`);
+      await fs.writeFile(filePath, markdown, { encoding: "utf8", flag: "wx" });
+      return { filePath };
+    } catch (error) { return persistenceError("SESSIONS:TRANSFER_EXPORT_ERR", error); }
   });
 
   ipcMain.handle("sessions:export-markdown", async (event, { projectId, sessionId }: { projectId: string; sessionId: string }) => {

@@ -58,100 +58,25 @@ export function getHighestEffort(efforts: readonly string[]): string | undefined
   return best;
 }
 
-/** Upper bound for the transcript embedded in a transfer prompt (~240 KB). */
-export const TRANSFER_MARKDOWN_MAX_BYTES = 240 * 1024;
-
-function byteLength(text: string): number {
-  return new TextEncoder().encode(text).byteLength;
+/** Export all live messages without the size cap used by inline handoffs. */
+export function buildTransferMarkdown(session: SessionMeta, messages: UIMessage[]): string {
+  // Keep actual user prompts, including earlier handoff file paths, rather than
+  // the abbreviated display text shown in the chat UI.
+  const prepared = markdownMessages(messages).map((message) => ({
+    ...message,
+    displayContent: undefined,
+  }));
+  return buildSessionMarkdown(session, prepared);
 }
 
-export interface TransferMarkdownResult {
-  markdown: string;
-  /** Number of middle messages dropped to satisfy the size cap (0 = full transcript). */
-  omittedCount: number;
-}
-
-/**
- * Render the session as Markdown. When the transcript exceeds `maxBytes`, keep
- * the first message (usually the original request) plus as many trailing
- * messages as fit, and record how many middle messages were omitted.
- */
-export function buildTransferMarkdown(
-  session: SessionMeta,
-  messages: UIMessage[],
-  maxBytes: number = TRANSFER_MARKDOWN_MAX_BYTES,
-): TransferMarkdownResult {
-  const prepared = markdownMessages(messages);
-  const full = buildSessionMarkdown(session, prepared);
-  if (byteLength(full) <= maxBytes) return { markdown: full, omittedCount: 0 };
-
-  const omissionNote = (count: number) =>
-    `> [${count} older message(s) omitted to keep this handoff within size limits. ` +
-    `The first request and the most recent turns are preserved.]`;
-
-  // Binary search the largest trailing window that still fits alongside the first message.
-  const first = prepared.slice(0, 1);
-  const rest = prepared.slice(1);
-  let lo = 0;
-  let hi = rest.length;
-  let best = "";
-  let bestK = -1;
-  while (lo <= hi) {
-    const k = Math.floor((lo + hi) / 2);
-    const kept = [...first, ...rest.slice(rest.length - k)];
-    const omitted = prepared.length - kept.length;
-    const candidate = `${buildSessionMarkdown(session, kept)}\n${omissionNote(omitted)}\n`;
-    if (byteLength(candidate) <= maxBytes) {
-      best = candidate;
-      bestK = k;
-      lo = k + 1;
-    } else {
-      hi = k - 1;
-    }
-  }
-  if (bestK < 0) {
-    // Even a single message is too large -- hard-truncate the full document.
-    const encoder = new TextEncoder();
-    const truncated = new TextDecoder().decode(encoder.encode(full).slice(0, maxBytes));
-    return { markdown: `${truncated}\n\n${omissionNote(prepared.length - 1)}\n`, omittedCount: prepared.length - 1 };
-  }
-  return { markdown: best, omittedCount: rest.length - bestK };
-}
-
-export interface SessionTransferPromptResult {
-  prompt: string;
-  omittedCount: number;
-  messageCount: number;
-}
-
-/**
- * Build the initial prompt for the target session: takeover instructions plus
- * the source session transcript as Markdown.
- */
+/** Build the first message only after the context file has been written. */
 export function buildSessionTransferPrompt(input: {
-  session: SessionMeta;
-  messages: UIMessage[];
-  projectPath?: string;
-  maxBytes?: number;
-}): SessionTransferPromptResult {
-  const { session, messages, projectPath, maxBytes } = input;
-  const { markdown, omittedCount } = buildTransferMarkdown(session, messages, maxBytes);
-  const sourceEngine = session.engine ?? "claude";
-  const lines = [
-    `You are taking over an ongoing work session previously handled by the ${sourceEngine} agent. The full conversation transcript is provided below as Markdown.`,
-    "",
-    "Continue the work exactly from where the transcript ends:",
-    "- Treat the transcript as the source of truth for decisions, progress, and pending tasks.",
-    "- Do not restart or redo completed steps; verify the current workspace state before editing files.",
-    "- Resume with the most recent unanswered request or unfinished task.",
-  ];
-  if (projectPath) lines.push(`- Work inside the current project directory: ${projectPath}`);
-  if (omittedCount > 0) {
-    lines.push(`- Note: ${omittedCount} older message(s) were omitted for size; the opening request and recent turns are complete.`);
-  }
-  return {
-    prompt: `${lines.join("\n")}\n\n---\n\n${markdown}`,
-    omittedCount,
-    messageCount: messages.length,
-  };
+  filePath: string;
+  objective?: string;
+}): string {
+  const objective = input.objective?.trim();
+  const prefix = `上一轮会话的完整上下文已导出到 ${input.filePath}。请先阅读该文件，了解之前的讨论内容、进展和当前状态`;
+  return objective
+    ? `${prefix}，沿用已有决策和进度，不重复已完成的工作，然后以这些上下文为基础完成以下工作：\n\n${objective}`
+    : `${prefix}，然后从中断处继续完成未完成的任务`;
 }

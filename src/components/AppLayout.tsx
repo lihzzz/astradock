@@ -100,6 +100,7 @@ import {
 } from "@/lib/chat/input-history";
 import {
   buildSessionTransferPrompt,
+  buildTransferMarkdown,
   type SessionTransferTarget,
 } from "@/lib/session/session-transfer";
 import { useI18n } from "@/lib/i18n";
@@ -216,7 +217,7 @@ export function AppLayout() {
   // ── Session transfer: export the live conversation as Markdown and hand it
   // to a fresh session running the selected engine/model. ──
   const [isTransferring, setIsTransferring] = useState(false);
-  const handleTransferSession = useCallback(async (target: SessionTransferTarget) => {
+  const handleTransferSession = useCallback(async (target: SessionTransferTarget, objective?: string) => {
     const session = manager.activeSession;
     const projectId = session?.projectId ?? activeProjectId;
     const sourceMessages = manager.messages.filter((message) => !message.isQueued);
@@ -230,11 +231,14 @@ export function AppLayout() {
     }
     setIsTransferring(true);
     try {
-      const { prompt, messageCount } = buildSessionTransferPrompt({
-        session: { ...session, lastMessageAt: session.lastMessageAt ?? session.createdAt },
-        messages: sourceMessages,
-        projectPath: activeProjectPath,
-      });
+      const markdown = buildTransferMarkdown(
+        { ...session, lastMessageAt: session.lastMessageAt ?? session.createdAt },
+        sourceMessages,
+      );
+      const exported = await window.claude.sessions.saveTransferContext(markdown);
+      if ("error" in exported) throw new Error(exported.error);
+      const prompt = buildSessionTransferPrompt({ filePath: exported.filePath, objective });
+      const messageCount = sourceMessages.length;
       const targetAgent = target.agentId
         ? agents.find((agent) => agent.id === target.agentId) ?? null
         : agents.find((agent) => agent.engine === target.engine) ?? null;
@@ -256,10 +260,11 @@ export function AppLayout() {
       if (target.engine === "codex" && target.effort) {
         manager.setCodexEffort(target.effort);
       }
-      const displayText = t("transferDisplayText")
+      const transferSummary = t("transferDisplayText")
         .replace("{{title}}", session.title)
         .replace("{{count}}", String(messageCount))
         .replace("{{target}}", target.label);
+      const displayText = objective?.trim() ? `${transferSummary}\n\n${objective.trim()}` : transferSummary;
       const result = await manager.send(prompt, undefined, displayText);
       if (!result?.sessionId) {
         throw new Error(result?.error ?? "Target session did not start.");
@@ -272,7 +277,7 @@ export function AppLayout() {
     } finally {
       setIsTransferring(false);
     }
-  }, [activeProjectId, activeProjectPath, agents, manager, settings, t]);
+  }, [activeProjectId, agents, manager, settings, t]);
 
 
   // Wrap handleSend to clear grabbed elements after sending
