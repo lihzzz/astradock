@@ -107,7 +107,8 @@ export async function codexUtilityPrompt(
       if (msg.method === "item/started" || msg.method === "item/completed") {
         const params = msg.params as { item?: { type?: string } };
         const itemType = params.item?.type;
-        if (itemType && !["agentMessage", "reasoning", "plan"].includes(itemType)) {
+        // Codex emits userMessage items for the submitted prompt; they are not tool calls.
+        if (itemType && !["userMessage", "agentMessage", "reasoning", "plan"].includes(itemType)) {
           fail(new Error(`Codex prediction refused tool item: ${itemType}`));
           rpc?.destroy();
           return;
