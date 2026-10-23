@@ -6,6 +6,7 @@ import { equalWidthFractions } from "@/lib/layout/constants";
 import { getHorizontalInsertSide, getToolColumnDropIntent } from "@/lib/workspace/drag";
 import { PanelDockControls } from "@/components/PanelDockControls";
 import { PanelDockPreview } from "@/components/PanelDockPreview";
+import { CollapsibleToolPanel } from "@/components/workspace/CollapsibleToolPanel";
 import { SplitHandle } from "@/components/split/SplitHandle";
 import type { PanelToolId } from "@/types/tools";
 import type { PaneResizeController, ToolDragState, ToolIsland } from "@/types";
@@ -303,7 +304,7 @@ export function MainTopToolArea({
                         {stackEntry.kind === "preview" ? (
                           <div
                             className="flex min-h-0"
-                            style={{ flex: `${stackFraction} 1 0%`, minHeight: 0 }}
+                            style={{ flex: `${stackFraction * 100} 1 0%`, minHeight: 0 }}
                             onDragOver={(event) => {
                               event.preventDefault();
                               event.stopPropagation();
@@ -336,9 +337,9 @@ export function MainTopToolArea({
                             <PanelDockPreview orientation="vertical" label={mainToolLabel ?? undefined} className="min-h-0 flex-1" />
                           </div>
                         ) : (
-                          <div
-                            className="island flex min-h-0 flex-col overflow-hidden rounded-[var(--island-radius)] bg-background"
-                            style={{ flex: `${stackFraction} 1 0%`, minHeight: 0 }}
+                          <CollapsibleToolPanel
+                            toolId={stackEntry.island.toolId}
+                            fraction={stackFraction}
                             onDragOver={(event) => {
                               if (!mainToolDrag || mainToolDrag.islandId === stackEntry.island.id) return;
                               event.preventDefault();
@@ -369,8 +370,7 @@ export function MainTopToolArea({
                               event.stopPropagation();
                               onCommitDrop();
                             }}
-                          >
-                            {renderToolContent(stackEntry.island.toolId, (
+                            headerControls={(
                               <PanelDockControls
                                 isBottom={false}
                                 moveLabel="Move to bottom"
@@ -389,8 +389,9 @@ export function MainTopToolArea({
                                 }}
                                 onDragEnd={onResetDrag}
                               />
-                            ))}
-                          </div>
+                            )}
+                            renderContent={(controls) => renderToolContent(stackEntry.island.toolId, controls)}
+                          />
                         )}
                       </React.Fragment>
                     );

@@ -14,6 +14,8 @@ import { TOKEN_USAGE_EN, TOKEN_USAGE_ZH } from "@/components/settings/usage-stri
  * used as the fallback so newly added copy stays readable before it is translated.
  */
 const ZH_CN: Record<string, string> = {
+  "Expand tool": "展开工具",
+  "Collapse tool": "收起工具",
   ...MEMORY_PANEL_ZH,
   ...APPS_ZH,
   ...TASKS_ZH,

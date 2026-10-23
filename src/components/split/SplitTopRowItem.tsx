@@ -17,9 +17,10 @@ import { getHorizontalInsertSide, getToolColumnDropIntent } from "@/lib/workspac
 import { PanelDockControls } from "@/components/PanelDockControls";
 import { PanelDockPreview } from "@/components/PanelDockPreview";
 import { ToolIslandContent } from "@/components/workspace/ToolIslandContent";
+import { CollapsibleToolPanel } from "@/components/workspace/CollapsibleToolPanel";
 import { SplitChatPane } from "@/components/split/SplitChatPane";
 import { SplitPaneHost } from "@/components/split/SplitPaneHost";
-import type { PanelToolId, ToolId } from "@/types/tools";
+import type { ToolId } from "@/types/tools";
 import type { ChatSession, InstalledAgent, Project, TodoItem, BackgroundAgent } from "@/types";
 import type { SessionPaneState } from "@/hooks/session/useSessionPane";
 import type { CodexModelSummary, SessionPaneBootstrap } from "@/hooks/session/types";
@@ -216,9 +217,10 @@ function renderToolIsland(
   );
 
   return (
-    <div
-      className="island flex min-h-0 flex-col overflow-hidden rounded-[var(--island-radius)] bg-background"
-      style={{ flex: `${fraction} 1 0%`, minHeight: 0 }}
+    <CollapsibleToolPanel
+      toolId={island.toolId}
+      fraction={fraction}
+      headerControls={controls}
       onDragOver={(event) => {
         if (!splitToolDrag || splitToolDrag.islandId === island.id) return;
         event.preventDefault();
@@ -240,22 +242,23 @@ function renderToolIsland(
         event.stopPropagation();
         commitSplitToolDrop();
       }}
-    >
-      <ToolIslandContent
-        toolId={island.toolId as PanelToolId}
-        persistKey={island.persistKey}
-        headerControls={controls}
-        projectPath={paneProjectPath}
-        projectRoot={paneProjectRoot}
-        projectId={paneProject?.id ?? null}
-        sessionId={island.sourceSessionId}
-        messages={paneState.messages}
-        activeEngine={session?.engine}
-        isActiveSessionPane={isActiveSessionPane}
-        hasLiveSession={paneState.isConnected}
-        {...toolIslandCtx}
-      />
-    </div>
+      renderContent={(headerControls) => (
+        <ToolIslandContent
+          toolId={island.toolId}
+          persistKey={island.persistKey}
+          headerControls={headerControls}
+          projectPath={paneProjectPath}
+          projectRoot={paneProjectRoot}
+          projectId={paneProject?.id ?? null}
+          sessionId={island.sourceSessionId}
+          messages={paneState.messages}
+          activeEngine={session?.engine}
+          isActiveSessionPane={isActiveSessionPane}
+          hasLiveSession={paneState.isConnected}
+          {...toolIslandCtx}
+        />
+      )}
+    />
   );
 }
 
@@ -364,7 +367,7 @@ function renderToolColumn(
             {entry.kind === "preview" ? (
               <div
                 className="flex min-h-0"
-                style={{ flex: `${fraction} 1 0%`, minHeight: 0 }}
+                style={{ flex: `${fraction * 100} 1 0%`, minHeight: 0 }}
                 onDragOver={(event) => {
                   event.preventDefault();
                   event.stopPropagation();

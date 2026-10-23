@@ -24,32 +24,30 @@ export function useToolColumnResize({
     const container = columnRefs.current[columnId];
     if (!container) return;
 
+    const panels = Array.from(container.children).filter((child): child is HTMLElement =>
+      child instanceof HTMLElement && child.hasAttribute("data-tool-panel"),
+    );
+    const topPanel = panels[handleIndex];
+    const bottomPanel = panels[handleIndex + 1];
+    if (!topPanel || !bottomPanel ||
+      topPanel.dataset.toolPanelCollapsed === "true" || bottomPanel.dataset.toolPanelCollapsed === "true") return;
+
     setActiveResizeId(`${columnId}:${handleIndex}`);
     const startY = event.clientY;
     const startFractions = [...splitRatios];
-    const containerHeight = Math.max(container.getBoundingClientRect().height, 1);
-    const minPanelFraction = Math.min(0.92, MIN_STACKED_TOOL_PANEL_HEIGHT / containerHeight);
+    const pairHeight = Math.max(topPanel.getBoundingClientRect().height + bottomPanel.getBoundingClientRect().height, 1);
+    const pairFraction = startFractions[handleIndex]! + startFractions[handleIndex + 1]!;
+    const minPanelFraction = Math.min(pairFraction / 2, MIN_STACKED_TOOL_PANEL_HEIGHT / pairHeight * pairFraction);
 
     const handleMove = (moveEvent: MouseEvent) => {
-      const deltaFraction = (moveEvent.clientY - startY) / containerHeight;
+      const deltaFraction = (moveEvent.clientY - startY) / pairHeight * pairFraction;
       const nextFractions = [...startFractions];
 
-      let topNew = nextFractions[handleIndex]! + deltaFraction;
-      let bottomNew = nextFractions[handleIndex + 1]! - deltaFraction;
-
-      if (topNew < minPanelFraction) {
-        const overflow = minPanelFraction - topNew;
-        topNew = minPanelFraction;
-        bottomNew -= overflow;
-      }
-      if (bottomNew < minPanelFraction) {
-        const overflow = minPanelFraction - bottomNew;
-        bottomNew = minPanelFraction;
-        topNew -= overflow;
-      }
-
-      topNew = Math.max(minPanelFraction, topNew);
-      bottomNew = Math.max(minPanelFraction, bottomNew);
+      const topNew = Math.max(minPanelFraction, Math.min(
+        pairFraction - minPanelFraction,
+        startFractions[handleIndex]! + deltaFraction,
+      ));
+      const bottomNew = pairFraction - topNew;
 
       nextFractions[handleIndex] = topNew;
       nextFractions[handleIndex + 1] = bottomNew;

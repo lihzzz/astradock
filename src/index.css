@@ -476,6 +476,17 @@ html:not(.dark) .glass-outline {
   inset: -2px 0;
 }
 
+/* Collapsed tools keep their title bar height instead of participating in resizing. */
+[data-tool-panel-collapsed="true"] + .resize-row,
+.resize-row:has(+ [data-tool-panel-collapsed="true"]) {
+  cursor: default;
+}
+
+[data-tool-panel-collapsed="true"] + .resize-row > div,
+.resize-row:has(+ [data-tool-panel-collapsed="true"]) > div {
+  visibility: hidden;
+}
+
 /* ── No-shine: remove the diagonal reflection gradient, keep plain border ── */
 .no-island-shine .island {
   border-color: oklch(0 0 0 / 0.06);
