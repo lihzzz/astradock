@@ -1,3 +1,4 @@
+import { SPACES_EN, SPACES_ZH } from "@/components/spaces/strings";
 import { MEMORY_PANEL_ZH } from "@/components/memory/strings";
 import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from "react";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -20,6 +21,7 @@ const ZH_CN: Record<string, string> = {
   ...APPS_ZH,
   ...TASKS_ZH,
   ...TOKEN_USAGE_ZH,
+  ...SPACES_ZH,
   sessionRecoveryCancelled: "会话已切换或停用，已取消恢复。未发送内容保留在原会话队列中。",
   sessionRecoveryNoAgent: "此会话缺少 Agent 配置，请选择有效的 Agent 后重试。",
   sessionRecoveryNoThread: "未找到可恢复的 Codex 线程。",
@@ -530,6 +532,7 @@ const EN_US: Record<TranslationKey, string> = {
   ...APPS_EN,
   ...TASKS_EN,
   ...TOKEN_USAGE_EN,
+  ...SPACES_EN,
   sessionRecoveryCancelled: "The conversation changed or became unavailable. Restoration was cancelled; unsent input remains in its queue.",
   sessionRecoveryNoAgent: "This conversation has no agent configuration. Select an available agent and retry.",
   sessionRecoveryNoThread: "No resumable Codex thread was found.",

@@ -17,6 +17,8 @@ import {
   PopoverAnchor,
 } from "@/components/ui/popover";
 import { resolveLucideIcon } from "@/lib/icon-utils";
+import { Dialog, DialogTrigger } from "@/components/ui/dialog";
+import { CreateSpaceDialog, type SpaceDetails } from "./spaces/CreateSpaceDialog";
 import { SpaceCustomizer } from "./SpaceCustomizer";
 import type { Space } from "@/types";
 import { useI18n } from "@/lib/i18n";
@@ -25,13 +27,11 @@ interface SpaceBarProps {
   spaces: Space[];
   activeSpaceId: string;
   onSelectSpace: (id: string) => void;
-  onStartCreateSpace: () => void;
+  onCreateSpace: (details: SpaceDetails) => Promise<void>;
   onUpdateSpace: (id: string, updates: Partial<Pick<Space, "name" | "icon" | "iconType" | "color">>) => void;
   onDeleteSpace: (id: string) => void;
   onDropProject?: (projectId: string, spaceId: string) => void;
   onOpenSettings?: () => void;
-  /** When non-null, a draft space is active — disable the + button */
-  draftSpace?: Space | null;
 }
 
 export function SpaceIcon({ space, size = 18 }: { space: Space; size?: number }) {
@@ -60,15 +60,14 @@ export const SpaceBar = memo(function SpaceBar({
   spaces,
   activeSpaceId,
   onSelectSpace,
-  onStartCreateSpace,
+  onCreateSpace,
   onUpdateSpace,
   onDeleteSpace,
   onDropProject,
   onOpenSettings,
-  draftSpace,
 }: SpaceBarProps) {
   const { t } = useI18n();
-  const isCreatingSpace = draftSpace != null;
+  const [creating, setCreating] = useState(false);
   const sorted = [...spaces].sort((a, b) => a.order - b.order);
   const [contextSpace, setContextSpace] = useState<Space | null>(null);
   const [contextPos, setContextPos] = useState({ x: 0, y: 0 });
@@ -260,21 +259,23 @@ export const SpaceBar = memo(function SpaceBar({
         )}
       </div>
 
-      {/* + button — enters draft creation mode in sidebar */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            onClick={onStartCreateSpace}
-            disabled={isCreatingSpace}
-            className="mb-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sidebar-foreground/40 transition-all hover:bg-black/5 hover:text-sidebar-foreground dark:hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none"
-          >
-            <Plus className="h-4.5 w-4.5" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="text-xs">
-          {t("newSpace")}
-        </TooltipContent>
-      </Tooltip>
+      <Dialog open={creating} onOpenChange={setCreating}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                aria-label={t("newSpace")}
+                className="mb-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-dashed border-sidebar-foreground/20 text-sidebar-foreground/60 transition-colors hover:border-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </DialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="text-xs">{t("newSpace")}</TooltipContent>
+        </Tooltip>
+        {creating && <CreateSpaceDialog onCreate={onCreateSpace} onClose={() => setCreating(false)} />}
+      </Dialog>
 
       {/* ── Edit popover (for existing spaces) ── */}
       <Popover

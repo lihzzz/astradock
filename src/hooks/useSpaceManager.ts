@@ -59,11 +59,16 @@ export function useSpaceManager() {
         createdAt: Date.now(),
         order: spaces.length,
       };
-      await persistSpaces([...spaces, space], true);
+      // Publish only after persistence succeeds; a failed create must not leave a ghost space.
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      const next = [...spaces, space];
+      const result = await window.claude.spaces.save(next);
+      if ("error" in result) throw new Error(result.error);
+      setSpaces(next);
       capture("space_created", { has_color: !!color, icon_type: iconType });
       return space;
     },
-    [spaces, persistSpaces],
+    [spaces],
   );
 
   const updateSpace = useCallback(

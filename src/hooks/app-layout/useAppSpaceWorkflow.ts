@@ -9,7 +9,7 @@ import {
 import { useSpaceManager } from "@/hooks/useSpaceManager";
 import { useSplitView } from "@/hooks/useSplitView";
 import { useSpaceTerminals } from "@/hooks/useSpaceTerminals";
-import { SPACE_COLOR_PRESETS } from "@/hooks/useSpaceManager";
+import type { Space } from "@/types";
 
 const LAST_SESSION_KEY = "harnss-last-session-per-space";
 
@@ -31,16 +31,8 @@ interface UseAppSpaceWorkflowInput {
 
 export function useAppSpaceWorkflow(input: UseAppSpaceWorkflowInput) {
   const [isSpaceSwitching, setIsSpaceSwitching] = useState(false);
-  const [draftSpaceId, setDraftSpaceId] = useState<string | null>(null);
-  const draftSpaceIdRef = useRef<string | null>(null);
-  const preDraftSpaceRef = useRef<string | null>(null);
-  const preDraftSessionRef = useRef<string | null>(null);
   const prevSpaceIdRef = useRef(input.spaceManager.activeSpaceId);
   const spaceSwitchRequestIdRef = useRef(0);
-
-  useEffect(() => {
-    draftSpaceIdRef.current = draftSpaceId;
-  }, [draftSpaceId]);
 
   const activeProjectId = input.manager.activeSession?.projectId ?? input.manager.draftProjectId ?? null;
 
@@ -71,40 +63,12 @@ export function useAppSpaceWorkflow(input: UseAppSpaceWorkflowInput) {
     : null;
   const hasProjects = input.projectManager.projects.length > 0;
 
-  const handleStartCreateSpace = useCallback(async () => {
-    const randomColor = SPACE_COLOR_PRESETS[1 + Math.floor(Math.random() * (SPACE_COLOR_PRESETS.length - 1))];
-    preDraftSpaceRef.current = input.spaceManager.activeSpaceId;
-    preDraftSessionRef.current = input.manager.activeSessionId;
-    const space = await input.spaceManager.createSpace("", "⭐", "emoji", randomColor);
+  const handleCreateSpace = useCallback(async (details: Pick<Space, "name" | "icon" | "iconType" | "color">) => {
+    const name = details.name.trim();
+    if (!name) throw new Error("Space name is required");
+    const space = await input.spaceManager.createSpace(name, details.icon, details.iconType, details.color);
     input.spaceManager.setActiveSpaceId(space.id);
-    setDraftSpaceId(space.id);
-  }, [input.manager.activeSessionId, input.spaceManager]);
-
-  const handleConfirmCreateSpace = useCallback(() => {
-    const draft = draftSpaceId ? input.spaceManager.spaces.find((space) => space.id === draftSpaceId) : null;
-    if (!draft || !draft.name.trim()) return;
-    setDraftSpaceId(null);
-    preDraftSpaceRef.current = null;
-    preDraftSessionRef.current = null;
-  }, [draftSpaceId, input.spaceManager.spaces]);
-
-  const handleCancelCreateSpace = useCallback(async () => {
-    const currentDraftSpaceId = draftSpaceId;
-    setDraftSpaceId(null);
-    if (currentDraftSpaceId) {
-      await input.spaceManager.deleteSpace(currentDraftSpaceId);
-    }
-    const prevSpace = preDraftSpaceRef.current;
-    if (prevSpace) {
-      input.spaceManager.setActiveSpaceId(prevSpace);
-    }
-    const prevSession = preDraftSessionRef.current;
-    if (prevSession) {
-      setTimeout(() => input.manager.switchSession(prevSession), 60);
-    }
-    preDraftSpaceRef.current = null;
-    preDraftSessionRef.current = null;
-  }, [draftSpaceId, input.manager, input.spaceManager]);
+  }, [input.spaceManager]);
 
   const handleUpdateSpace = useCallback((id: string, updates: object) => {
     void input.spaceManager.updateSpace(id, updates);
@@ -138,25 +102,12 @@ export function useAppSpaceWorkflow(input: UseAppSpaceWorkflowInput) {
   }, [input.manager.activeSessionId, input.manager.isDraft, input.manager.sessions, input.projectManager.projects, readLastSessionMap]);
 
   useEffect(() => {
-    if (!draftSpaceId || input.spaceManager.activeSpaceId === draftSpaceId) return;
-    void input.spaceManager.deleteSpace(draftSpaceId);
-    const prevSession = preDraftSessionRef.current;
-    if (prevSession) {
-      setTimeout(() => input.manager.switchSession(prevSession), 60);
-    }
-    setDraftSpaceId(null);
-    preDraftSpaceRef.current = null;
-    preDraftSessionRef.current = null;
-  }, [draftSpaceId, input.manager, input.spaceManager]);
-
-  useEffect(() => {
     const prev = prevSpaceIdRef.current;
     const next = input.spaceManager.activeSpaceId;
     prevSpaceIdRef.current = next;
     // In Apps, Space is a catalog filter. The mounted chat and its draft stay put.
     if (input.appsViewActive) return;
     if (prev === next) return;
-    if (next === draftSpaceIdRef.current) return;
 
     const requestId = spaceSwitchRequestIdRef.current + 1;
     spaceSwitchRequestIdRef.current = requestId;
@@ -248,10 +199,7 @@ export function useAppSpaceWorkflow(input: UseAppSpaceWorkflowInput) {
     activeSpaceTerminalCwd,
     hasProjects,
     isSpaceSwitching,
-    draftSpaceId,
-    handleStartCreateSpace,
-    handleConfirmCreateSpace,
-    handleCancelCreateSpace,
+    handleCreateSpace,
     handleUpdateSpace,
     handleDeleteSpace,
     handleMoveProjectToSpace,

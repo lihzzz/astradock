@@ -120,7 +120,6 @@ export function AppLayout() {
     hasProjects, isSpaceSwitching, showToolPicker, hasRightPanel,
     activeTodos, bgAgents, hasTodos, hasAgents, availableContextual,
     glassSupported, glassActive, macLiquidGlassSupported, liveMacBackgroundEffect, devFillEnabled,
-    draftSpaceId,
   } = state;
   const inputHistory = useMemo(
     () => mergeInputHistory(loadPersistedInputHistory(activeProjectPath), getInputHistory(manager.messages)),
@@ -134,7 +133,7 @@ export function AppLayout() {
     handleModelChange, handlePermissionModeChange,
     handleClaudeModelEffortChange, handleAgentWorktreeChange, handleStop, handleSelectSession,
     handleSendQueuedNow, handleUnqueueMessage, handleCreateProject, handleImportCCSession,
-    handleStartCreateSpace, handleConfirmCreateSpace, handleCancelCreateSpace,
+    handleCreateSpace,
     handleUpdateSpace, handleDeleteSpace, handleMoveProjectToSpace, handleSeedDevExampleSpaceData,
   } = actions;
 
@@ -1178,7 +1177,6 @@ export function AppLayout() {
           activeSessionId: manager.activeSessionId,
           foldersByProject: o.foldersByProject,
           organizeByChatBranch: settings.organizeByChatBranch,
-          draftSpaceId,
         }}
         projectActions={{
           onNewChat: handleOpenNewChat,
@@ -1206,12 +1204,10 @@ export function AppLayout() {
         }}
         spaceActions={{
           onSelectSpace: spaceManager.setActiveSpaceId,
-          onStartCreateSpace: handleStartCreateSpace,
+          onCreateSpace: handleCreateSpace,
           onUpdateSpace: handleUpdateSpace,
           onDeleteSpace: handleDeleteSpace,
           onOpenSettings: () => setShowSettings("general"),
-          onConfirmCreateSpace: handleConfirmCreateSpace,
-          onCancelCreateSpace: handleCancelCreateSpace,
         }}
         sessionActions={{
           onSelectSession: handleSidebarSelectSession,

@@ -258,7 +258,6 @@ export function useAppOrchestrator() {
     macLiquidGlassSupported: environment.macLiquidGlassSupported,
     liveMacBackgroundEffect: environment.liveMacBackgroundEffect,
     devFillEnabled: environment.devFillEnabled,
-    draftSpaceId: spaceWorkflow.draftSpaceId,
   };
 
   const agentState = {
@@ -289,9 +288,7 @@ export function useAppOrchestrator() {
     handleImportCCSession: sessionActions.handleImportCCSession,
     handleSeedDevExampleSpaceData: sessionActions.handleSeedDevExampleSpaceData,
     handleNavigateToMessage: (sessionId: string, messageId: string) => sessionActions.handleNavigateToMessage(sessionId, environment.setScrollToMessageId, messageId),
-    handleStartCreateSpace: spaceWorkflow.handleStartCreateSpace,
-    handleConfirmCreateSpace: spaceWorkflow.handleConfirmCreateSpace,
-    handleCancelCreateSpace: spaceWorkflow.handleCancelCreateSpace,
+    handleCreateSpace: spaceWorkflow.handleCreateSpace,
     handleUpdateSpace: spaceWorkflow.handleUpdateSpace,
     handleDeleteSpace: spaceWorkflow.handleDeleteSpace,
     handleMoveProjectToSpace: spaceWorkflow.handleMoveProjectToSpace,
@@ -365,9 +362,6 @@ export function useAppOrchestrator() {
     showSettings: ui.showSettings,
     setShowSettings: ui.setShowSettings,
 
-    // Space management (draft = real space, deleted on cancel)
-    draftSpaceId: state.draftSpaceId,
-
     // Scroll navigation
     scrollToMessageId: ui.scrollToMessageId,
     setScrollToMessageId: ui.setScrollToMessageId,
@@ -397,9 +391,7 @@ export function useAppOrchestrator() {
     handleImportCCSession: sessionActions.handleImportCCSession,
     handleSeedDevExampleSpaceData: sessionActions.handleSeedDevExampleSpaceData,
     handleNavigateToMessage: (sessionId: string, messageId: string) => sessionActions.handleNavigateToMessage(sessionId, environment.setScrollToMessageId, messageId),
-    handleStartCreateSpace: spaceWorkflow.handleStartCreateSpace,
-    handleConfirmCreateSpace: spaceWorkflow.handleConfirmCreateSpace,
-    handleCancelCreateSpace: spaceWorkflow.handleCancelCreateSpace,
+    handleCreateSpace: spaceWorkflow.handleCreateSpace,
     handleUpdateSpace: spaceWorkflow.handleUpdateSpace,
     handleDeleteSpace: spaceWorkflow.handleDeleteSpace,
     handleMoveProjectToSpace: spaceWorkflow.handleMoveProjectToSpace,
