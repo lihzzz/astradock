@@ -57,6 +57,13 @@ export function stopUsageSession(sessionId: string): void {
   getUsageTracker().stopSession(sessionId);
 }
 
+export function getUsageTimings(): UsageTimings {
+  const current = getUsageTracker();
+  if (loadError) throw loadError;
+  current.checkpoint();
+  return current.data;
+}
+
 function flushUsageTimings(): Promise<void> {
   const current = getUsageTracker();
   if (loadError) return Promise.reject(loadError);

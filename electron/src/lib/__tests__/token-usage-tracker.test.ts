@@ -3,6 +3,7 @@ import {
   cleanTokenCount, ClaudeTokenObserver, CodexTokenObserver, emptyTokenTotals,
   normalizeAcpTokenUsage, normalizeClaudeTokenUsage, normalizeCodexTokenUsage, TokenUsageTracker,
 } from "../token-usage-tracker";
+import { UsageTracker } from "../usage-tracker";
 import type { UsageTokenTotals } from "@shared/types/usage";
 
 function claudeUsage(input: number, output = 0, read = 0, creation = 0) {
@@ -181,14 +182,67 @@ describe("Codex cumulative usage", () => {
     expect(sum(tracker).totalTokens).toBe(150);
   });
 
-  it("handles a live cumulative reset without replaying an earlier snapshot", () => {
+  it("does not treat lower same-turn snapshots as a counter reset", () => {
     const { tracker, start, usage } = makeCodex();
     start();
     usage(codexUsage(100));
     usage(codexUsage(20));
     usage(codexUsage(100));
     usage(codexUsage(30));
-    expect(sum(tracker).totalTokens).toBe(130);
+    usage(codexUsage(110));
+    expect(sum(tracker).totalTokens).toBe(110);
+  });
+});
+
+describe("Codex accounting regression cases", () => {
+  it("ignores unseen out-of-order snapshots and retains a persistent high-water mark", () => {
+    const { tracker, start, usage, baselines } = makeCodex();
+    start();
+    usage(codexUsage(100));
+    usage(codexUsage(90));
+    usage(codexUsage(110));
+    expect(sum(tracker).totalTokens).toBe(110);
+    expect(baselines.get("thread")?.totalTokens).toBe(110);
+  });
+
+  it("handles lower new-turn counters conservatively and ignores completed-turn replays", () => {
+    const { tracker, start, usage } = makeCodex();
+    start("first");
+    usage(codexUsage(100), undefined, "first");
+    start("second");
+    usage(codexUsage(30), codexUsage(10), "second");
+    usage(codexUsage(90), undefined, "first");
+    usage(codexUsage(40), codexUsage(10), "second");
+    expect(sum(tracker).totalTokens).toBe(120);
+  });
+
+  it("counts owned child and grandchild lifetimes after root completion, excluding foreign threads", () => {
+    const timing = new UsageTracker(0);
+    let now = 0;
+    const observer = new CodexTokenObserver(() => {}, false, new Map(), undefined, undefined,
+      (thread, turn, running) => {
+        const key = JSON.stringify([thread, turn]);
+        if (running) timing.begin("root", key, now);
+        else timing.end("root", key, now);
+      });
+    const event = (method: string, params: unknown, time: number) => { now = time; observer.observe(method, params, "root", time); };
+    timing.begin("root", "main", 0);
+    event("thread/started", { thread: { id: "child", parentThreadId: "root" } }, 1000);
+    event("turn/started", { threadId: "child", turn: { id: "a" } }, 1000);
+    event("thread/started", { thread: { id: "grandchild", parentThreadId: "child" } }, 2000);
+    event("turn/started", { threadId: "grandchild", turn: { id: "a" } }, 2000);
+    timing.end("root", "main", 3000);
+    event("turn/started", { threadId: "foreign", turn: { id: "x" } }, 4000);
+    event("turn/completed", { threadId: "child", turn: { id: "a" } }, 5000);
+    event("turn/started", { threadId: "child", turn: { id: "a" } }, 6000); // replay
+    event("error", { threadId: "grandchild", turnId: "a", willRetry: true }, 6000);
+    event("error", { threadId: "grandchild", turnId: "a", willRetry: false }, 7000);
+    timing.checkpoint(8000);
+    expect(timing.data.agent).toEqual([[0, 7000]]);
+    event("turn/started", { threadId: "child", turn: { id: "b" } }, 9000);
+    event("thread/closed", { threadId: "child" }, 10000);
+    timing.checkpoint(11000);
+    expect(timing.data.agent).toEqual([[0, 7000], [9000, 10000]]);
   });
 });
 

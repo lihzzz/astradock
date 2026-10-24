@@ -1,11 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { summarizeUsageSession, type UsageSessionSummary } from "@shared/lib/usage";
-import { parseSessionJsonl } from "./session-jsonl";
+import { parseSessionJsonlWithDiagnostics } from "./session-jsonl";
 
 /** Cache summaries, not chat content. Only changed snapshots need to be parsed again. */
 export class UsageHistory {
-  private cache = new Map<string, { modifiedAt: number; size: number; summary: UsageSessionSummary }>();
+  private cache = new Map<string, { modifiedAt: number; size: number; summary: UsageSessionSummary; damaged: boolean }>();
 
   constructor(private directory: string) {}
 
@@ -20,7 +20,7 @@ export class UsageHistory {
     const sessions: UsageSessionSummary[] = [];
     const visited = new Set<string>();
     let incomplete = false;
-    for (const project of projects.filter((entry) => entry.isDirectory())) {
+    for (const project of projects.filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))) {
       const directory = path.join(this.directory, project.name);
       let files;
       try {
@@ -41,14 +41,18 @@ export class UsageHistory {
             const stat = await fs.stat(filePath);
             const cached = this.cache.get(filePath);
             if (cached && cached.modifiedAt === stat.mtimeMs && cached.size === stat.size) {
+              incomplete ||= cached.damaged;
               sessions.push(cached.summary);
               return;
             }
             const raw = await fs.readFile(filePath, "utf-8");
-            const data = file.endsWith(".jsonl") ? parseSessionJsonl(raw) : JSON.parse(raw);
+            const parsed = file.endsWith(".jsonl") ? parseSessionJsonlWithDiagnostics(raw) : { data: JSON.parse(raw), damagedLines: 0 };
+            const { data } = parsed;
+            const damaged = parsed.damagedLines > 0;
+            incomplete ||= damaged;
             if (!data || typeof data.id !== "string" || !Array.isArray(data.messages)) throw new Error("Invalid session snapshot");
             const summary = summarizeUsageSession({ ...data, projectId: project.name }, stat.mtimeMs);
-            this.cache.set(filePath, { modifiedAt: stat.mtimeMs, size: stat.size, summary });
+            this.cache.set(filePath, { modifiedAt: stat.mtimeMs, size: stat.size, summary, damaged });
             sessions.push(summary);
           } catch (error) {
             if ((error as NodeJS.ErrnoException).code !== "ENOENT") incomplete = true;

@@ -733,20 +733,12 @@ Types shared between electron and renderer live in `shared/types/`. Both tsconfi
 
 ### Error Tracking (PostHog)
 
-Two PostHog clients run in parallel, one per process:
+Telemetry is optional (off by default for new installations; existing consent is preserved). Local usage statistics do not depend on telemetry.
 
-1. **Main process** (`posthog-node` in `electron/src/lib/posthog.ts`):
-   - `enableExceptionAutocapture: true` — auto-captures `process.on('uncaughtException')` and `process.on('unhandledRejection')`
-   - `captureException(error, additionalProperties?)` — manual exception capture with stack trace
-   - `captureEvent(event, properties?)` — custom analytics events
-   - Respects `analyticsEnabled` setting, uses anonymous `analyticsUserId`
-
-2. **Renderer process** (`posthog-js` + `@posthog/react` in `src/lib/analytics/posthog.ts`):
-   - Exception autocapture via `defaults: "2026-01-30"` — auto-hooks `window.onerror` and `window.onunhandledrejection`
-   - `PostHogProvider` wraps the app in `main.tsx`
-   - `ErrorBoundary.componentDidCatch` → `posthog.captureException()` for React rendering errors
-   - Starts opted-out (`opt_out_capturing_by_default: true`), syncs to main process settings via `syncAnalyticsSettings()`
-   - Uses same anonymous user ID as main process for cross-process correlation
+- **Main process** (`posthog-node` in `electron/src/lib/posthog.ts`) is the only delivery gateway. Every capture rechecks consent and uses the closed event/property allowlist in `shared/lib/telemetry-privacy.ts`. Free-form names, model strings, tool/server names, paths, prompts, credentials, nested context and unknown properties are dropped.
+- **Errors**: `captureException()` emits a category-only `app_error` event. Original error messages, stacks, causes and component stacks remain local. Raw SDK exception autocapture is disabled; do not re-enable it or call the SDK's exception API directly.
+- **Renderer**: `posthog-js` remains an opted-out compatibility client for `PostHogProvider`, with a deny-all `before_send` hook and session recording disabled. Renderer errors (including ErrorBoundary) use the IPC gateway, not renderer SDK delivery. `syncAnalyticsSettings()` keeps renderer capture disabled.
+- **Local statistics**: `usage:get` is read-only and independently reports history, timing and token availability. Never repair/reset a damaged ledger during a read. JSONL corruption must retain an incomplete flag even on summary-cache hits, and internal dot-directories are not project history.
 
 **Error reporting helpers:**
 

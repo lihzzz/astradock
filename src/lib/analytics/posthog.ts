@@ -1,12 +1,6 @@
 /**
- * PostHog renderer-side client initialization.
- *
- * Provides posthog-js instance for React error tracking and exception autocapture.
- * Respects the analytics opt-in/out setting from the main process.
- * Uses the same anonymous user ID as the main process client (posthog-node).
- *
- * Exception autocapture automatically hooks into window.onerror and
- * window.onunhandledrejection to capture unhandled errors as $exception events.
+ * Compatibility client for PostHogProvider. Renderer delivery stays disabled;
+ * all product/error events go through the main-process consent/privacy gate.
  */
 
 import posthog from "posthog-js";
@@ -16,13 +10,7 @@ import posthog from "posthog-js";
 const POSTHOG_KEY = "phc_lOKFRov0SWy2R71BNJ2t978tmNYc3ND7WwueOteV5vw";
 const POSTHOG_HOST = "https://us.i.posthog.com";
 
-/**
- * Initialize posthog-js in the renderer process.
- *
- * Starts with capturing disabled (opt_out_capturing_by_default).
- * Call {@link syncAnalyticsSettings} after loading app settings to enable
- * capturing based on the user's preference.
- */
+/** Initialize the provider without enabling any renderer telemetry. */
 export function initPostHog(): void {
   posthog.init(POSTHOG_KEY, {
     api_host: POSTHOG_HOST,
@@ -35,42 +23,23 @@ export function initPostHog(): void {
     // No meaningful pageviews/pageleaves in a single-window Electron app
     capture_pageview: false,
     capture_pageleave: false,
-    // Disable generic click/input autocapture — we only want exception tracking
+    // Disable all renderer-side automatic capture.
     autocapture: false,
+    capture_exceptions: false,
+    disable_session_recording: true,
+    // All telemetry uses the main-process allowlist. Never send SDK-enriched
+    // renderer events (which can contain URLs, stacks, or component content).
+    before_send: () => null,
 
     // ── Persistence ──
     persistence: "localStorage",
   });
 }
 
-/**
- * Sync posthog-js capturing state with the main process analytics settings.
- *
- * Reads AppSettings via IPC and enables/disables capturing + sets the
- * anonymous user ID to match the main process client.
- *
- * Call this:
- * - Once after app mount (settings become available)
- * - Whenever the user toggles analytics on/off in settings
- */
+/** Preserve the existing settings-sync API, but never enable renderer capture. */
 export async function syncAnalyticsSettings(): Promise<void> {
-  try {
-    const settings = await window.claude.settings.get();
-
-    if (settings.analyticsEnabled) {
-      posthog.opt_in_capturing();
-
-      // Use the same anonymous user ID as the main process PostHog client
-      // so events from both processes correlate to the same distinct_id.
-      if (settings.analyticsUserId) {
-        posthog.identify(settings.analyticsUserId);
-      }
-    } else {
-      posthog.opt_out_capturing();
-    }
-  } catch {
-    // Settings not available yet — stay opted out (safe default)
-  }
+  // Main process owns consent and sanitized delivery; renderer stays opted out.
+  posthog.opt_out_capturing();
 }
 
 export { posthog };

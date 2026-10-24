@@ -110,7 +110,7 @@ export const TokenUsageSection = memo(function TokenUsageSection({ report }: { r
       </div>
 
       <p className="text-[11px] leading-relaxed text-muted-foreground">{t("usageTokenCountingNote")}</p>
-      {!summary.reported && <p className="text-xs text-muted-foreground">{t("usageTokenNoReports")}</p>}
+      {!report.incomplete && !summary.reported && <p className="text-xs text-muted-foreground">{t("usageTokenNoReports")}</p>}
       {report.incomplete && <p role="status" className="text-xs text-destructive">{t("usageTokenIncomplete")}</p>}
 
       <div className="max-h-80 overflow-auto rounded-md border border-foreground/[0.06]" tabIndex={0} role="region" aria-label={t("usageTokenDaily")}>
@@ -147,7 +147,7 @@ export const TokenUsageSection = memo(function TokenUsageSection({ report }: { r
       </div>
 
       <div className="space-y-1 text-[11px] leading-relaxed text-muted-foreground">
-        <p>{t("usageTokenTrackingSince")} {new Date(report.trackingStartedAt).toLocaleString(language)}</p>
+        {!report.incomplete && <p>{t("usageTokenTrackingSince")} {new Date(report.trackingStartedAt).toLocaleString(language)}</p>}
         <p>{t("usageTokenLocalNote")}</p>
         <p>{t("usageTokenMissingNote")}</p>
       </div>

@@ -413,8 +413,12 @@ describe("Codex subagent notification routing", () => {
     expect(safeSend).not.toHaveBeenCalledWith(expect.any(Function), "codex:event", expect.objectContaining({
       method: "turn/completed", params: expect.objectContaining({ threadId: "agent" }),
     }));
-    expect(beginUsageTurn).toHaveBeenCalledExactlyOnceWith(result.sessionId, "root-turn");
-    expect(endUsageTurn).not.toHaveBeenCalled();
+    const childKey = JSON.stringify(["child", "agent", "child-turn"]);
+    expect(beginUsageTurn).toHaveBeenCalledTimes(2);
+    expect(beginUsageTurn).toHaveBeenCalledWith(result.sessionId, "root-turn");
+    expect(beginUsageTurn).toHaveBeenCalledWith(result.sessionId, childKey);
+    expect(endUsageTurn).toHaveBeenCalledExactlyOnceWith(result.sessionId, childKey);
+    expect(endUsageTurn).not.toHaveBeenCalledWith(result.sessionId, "root-turn");
     await invoke("codex:interrupt", result.sessionId);
     await vi.waitFor(() => expect(state.requests).toContain("turn/interrupt"));
     await codex.stopForDeletion(result.sessionId);

@@ -84,4 +84,5 @@ export interface UsageReport {
   trackingStartedAt: number;
   timeZone: string;
   incompleteHistory: boolean;
+  incompleteTimings: boolean;
 }

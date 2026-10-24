@@ -39,6 +39,36 @@ describe("usage history reader", () => {
     expect(result).toEqual({ sessions: [], incomplete: true });
   });
 
+  it("ignores internal transaction directories without modifying their records", async () => {
+    for (const name of [".replacements", ".deletions", ".project-deletions"]) {
+      const folder = path.join(directory, name);
+      await fs.mkdir(folder);
+      await fs.writeFile(path.join(folder, "transaction.json"), '{"version":1,"state":"committed"}');
+    }
+    await fs.writeFile(path.join(directory, "project", "s.json"), JSON.stringify({ id: "s", messages: [] }));
+    const result = await new UsageHistory(directory).read();
+    expect(result.sessions).toHaveLength(1);
+    expect(result.incomplete).toBe(false);
+    expect(await fs.readFile(path.join(directory, ".replacements", "transaction.json"), "utf8"))
+      .toBe('{"version":1,"state":"committed"}');
+  });
+
+  it("retains readable messages and damage status on cache hits without rewriting JSONL", async () => {
+    const file = path.join(directory, "project", "s.jsonl");
+    const content = serializeSessionJsonl({ id: "s", messages: [{ id: "m", role: "user", timestamp: 123 }] })
+      + '{broken\n' + JSON.stringify({ type: "msg", msg: null }) + '\n';
+    await fs.writeFile(file, content);
+    const history = new UsageHistory(directory);
+    for (let i = 0; i < 2; i++) {
+      const result = await history.read();
+      expect(result.incomplete).toBe(true);
+      expect(result.sessions[0].entries).toHaveLength(1);
+    }
+    expect(await fs.readFile(file, "utf8")).toBe(content);
+    await fs.writeFile(file, serializeSessionJsonl({ id: "s", messages: [] }));
+    expect((await history.read()).incomplete).toBe(false);
+  });
+
   it("treats a new installation as empty history", async () => {
     const result = await new UsageHistory(path.join(directory, "missing")).read();
     expect(result).toEqual({ sessions: [], incomplete: false });

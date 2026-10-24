@@ -1,15 +1,14 @@
 /**
  * Renderer-side analytics utility.
  *
- * Two channels:
- * - Custom events → IPC bridge to main process PostHog client (posthog-node)
- * - Exception capture → renderer-side posthog-js for rich stack traces
+ * All events use the consent-checked, allowlisted main-process gateway.
+ * Errors become category-only events; their messages/stacks remain local.
  *
  * Privacy: Never include file paths, prompt content, project names, API keys,
  * or any PII. Only pass anonymized metadata (engine type, tool name, counts, etc.).
  */
 
-import { posthog } from "@/lib/analytics/posthog";
+import { telemetryErrorProperties } from "@shared/lib/telemetry-privacy";
 
 /** Fire-and-forget analytics event via the main process PostHog client. */
 export function capture(event: string, properties?: Record<string, unknown>): void {
@@ -21,14 +20,12 @@ export function capture(event: string, properties?: Record<string, unknown>): vo
 }
 
 /**
- * Capture an exception to PostHog error tracking.
- *
- * Uses the renderer-side posthog-js client so stack traces are captured
- * with full source context. Respects the user's analytics opt-in/out setting.
+ * Report an error category through the main-process privacy boundary.
+ * Never forwards the original error, stack, cause, or component context.
  */
 export function captureException(error: Error, properties?: Record<string, unknown>): void {
   try {
-    posthog.captureException(error, properties);
+    capture("app_error", telemetryErrorProperties(error, properties));
   } catch {
     // Analytics should never break the app
   }

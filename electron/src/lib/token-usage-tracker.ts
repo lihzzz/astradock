@@ -3,6 +3,8 @@ import type { UsageTokenEntry, UsageTokens, UsageTokenTotals } from "@shared/typ
 
 type TokenRecorder = (engine: EngineId, totals: UsageTokenTotals, timestamp: number) => void;
 type SubagentTokenRecorder = (agentId: string, tokens: number) => void;
+export type CodexChildTurnListener = (threadId: string, turnId: string, running: boolean) => void;
+
 export interface CodexTokenBaselines {
   get(threadId: string): UsageTokenTotals | undefined;
   set(threadId: string, totals: UsageTokenTotals): void;
@@ -239,14 +241,16 @@ export class ClaudeTokenObserver {
 /** Observe the selected thread and explicitly owned children, each with its own counter. */
 export class CodexTokenObserver {
   private previous: UsageTokenTotals | undefined;
-  private turns = new Set<string>();
+  private turns = new Map<string, number>();
+  private lastUsageTurn = -1;
+  private activeTurns = new Set<string>();
   private snapshots = new Set<string>();
   private loadedBaseline = false;
   private hasLiveUsage = false;
   private children = new Map<string, CodexTokenObserver>();
 
   constructor(private record: TokenRecorder, private resumed: boolean, private baselines: CodexTokenBaselines,
-    private recordSubagent?: SubagentTokenRecorder, private agentId?: string) {
+    private recordSubagent?: SubagentTokenRecorder, private agentId?: string, private onChildTurn?: CodexChildTurnListener) {
     this.previous = resumed ? undefined : emptyTokenTotals();
   }
 
@@ -277,8 +281,21 @@ export class CodexTokenObserver {
       this.loadedBaseline = true;
     }
     if (method === "turn/started" && isRecord(params.turn) && typeof params.turn.id === "string") {
-      this.turns.add(params.turn.id);
+      if (!this.turns.has(params.turn.id)) {
+        this.turns.set(params.turn.id, this.turns.size);
+        this.activeTurns.add(params.turn.id);
+        if (this.agentId) this.onChildTurn?.(threadId, params.turn.id, true);
+      }
       return;
+    }
+    const completedTurn = method === "turn/completed" && isRecord(params.turn) ? params.turn.id
+      : method === "error" && params.willRetry === false ? params.turnId : undefined;
+    if (typeof completedTurn === "string" && this.activeTurns.delete(completedTurn) && this.agentId) {
+      this.onChildTurn?.(threadId, completedTurn, false);
+    }
+    if (method === "thread/closed") {
+      for (const turn of this.activeTurns) if (this.agentId) this.onChildTurn?.(threadId, turn, false);
+      this.activeTurns.clear();
     }
     if (method !== "thread/tokenUsage/updated" || !isRecord(params.tokenUsage)) return;
     const current = normalizeCodexTokenUsage(params.tokenUsage.total);
@@ -296,13 +313,20 @@ export class CodexTokenObserver {
       }
       return;
     }
+    const turnOrder = typeof params.turnId === "string" ? this.turns.get(params.turnId) : undefined;
+    if (turnOrder === undefined || turnOrder < this.lastUsageTurn) return;
+    const decreased = this.previous && current.totalTokens < this.previous.totalTokens;
+    // A lower snapshot in the same turn is stale, not proof of a counter reset.
+    // Keep the high-water mark so a later update cannot charge the old tokens again.
+    if (decreased && turnOrder === this.lastUsageTurn) return;
     const last = normalizeCodexTokenUsage(params.tokenUsage.last);
-    // A resumed thread has no total in thread/read. Without an initial historical
-    // notification, last is the safe lower bound for its first live update.
-    const delta = this.previous ? cumulativeDifference(current, this.previous) : last;
-    this.previous = current;
+    // Across a new turn/resume a lower counter is ambiguous. Only charge the
+    // explicitly reported last call, never the entire possibly historical total.
+    const delta = this.previous && !decreased ? positiveDifference(current, this.previous) : last;
+    this.lastUsageTurn = turnOrder;
+    this.previous = decreased || !this.previous ? current : maximumTotals(current, this.previous);
     this.hasLiveUsage = true;
-    this.baselines.set(threadId, current);
+    this.baselines.set(threadId, this.previous);
     if (delta && (hasTokens(delta) || this.snapshots.size === 1)) {
       this.record("codex", delta, timestamp);
       if (this.agentId) this.recordSubagent?.(this.agentId, delta.totalTokens);
@@ -314,6 +338,6 @@ export class CodexTokenObserver {
     this.recordSubagent?.(threadId, 0);
     // Forked threads can inherit their parent's counter. The first live `last`
     // report is the safe baseline when no historical notification was supplied.
-    this.children.set(threadId, new CodexTokenObserver(this.record, true, this.baselines, this.recordSubagent, threadId));
+    this.children.set(threadId, new CodexTokenObserver(this.record, true, this.baselines, this.recordSubagent, threadId, this.onChildTurn));
   }
 }

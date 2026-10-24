@@ -3,10 +3,11 @@ import path from "node:path";
 import { buildUsageReport, USAGE_MAX_GAP_MS } from "@shared/lib/usage";
 import { getDataDir } from "../lib/data-dir";
 import { UsageHistory } from "../lib/usage-history";
-import { flushUsage, getUsageTracker, startUsageTracking } from "../lib/usage";
+import { flushUsage, getUsageTracker, getUsageTimings, startUsageTracking } from "../lib/usage";
 import { log } from "../lib/logger";
 import { reportError } from "../lib/error-utils";
 import { getSessionTokenUsage, getTokenUsage } from "../lib/token-usage";
+import type { UsageTimings, UsageTokens } from "@shared/types/usage";
 
 export function register(getMainWindow: () => BrowserWindow | null): void {
   let history: UsageHistory | undefined;
@@ -24,13 +25,26 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     if (event.sender !== getMainWindow()?.webContents) return { error: "Unknown usage client" };
     if (range !== 1 && range !== 7 && range !== 30 && range !== 90) return { error: "Invalid usage range" };
     try {
-      await flushUsage();
+      // Read-only dashboard: persistence failures must not hide readable data.
+      const now = Date.now();
       history ??= new UsageHistory(path.join(getDataDir(), "sessions"));
-      const result = await history.read();
-      const tracker = getUsageTracker();
-      tracker.checkpoint();
-      const data = buildUsageReport(result.sessions, tracker.data, range, getTokenUsage());
+      const result = await history.read().catch((error: unknown) => {
+        reportError("USAGE_HISTORY_READ_ERR", error);
+        return { sessions: [], incomplete: true };
+      });
+      let timings: UsageTimings = { version: 1, trackingStartedAt: now, active: [], agent: [] };
+      let tokens: UsageTokens = { version: 1, trackingStartedAt: now, entries: [] };
+      let incompleteTimings = false;
+      let incompleteTokens = false;
+      try { timings = getUsageTimings(); }
+      catch (error) { incompleteTimings = true; reportError("USAGE_TIMINGS_READ_ERR", error); }
+      try { tokens = getTokenUsage(); }
+      catch (error) { incompleteTokens = true; reportError("USAGE_TOKENS_READ_ERR", error); }
+      const data = buildUsageReport(result.sessions, timings, range, tokens, now);
       data.incompleteHistory = result.incomplete;
+      data.incompleteTimings = incompleteTimings;
+      data.tokens.incomplete = incompleteTokens;
+      if (incompleteTimings) for (const day of data.days) { day.activeMs = null; day.agentMs = null; }
       return { data };
     } catch (error) {
       reportError("USAGE_READ_ERR", error);

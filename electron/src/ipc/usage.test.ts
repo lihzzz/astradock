@@ -102,6 +102,7 @@ describe("local usage IPC", () => {
     expect(result.error).toBeUndefined();
     expect(result.data?.days.at(-1)).toMatchObject({ userMessages: 1, activeMs: 10000, agentMs: 15000 });
     expect(result.data?.commands).toEqual([{ name: "pnpm test", count: 1 }]);
+    await usage.flushUsage(); // Persistence is independent of read-only reports.
     const saved = JSON.parse(await fs.readFile(path.join(mocks.directory, "usage-timings.json"), "utf-8"));
     expect(saved.agent).toEqual([[now, now + 15000]]);
     expect(saved.active).toEqual([[now + 5000, now + 15000]]);
@@ -120,11 +121,54 @@ describe("local usage IPC", () => {
     expect((await query()).data?.days.at(-1)?.activeMs).toBe(0);
   });
 
+  it("keeps message counts when both ledgers are corrupt, preserving bytes", async () => {
+    const folder = path.join(mocks.directory, "sessions", "p");
+    await fs.mkdir(folder, { recursive: true });
+    await fs.writeFile(path.join(folder, "s.json"), JSON.stringify({ id: "s", messages: [
+      { id: "m", role: "user", timestamp: now, content: "hello" },
+    ] }));
+    for (const file of ["usage-timings.json", "usage-tokens.json"]) await fs.writeFile(path.join(mocks.directory, file), "{broken");
+    await register();
+    const result = await query();
+    expect(result.data).toMatchObject({ incompleteTimings: true, tokens: { incomplete: true }, incompleteHistory: false });
+    expect(result.data?.days.at(-1)?.userMessages).toBe(1);
+    for (const file of ["usage-timings.json", "usage-tokens.json"]) expect(await fs.readFile(path.join(mocks.directory, file), "utf8")).toBe("{broken");
+  });
+
+  it("isolates history directory failures from token and timing reports", async () => {
+    await fs.writeFile(path.join(mocks.directory, "sessions"), "not a directory");
+    await register();
+    const tokens = await import("../lib/token-usage");
+    tokens.recordAcpTokenUsage("turn", { totalTokens: 42 });
+    const result = await query();
+    expect(result.data).toMatchObject({ incompleteHistory: true, incompleteTimings: false, tokens: { incomplete: false } });
+    expect(result.data?.tokens.engines.find((entry) => entry.engine === "acp")?.totalTokens).toBe(42);
+  });
+
+  it("does not write ledgers to produce a report, even when persistence is unavailable", async () => {
+    await register();
+    await usage.flushUsage();
+    const file = path.join(mocks.directory, "usage-tokens.json");
+    const original = await fs.readFile(file, "utf8");
+    const tokens = await import("../lib/token-usage");
+    tokens.recordAcpTokenUsage("turn", { totalTokens: 42 });
+    const atomic = await import("../lib/atomic-file");
+    const write = vi.spyOn(atomic, "writeTextAtomically").mockRejectedValue(new Error("disk unavailable"));
+    const result = await query();
+    expect(result.data?.tokens.engines.find((entry) => entry.engine === "acp")?.totalTokens).toBe(42);
+    expect(write).not.toHaveBeenCalled();
+    expect(await fs.readFile(file, "utf8")).toBe(original);
+  });
+
   it("surfaces corrupted timing data without overwriting it with zeros", async () => {
     const file = path.join(mocks.directory, "usage-timings.json");
     await fs.writeFile(file, "{broken");
     await register();
-    expect((await query()).error).toBeTruthy();
+    const result = await query();
+    expect(result.error).toBeUndefined();
+    expect(result.data?.incompleteTimings).toBe(true);
+    expect(result.data?.days.at(-1)?.agentMs).toBeNull();
+    expect(result.data?.tokens.incomplete).toBe(false);
     expect(await fs.readFile(file, "utf-8")).toBe("{broken");
   });
 
@@ -132,7 +176,11 @@ describe("local usage IPC", () => {
     const file = path.join(mocks.directory, "usage-tokens.json");
     await fs.writeFile(file, "{broken");
     await register();
-    expect((await query(1)).error).toBeTruthy();
+    const result = await query(1);
+    expect(result.error).toBeUndefined();
+    expect(result.data?.tokens.incomplete).toBe(true);
+    expect(result.data?.incompleteTimings).toBe(false);
+    expect(result.data?.days[0].activeMs).toBe(0);
     expect(await fs.readFile(file, "utf-8")).toBe("{broken");
   });
 });

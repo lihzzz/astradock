@@ -20,6 +20,22 @@ function writeSettings(settings: object): void {
   fs.writeFileSync(path.join(state.directory, "settings.json"), JSON.stringify(settings));
 }
 
+describe("telemetry consent", () => {
+  it("defaults new installations to off without creating or rewriting settings", async () => {
+    const settings = await import("../app-settings");
+    expect(settings.getAppSettings().analyticsEnabled).toBe(false);
+    expect(fs.existsSync(path.join(state.directory, "settings.json"))).toBe(false);
+  });
+  it.each([true, false])("preserves the existing explicit consent value %s byte-for-byte on read", async (analyticsEnabled) => {
+    writeSettings({ analyticsEnabled, analyticsUserId: "existing-id", defaultChatLimit: 20 });
+    const file = path.join(state.directory, "settings.json");
+    const original = fs.readFileSync(file, "utf8");
+    const settings = await import("../app-settings");
+    expect(settings.getAppSettings().analyticsEnabled).toBe(analyticsEnabled);
+    expect(fs.readFileSync(file, "utf8")).toBe(original);
+  });
+});
+
 describe("engine binary source settings", () => {
   it("migrates both legacy managed sources to system detection and persists them on save", async () => {
     writeSettings({ codexBinarySource: "managed", claudeBinarySource: "managed", codexClientName: "Existing client" });

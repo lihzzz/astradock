@@ -14,6 +14,7 @@ import { randomUUID } from "crypto";
 import { app } from "electron";
 import { getAppSettings, setAppSettings } from "./app-settings";
 import { log } from "./logger";
+import { isTelemetryEvent, sanitizeTelemetryProperties, telemetryErrorProperties } from "@shared/lib/telemetry-privacy";
 
 // Lazy-loaded PostHog client
 let PostHogCtor: typeof import("posthog-node").PostHog | null = null;
@@ -55,9 +56,8 @@ export async function initPostHog(): Promise<void> {
       // Flush events every 10 seconds or 20 events, whichever comes first
       flushAt: 20,
       flushInterval: 10000,
-      // Automatically capture uncaught exceptions and unhandled promise rejections
-      // via process.on('uncaughtException') and process.on('unhandledRejection')
-      enableExceptionAutocapture: true,
+      // Raw exception autocapture bypasses the application privacy boundary.
+      enableExceptionAutocapture: false,
     });
 
     log("POSTHOG", `Initialized (userId=${userId})`);
@@ -127,17 +127,13 @@ export async function captureEvent(
   event: string,
   properties?: Record<string, unknown>
 ): Promise<void> {
-  if (!client || !userId) return;
+  if (!client || !userId || !getAppSettings().analyticsEnabled || !isTelemetryEvent(event)) return;
 
   try {
     client.capture({
       distinctId: userId,
       event,
-      properties: {
-        ...properties,
-        // Always include version in all events
-        app_version: app.getVersion(),
-      },
+      properties: sanitizeTelemetryProperties({ ...properties, app_version: app.getVersion() }),
     });
   } catch (err) {
     // Non-fatal - analytics should never break the app
@@ -146,11 +142,8 @@ export async function captureEvent(
 }
 
 /**
- * Capture an exception to PostHog error tracking.
- *
- * Use this for errors caught in IPC handlers, SDK event loops, child process
- * failures, etc. — anywhere you have an Error object and want a tracked
- * $exception event with stack trace.
+ * Report only an allowlisted error category as an app_error event.
+ * Original messages, stacks, causes and free-form context stay on the device.
  */
 export function captureException(
   error: Error,
@@ -159,7 +152,7 @@ export function captureException(
   if (!client || !userId) return;
 
   try {
-    client.captureException(error, userId, additionalProperties);
+    void captureEvent("app_error", telemetryErrorProperties(error, additionalProperties));
   } catch (err) {
     log("POSTHOG", `Failed to capture exception: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -171,12 +164,12 @@ export function captureException(
 export async function identifyUser(
   properties: Record<string, unknown>
 ): Promise<void> {
-  if (!client || !userId) return;
+  if (!client || !userId || !getAppSettings().analyticsEnabled) return;
 
   try {
     client.identify({
       distinctId: userId,
-      properties,
+      properties: sanitizeTelemetryProperties(properties),
     });
   } catch (err) {
     log("POSTHOG", `Failed to identify user: ${err instanceof Error ? err.message : String(err)}`);

@@ -21,12 +21,12 @@ export const AnalyticsSettings = memo(function AnalyticsSettings({
 }: AnalyticsSettingsProps) {
   const { t } = useI18n();
   // Local optimistic state — synced from props once loaded
-  const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (appSettings) {
-      setAnalyticsEnabled(appSettings.analyticsEnabled ?? true);
+      setAnalyticsEnabled(appSettings.analyticsEnabled ?? false);
       setUserId(appSettings.analyticsUserId ?? null);
     }
   }, [appSettings]);

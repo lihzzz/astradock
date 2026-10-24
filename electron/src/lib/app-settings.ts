@@ -60,7 +60,7 @@ const DEFAULTS: AppSettings = {
   opencodeCustomBinaryPath: "",
   showDevFillInChatTitleBar: false,
   macBackgroundEffect: "liquid-glass",
-  analyticsEnabled: true,
+  analyticsEnabled: false,
   memory: MEMORY_DEFAULTS,
 };
 

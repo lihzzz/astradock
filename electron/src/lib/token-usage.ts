@@ -4,7 +4,7 @@ import type { SessionTokenUsage, UsageTokens, UsageTokenTotals } from "@shared/t
 import { getDataDir } from "./data-dir";
 import { writeTextAtomically } from "./atomic-file";
 import { reportError } from "./error-utils";
-import { ClaudeTokenObserver, CodexTokenObserver, TokenUsageTracker } from "./token-usage-tracker";
+import { ClaudeTokenObserver, CodexTokenObserver, TokenUsageTracker, type CodexChildTurnListener } from "./token-usage-tracker";
 import { isSessionTokenData, SessionTokenUsageTracker, type SessionTokenData } from "./session-token-usage-tracker";
 
 let tracker: TokenUsageTracker | undefined;
@@ -92,7 +92,7 @@ export function createClaudeTokenObserver(resumed: boolean, sessionId?: string):
   }, resumed, sessionId ? (agentId, tokens) => sessionTracker.recordSubagent(sessionId, agentId, tokens) : undefined);
 }
 
-export function createCodexTokenObserver(resumed: boolean, sessionId?: string): CodexTokenObserver {
+export function createCodexTokenObserver(resumed: boolean, sessionId?: string, onChildTurn?: CodexChildTurnListener): CodexTokenObserver {
   getTracker();
   return new CodexTokenObserver((engine, totals, timestamp) => {
     getTracker().record(engine, totals, timestamp);
@@ -100,7 +100,7 @@ export function createCodexTokenObserver(resumed: boolean, sessionId?: string): 
   }, resumed, {
     get(threadId) { getTracker(); return codexBaselines.get(threadId); },
     set(threadId, totals) { getTracker(); codexBaselines.set(threadId, totals); },
-  }, sessionId ? (agentId, tokens) => sessionTracker.recordSubagent(sessionId, agentId, tokens) : undefined);
+  }, sessionId ? (agentId, tokens) => sessionTracker.recordSubagent(sessionId, agentId, tokens) : undefined, undefined, onChildTurn);
 }
 
 export function recordAcpTokenUsage(promptId: string, usage: unknown, sessionId?: string): void {

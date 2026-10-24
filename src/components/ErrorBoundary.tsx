@@ -1,6 +1,6 @@
 import { Component } from "react";
 import type { ReactNode, ErrorInfo } from "react";
-import { posthog } from "@/lib/analytics/posthog";
+import { captureException } from "@/lib/analytics/analytics";
 
 interface Props {
   children: ReactNode;
@@ -15,8 +15,7 @@ interface State {
  * fallback instead of a blank/transparent window. Especially important in
  * Electron where a transparent frameless window makes crashes invisible.
  *
- * Also captures exceptions to PostHog for error tracking (respects the
- * analytics opt-in/out setting via posthog-js opt_out state).
+ * Reports only sanitized error categories through the main-process consent gate.
  */
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
@@ -33,7 +32,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
     // Capture to PostHog error tracking (no-ops if user has opted out)
     try {
-      posthog.captureException(error, {
+      captureException(error, {
         componentStack: info.componentStack ?? undefined,
       });
     } catch {

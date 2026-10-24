@@ -431,7 +431,13 @@ function setupCodexHandlers(
   resumed: boolean,
 ): void {
   bindSessionTokenUsage(internalId);
-  const tokenObserver = createCodexTokenObserver(resumed, internalId);
+  const tokenObserver = createCodexTokenObserver(resumed, internalId, (threadId, turnId, running) => {
+    // Child notifications are filtered from the root transcript below, but their
+    // lifetimes still belong to this session's wall-clock union.
+    const key = JSON.stringify(["child", threadId, turnId]);
+    if (running) beginUsageTurn(internalId, key);
+    else endUsageTurn(internalId, key);
+  });
   const subagents = new CodexSubagentTracker(() => session.threadId);
   rpc.onStderr = (text) => {
     log("codex", `[stderr:${internalId.slice(0, 8)}] ${text.slice(0, 500)}`);

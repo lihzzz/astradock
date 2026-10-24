@@ -178,5 +178,6 @@ export function buildUsageReport(
     trackingStartedAt: timings.trackingStartedAt,
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     incompleteHistory: false,
+    incompleteTimings: false,
   };
 }

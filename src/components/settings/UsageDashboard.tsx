@@ -137,12 +137,12 @@ export function UsageDashboard() {
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">{t("usageActiveTime")}</dt>
-              <dd className="mt-1 text-2xl font-semibold tabular-nums">{duration(totals.active)}</dd>
+              <dd className="mt-1 text-2xl font-semibold tabular-nums">{duration(report.incompleteTimings ? null : totals.active)}</dd>
               <p className="mt-1 text-[11px] text-muted-foreground">{t("usageActiveShort")}</p>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">{t("usageAgentTime")}</dt>
-              <dd className="mt-1 text-2xl font-semibold tabular-nums">{duration(totals.agent)}</dd>
+              <dd className="mt-1 text-2xl font-semibold tabular-nums">{duration(report.incompleteTimings ? null : totals.agent)}</dd>
               <p className="mt-1 text-[11px] text-muted-foreground">{t("usageAgentShort")}</p>
             </div>
           </dl>
@@ -151,6 +151,7 @@ export function UsageDashboard() {
           )}
           {report.incompleteHistory && <p role="status" className="text-xs text-destructive">{t("usageIncomplete")}</p>}
 
+          {report.incompleteTimings && <p role="status" className="text-xs text-destructive">{t("usageTimingIncomplete")}</p>}
           <TokenUsageSection report={report.tokens} />
 
           <div>
@@ -208,7 +209,7 @@ export function UsageDashboard() {
             <summary className="cursor-pointer text-foreground focus-visible:outline-ring">{t("usageHowCounted")}</summary>
             <div className="mt-2 space-y-2 leading-relaxed">
               <p>{t("usageHistoryNote")}</p>
-              <p>{t("usageTimingSince")} {new Date(report.trackingStartedAt).toLocaleString(language)}</p>
+              {!report.incompleteTimings && <p>{t("usageTimingSince")} {new Date(report.trackingStartedAt).toLocaleString(language)}</p>}
               <p>{t("usageActiveNote")}</p>
               <p>{t("usageAgentNote")}</p>
               <p>{t("usageCommandNote")}</p>
