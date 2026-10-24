@@ -1,36 +1,77 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
+import { Brain, ExternalLink, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { reportError } from "@/lib/analytics/analytics";
 import type { AppSettings } from "@/types";
-import type { MemorySettings as MemoryConfig, MemoryStatusResult } from "@shared/types/memory";
+import type { MemoryStatusResult } from "@shared/types/memory";
 import { MEMORY_DEFAULTS } from "@shared/lib/memory";
-import { TextField, formatScopes, parseScopes, parseIds } from "@/components/memory/BindingFields";
-import { ProjectMemorySettings } from "@/components/memory/ProjectMemorySettings";
-interface Props { appSettings: AppSettings | null; onUpdateAppSettings: (patch: Partial<AppSettings>) => Promise<void>; projectId?: string }
-export const MemorySettings = memo(function MemorySettings({ appSettings, onUpdateAppSettings, projectId }: Props) {
-  const [draft, setDraft] = useState<MemoryConfig>(appSettings?.memory ?? MEMORY_DEFAULTS); const [token, setToken] = useState("");
-  const [scopes, setScopes] = useState(""); const [summaries, setSummaries] = useState("");
-  const [status, setStatus] = useState<MemoryStatusResult | null>(null); const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
-  useEffect(() => { if (appSettings) { setDraft(appSettings.memory); setScopes(formatScopes(appSettings.memory.personalReadScopes)); setSummaries(appSettings.memory.personalSummaryBlockIds.join("\n")); } }, [appSettings]);
-  async function act(task: () => Promise<void>) { if (busy) return; setBusy(true); setMessage(""); try { await task(); } catch (error) { setMessage(error instanceof Error ? error.message : "记忆设置操作失败"); } finally { setBusy(false); } }
-  const patch = (value: Partial<MemoryConfig>) => setDraft((current) => ({ ...current, ...value }));
-  return <div className="space-y-4 p-4 overflow-auto"><h2 className="text-lg font-semibold">思源长期记忆</h2>
-    <p className="text-xs text-muted-foreground">仅连接本机思源。当前 Agent 自动总结并追加，不逐条确认；不启用额外总结模型或云端记忆服务。思源未运行时记忆暂时失效。</p>
-    <TextField label="本机地址" value={draft.baseUrl} onChange={(baseUrl) => patch({ baseUrl })} disabled={busy} />
-    <label className="block text-xs">API Token（可选，仅主进程安全保存）<input aria-label="思源 API Token" type="password" autoComplete="off" className="mt-1 w-full rounded border bg-background p-2" value={token} disabled={busy} onChange={(e) => setToken(e.target.value)} /></label>
-    <Button variant="outline" size="sm" disabled={busy} onClick={() => void act(async () => { const result = await window.claude.memory.setToken(token); if (result.error) throw new Error(result.error); setToken(""); setMessage(result.value?.persistent ? "Token 已保存或清除" : "安全存储不可用，Token 仅在本次进程有效"); })}>保存 Token（空值清除）</Button>
-    <Button variant="outline" size="sm" disabled={busy} onClick={() => void act(async () => { const result = await window.claude.memory.probe(draft.baseUrl); if (result.error) throw new Error(result.error); if (result.value) { patch({ expectedWorkspacePath: result.value.workspacePath }); setMessage("已检测思源 " + result.value.version + "；请确认工作空间并绑定锚点文档。"); } })}>探测本机连接</Button>
-    <TextField label="预期工作空间路径（需与你的思源一致）" value={draft.expectedWorkspacePath} onChange={(expectedWorkspacePath) => patch({ expectedWorkspacePath })} disabled={busy} />
-    <TextField label="工作空间身份锚点文档 ID" value={draft.identityAnchorDocumentId} onChange={(identityAnchorDocumentId) => patch({ identityAnchorDocumentId })} disabled={busy} />
-    <label className="flex gap-2 text-xs"><input type="checkbox" checked={draft.enabled} disabled={busy} onChange={(e) => patch({ enabled: e.target.checked })} />启用思源长期记忆</label>
-    <details className="rounded border p-3 space-y-3"><summary>个人记忆（跨项目）</summary>
-      <label className="flex gap-2 text-xs"><input type="checkbox" checked={draft.personalReadEnabled} disabled={busy} onChange={(e) => patch({ personalReadEnabled: e.target.checked })} />允许读取个人记忆</label>
-      <label className="flex gap-2 text-xs"><input type="checkbox" checked={draft.personalAutoWriteEnabled} disabled={busy} onChange={(e) => patch({ personalAutoWriteEnabled: e.target.checked })} />允许自动保存明确的跨项目偏好</label>
-      <TextField label="个人记忆写入文档 ID" value={draft.personalWriteDocumentId} onChange={(personalWriteDocumentId) => patch({ personalWriteDocumentId })} disabled={busy} />
-      <TextField label="个人只读范围：笔记本ID/文档ID，可加 /*" value={scopes} onChange={setScopes} multiline disabled={busy} />
-      <TextField label="个人摘要块 ID（每行一个）" value={summaries} onChange={setSummaries} multiline disabled={busy} />
+interface Props { appSettings: AppSettings | null; onUpdateAppSettings: (patch: Partial<AppSettings>) => Promise<void> }
+export const MemorySettings = memo(function MemorySettings({ appSettings, onUpdateAppSettings }: Props) {
+  const memory = appSettings?.memory ?? MEMORY_DEFAULTS;
+  const [baseUrl, setBaseUrl] = useState(memory.baseUrl);
+  const [token, setToken] = useState("");
+  const [status, setStatus] = useState<MemoryStatusResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const locked = useRef(false);
+  useEffect(() => { setBaseUrl(memory.baseUrl); }, [memory.baseUrl]);
+  useEffect(() => {
+    let active = true;
+    void window.claude.memory.getStatus().then(value => { if (active) setStatus(value); }).catch(error => {
+      reportError("MEMORY_STATUS", error); if (active) setMessage("记忆状态读取失败，请重新连接");
+    });
+    return () => { active = false; };
+  }, [memory.enabled, memory.managedNotebookId]);
+  async function act(task: () => Promise<void>) {
+    if (locked.current) return;
+    locked.current = true; setBusy(true); setMessage("");
+    try { await task(); }
+    catch (error) { reportError("MEMORY_SETTINGS", error); setMessage(error instanceof Error ? error.message : "记忆连接失败"); }
+    finally { locked.current = false; setBusy(false); }
+  }
+  async function connect() {
+    if (token.trim()) {
+      const saved = await window.claude.memory.setToken(token.trim());
+      if (saved.error) throw new Error(saved.error);
+      setToken("");
+      if (saved.value && !saved.value.persistent) setMessage("安全存储不可用，Token 仅在本次进程有效。");
+    }
+    const result = await window.claude.memory.connect(baseUrl);
+    if (result.error) throw new Error(result.error);
+    if (result.value) await onUpdateAppSettings({ memory: result.value });
+    setStatus(await window.claude.memory.getStatus());
+  }
+  return <div className="space-y-5 overflow-auto p-4">
+    <div className="flex items-center gap-2"><Brain className="size-5" /><h2 className="text-lg font-semibold">长期记忆</h2></div>
+    <p className="text-sm text-muted-foreground">一个固定的大脑，跨会话、项目和模型持续积累。启用后自动创建或复用专用记忆库，无需手动绑定。</p>
+    <section className="space-y-4 rounded-lg border p-4">
+      <label className="flex items-center justify-between gap-3 text-sm font-medium">启用长期记忆
+        <input type="checkbox" role="switch" aria-label="启用长期记忆" checked={memory.enabled} disabled={busy || !appSettings} onChange={event => {
+          const enabled = event.target.checked;
+          void act(async () => {
+            if (enabled) await connect();
+            else { await onUpdateAppSettings({ memory: { ...memory, enabled: false } }); setMessage("已暂停长期记忆，已有内容保留在思源中。"); setStatus(await window.claude.memory.getStatus()); }
+          });
+        }} />
+      </label>
+      <div className="space-y-1 text-sm"><p role="status">{busy ? "正在连接并核对记忆库…" : !memory.enabled ? "长期记忆未启用" : status?.message ?? "正在检查连接…"}</p>
+        <p className="text-muted-foreground">存储位置：AstraDock 记忆（自动管理）</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" disabled={busy || status?.state !== "ready" || !memory.managedNotebookId} onClick={() => void act(async () => { const result = await window.claude.memory.openBrain(); if (result.error) throw new Error(result.error); })}><ExternalLink className="me-1 size-4" />查看记忆</Button>
+        <Button size="sm" variant="outline" disabled={busy || !appSettings} onClick={() => void act(connect)}><RefreshCw className="me-1 size-4" />{memory.managedNotebookId ? "重新连接" : "连接并启用"}</Button>
+      </div>
+    </section>
+    <details className="space-y-3 rounded-lg border p-4">
+      <summary className="cursor-pointer text-sm">连接设置</summary>
+      <p className="text-xs text-muted-foreground">默认连接本机思源。仅在地址不同或需要认证时修改。重新连接不会更换已有记忆库。</p>
+      <label className="block space-y-1 text-xs"><span>本机地址</span><input aria-label="思源本机地址" className="w-full rounded border bg-background p-2" value={baseUrl} disabled={busy} onChange={e => setBaseUrl(e.target.value)} /></label>
+      <label className="block space-y-1 text-xs"><span>API Token（可选）</span><input aria-label="思源 API Token" type="password" autoComplete="off" className="w-full rounded border bg-background p-2" value={token} disabled={busy} placeholder={status?.hasToken ? "已保存；留空保留" : "无需认证时留空"} onChange={e => setToken(e.target.value)} /></label>
+      <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" disabled={busy || !appSettings} onClick={() => void act(connect)}>保存并连接</Button>
+        {status?.hasToken ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => void act(async () => { const result = await window.claude.memory.setToken(""); if (result.error) throw new Error(result.error); setStatus(await window.claude.memory.getStatus()); setMessage("已清除保存的 Token。"); })}>清除 Token</Button> : null}</div>
     </details>
-    <Button disabled={busy} onClick={() => void act(async () => { await onUpdateAppSettings({ memory: { ...draft, personalReadScopes: parseScopes(scopes), personalSummaryBlockIds: parseIds(summaries) } }); setStatus(await window.claude.memory.getStatus()); setMessage("配置已保存。已有会话下次发送会重新检查权限。"); })}>保存连接与全局权限</Button>
-    <p role="status" className="text-xs whitespace-pre-wrap">{message}{status ? "\n" + status.message : ""}</p>
-    {projectId ? <ProjectMemorySettings key={projectId} projectId={projectId} /> : <p className="text-xs">打开项目后可配置项目读写绑定。</p>}
+    {message ? <p role="status" className="whitespace-pre-wrap text-xs">{message}</p> : null}
+    {memory.enabled && !memory.managedNotebookId ? <p className="text-xs text-muted-foreground">旧版手动绑定不会自动搬迁或删除。点击「连接并启用」后，新记忆统一存入专用库；原笔记仍保留在思源。</p> : null}
+    <p className="text-xs text-muted-foreground">助手自动保存有依据的结论与明确偏好，不逐条询问。项目知识与通用偏好自动分类，只访问专用库，不读取其他笔记本。思源未运行时记忆暂时不可用，聊天仍可继续。</p>
   </div>;
 });

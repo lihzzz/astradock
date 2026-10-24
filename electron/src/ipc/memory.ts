@@ -1,11 +1,11 @@
-import { BrowserWindow, ipcMain } from "electron";
+import { BrowserWindow, ipcMain, shell } from "electron";
 import { onMemoryEvent } from "../lib/memory/events";
 import { safeSend } from "../lib/safe-send";
 import { z } from "zod";
 import { assertMainRenderer } from "../lib/productivity-ipc";
 import { readProjects } from "./projects";
 import { memoryProjectSchema } from "@shared/lib/memory";
-import { getMemoryStatus, probeMemory, rememberSession, getMemoryProjectConfig, setMemoryProjectConfig, validateProjectBinding, getMemoryRecallState, setSkipNextMemoryRecall, remember, memoryJournal, reconcileMemory } from "../lib/memory/service";
+import { getMemoryStatus, connectMemory, getBrainDocument, probeMemory, rememberSession, getMemoryProjectConfig, setMemoryProjectConfig, validateProjectBinding, getMemoryRecallState, setSkipNextMemoryRecall, remember, memoryJournal, reconcileMemory } from "../lib/memory/service";
 import { setMemoryToken } from "../lib/memory/secrets";
 import { MemoryError } from "../lib/memory/siyuan/connection";
 export function register(getMainWindow: () => BrowserWindow | null): void {
@@ -16,6 +16,8 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     catch (error) { return { error: error instanceof MemoryError ? error.message : "记忆操作失败，请检查配置和目标；未确认写入请先核对" }; }
   });
   ipcMain.handle("memory:get-status", async (event) => { assertMainRenderer(event, getMainWindow); return getMemoryStatus(); });
+  handle("memory:connect", (url) => connectMemory(z.string().max(200).parse(url)));
+  handle("memory:open-brain", async () => { const id = await getBrainDocument(); await shell.openExternal("siyuan://blocks/" + id); return null; });
   handle("memory:probe", (url) => probeMemory(z.string().max(200).parse(url)));
   handle("memory:set-token", (token) => setMemoryToken(z.string().max(4096).parse(token)));
   handle("memory:get-project-config", (id) => getMemoryProjectConfig(project(id)));

@@ -3,7 +3,9 @@ export type MemoryScope = "project" | "personal";
 export type MemoryKind = "preference" | "convention" | "decision" | "troubleshooting" | "procedure" | "correction";
 export interface MemoryReadScope { notebookId: string; documentId: string; includeDescendants: boolean }
 export interface MemorySettings {
-  schemaVersion: 2; enabled: boolean; baseUrl: string; expectedWorkspacePath: string;
+  schemaVersion: 2; enabled: boolean; baseUrl: string;
+  /** Set only by the application-managed brain initializer. Absent on legacy bindings. */
+  managedNotebookId?: string; expectedWorkspacePath: string;
   identityAnchorDocumentId: string; personalReadEnabled: boolean; personalAutoWriteEnabled: boolean;
   personalSummaryBlockIds: string[]; personalReadScopes: MemoryReadScope[]; personalWriteDocumentId: string;
 }
@@ -26,6 +28,8 @@ export interface MemoryEvent { projectId: string; message: string; level: "info"
 export interface MemoryApi {
   onEvent(listener: (event: MemoryEvent) => void): () => void;
   getStatus(): Promise<MemoryStatusResult>;
+  connect(baseUrl: string): Promise<MemoryResult<MemorySettings>>;
+  openBrain(): Promise<MemoryResult<null>>;
   probe(baseUrl: string): Promise<MemoryResult<{ workspacePath: string; version: string }>>;
   setToken(token: string): Promise<MemoryResult<{ persistent: boolean }>>;
   getProjectConfig(projectId: string): Promise<MemoryResult<MemoryProjectConfig>>;

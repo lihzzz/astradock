@@ -5,6 +5,8 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { MEMORY_DEFAULTS, MEMORY_PROJECT_DEFAULTS } from "@shared/lib/memory";
 const f = vi.hoisted(() => ({ directory: "", settings: {}, config: {}, api: vi.fn(), call: vi.fn(), probe: vi.fn(), register: vi.fn(), revoke: vi.fn() }));
 vi.mock("../app-settings", () => ({ getAppSettings: () => ({ memory: f.settings }) }));
+vi.mock("../logger", () => ({ log: vi.fn() }));
+vi.mock("../error-utils", () => ({ reportError: vi.fn() }));
 vi.mock("../data-dir", () => ({ getDataDir: () => f.directory }));
 vi.mock("./secrets", () => ({ getMemoryToken: () => "" }));
 vi.mock("./project-config", () => ({ getMemoryProjectConfig: () => f.config, setMemoryProjectConfig: vi.fn() }));

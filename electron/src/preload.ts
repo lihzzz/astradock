@@ -474,6 +474,8 @@ contextBridge.exposeInMainWorld("claude", {
   memory: {
     onEvent: (callback: (event: MemoryEvent) => void) => { const listener = (_event: IpcRendererEvent, value: MemoryEvent) => callback(value); ipcRenderer.on("memory:event", listener); return () => ipcRenderer.removeListener("memory:event", listener); },
     getStatus: () => ipcRenderer.invoke("memory:get-status"),
+    connect: (url: string) => ipcRenderer.invoke("memory:connect", url),
+    openBrain: () => ipcRenderer.invoke("memory:open-brain"),
     probe: (url: string) => ipcRenderer.invoke("memory:probe", url),
     setToken: (token: string) => ipcRenderer.invoke("memory:set-token", token),
     getProjectConfig: (id: string) => ipcRenderer.invoke("memory:get-project-config", id),

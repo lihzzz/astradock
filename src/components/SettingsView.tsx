@@ -190,7 +190,6 @@ export const SettingsView = memo(function SettingsView({
           <MemorySettings
             appSettings={appSettings}
             onUpdateAppSettings={updateAppSettings}
-            projectId={sessions.find((session) => session.id === activeSessionId)?.projectId}
           />
         );
       case "advanced":

@@ -5,9 +5,10 @@ import { z } from "zod";
 import { blockId, MEMORY_AGENT_INSTRUCTIONS } from "@shared/lib/memory";
 import type { MemoryKind, MemoryProjectConfig, MemoryReadScope, MemoryRecallItem, MemoryRecallState, MemoryScope, MemoryStatusResult, MemoryWriteRecord } from "@shared/types/memory";
 import type { McpServerInput } from "@shared/lib/mcp-config";
-import { getAppSettings } from "../app-settings";
+import { initializeBrain, managedProject, managedWritePage, validateBrain } from "./managed-brain";
+import { getAppSettings, setAppSettings } from "../app-settings";
 import { SiyuanClient, MemoryError } from "./siyuan/connection";
-import { attributes, assertScope, children, documentLocation, normalizeMemoryText, plainMemoryMarkdown, readBlock, rejectSensitive } from "./siyuan/blocks";
+import { attributes, assertScope, children, documentLocation, location, normalizeMemoryText, plainMemoryMarkdown, readBlock, rejectSensitive } from "./siyuan/blocks";
 import { getMemoryToken } from "./secrets";
 import { getMemoryProjectConfig, setMemoryProjectConfig } from "./project-config";
 import { MemoryJournal } from "./write-journal";
@@ -27,17 +28,36 @@ function client(baseUrl = getAppSettings().memory.baseUrl): SiyuanClient {
   if (!cachedClient || cachedClient.key !== key) cachedClient = { key, client: new SiyuanClient(baseUrl, token) };
   return cachedClient.client;
 }
-function epoch(projectId: string): string { return hash(JSON.stringify([getAppSettings().memory, getMemoryProjectConfig(projectId), getMemoryToken()])); }
+function epoch(projectId: string): string { return hash(JSON.stringify([getAppSettings().memory, getAppSettings().memory.managedNotebookId ? null : getMemoryProjectConfig(projectId), getMemoryToken()])); }
 export async function probeMemory(baseUrl: string) { return client(baseUrl).probe(); }
+export async function connectMemory(baseUrl: string) {
+  const before = JSON.stringify(getAppSettings().memory); const token = getMemoryToken();
+  const check = () => { if (before !== JSON.stringify(getAppSettings().memory) || token !== getMemoryToken()) throw new MemoryError("denied", "连接设置已变化，请重新连接"); };
+  const connection = client(baseUrl); const info = await connection.probe(); check();
+  const previous = getAppSettings().memory;
+  if (previous.expectedWorkspacePath && pathKey(previous.expectedWorkspacePath) !== pathKey(info.workspacePath)) throw new MemoryError("workspace-mismatch", "思源工作空间已变化，请恢复原工作空间；不会替换已有记忆库");
+  if (previous.managedNotebookId) await validateBrain(connection, previous);
+  const brain = await initializeBrain(connection, info.workspacePath, check); check();
+  const memory = { ...previous, enabled: true, baseUrl: connection.baseUrl, managedNotebookId: brain.notebook,
+    expectedWorkspacePath: info.workspacePath, identityAnchorDocumentId: brain.root,
+    personalReadEnabled: true, personalAutoWriteEnabled: true, personalWriteDocumentId: brain.personal,
+    personalSummaryBlockIds: [], personalReadScopes: [{ notebookId: brain.notebook, documentId: brain.personal, includeDescendants: true }] };
+  setAppSettings({ memory }); return memory;
+}
+export async function getBrainDocument(): Promise<string> {
+  const status = await getMemoryStatus(); if (status.state !== "ready") throw new MemoryError("unavailable", status.message);
+  return getAppSettings().memory.identityAnchorDocumentId;
+}
 export async function getMemoryStatus(): Promise<MemoryStatusResult> {
   let hasToken = false;
   try {
     hasToken = !!getMemoryToken(); const settings = getAppSettings().memory;
-    if (!settings.enabled || !settings.expectedWorkspacePath || !settings.identityAnchorDocumentId) return { state: "unconfigured", message: "请连接思源并绑定工作空间后启用记忆", hasToken };
+    if (!settings.enabled || !settings.expectedWorkspacePath || !settings.identityAnchorDocumentId) return { state: "unconfigured", message: "请启用长期记忆并连接本机思源，记忆库将自动初始化", hasToken };
     const connection = client(); const info = await connection.probe();
-    if (pathKey(info.workspacePath) !== pathKey(settings.expectedWorkspacePath)) throw new MemoryError("workspace-mismatch", "思源工作空间已变化，请重新绑定");
+    if (pathKey(info.workspacePath) !== pathKey(settings.expectedWorkspacePath)) throw new MemoryError("workspace-mismatch", "思源工作空间已变化，请恢复原工作空间；不会创建替代记忆库");
     await documentLocation(connection, settings.identityAnchorDocumentId);
-    return { state: "ready", message: "思源长期记忆已连接", hasToken, ...info };
+    if (settings.managedNotebookId) await validateBrain(connection, settings);
+    return { state: "ready", message: settings.managedNotebookId ? "长期记忆已就绪 · AstraDock 记忆" : "旧版记忆已连接；可在设置中升级为固定记忆库", hasToken, ...info };
   } catch (error) {
     const state = error instanceof MemoryError && !["denied", "capacity"].includes(error.code) ? error.code : "unavailable";
     return { state: state === "denied" || state === "capacity" ? "unavailable" : state, message: error instanceof MemoryError ? error.message : "思源连接或安全存储不可用", hasToken };
@@ -68,14 +88,16 @@ export function withMemoryMcpServers(servers: McpServerInput[] | undefined, id: 
 export { memoryMcpDefinition };
 export function isMemoryTool(name: string): boolean { return /^(?:mcp__harnss_memory__|Tool: harnss_memory\/)memory_(status|search|read|remember)$/.test(name); }
 async function access(projectId: string, sessionId?: string) {
-  const stamp = epoch(projectId); const settings = getAppSettings().memory; const config = getMemoryProjectConfig(projectId);
-  if (!settings.enabled || !config.enabled) throw new MemoryError("denied", "当前项目长期记忆未启用");
+  const stamp = epoch(projectId); const settings = getAppSettings().memory;
+  if (!settings.enabled) throw new MemoryError("denied", "长期记忆未启用");
   const context = sessionId ? requireSession(sessionId) : null;
   const status = await getMemoryStatus();
   if (status.state !== "ready") throw new MemoryError("unavailable", status.message);
   const connection = client();
   const check = () => { if (epoch(projectId) !== stamp || (sessionId && sessions.get(sessionId) !== context)) throw new MemoryError("denied", "记忆配置或会话已变化"); };
   check();
+  const config = settings.managedNotebookId ? await managedProject(connection, settings, projectId, check) : getMemoryProjectConfig(projectId);
+  if (!config.enabled) throw new MemoryError("denied", "长期记忆未启用，请在设置中连接固定记忆库");
   const scopes = async (scope: MemoryScope): Promise<MemoryReadScope[]> => {
     check();
     if (scope === "personal" && (!config.includePersonalMemory || !settings.personalReadEnabled)) throw new MemoryError("denied", "个人记忆读取未启用");
@@ -141,7 +163,8 @@ async function read(id: string, refs: string[]): Promise<MemoryRecallItem[]> {
       const scopes = await a.scopes(candidate.scope); await assertScope(a.connection, candidate.id, scopes);
       const attrs = await attributes(a.connection, candidate.id); if (["invalidated", "superseded"].includes(attrs["custom-astradock-status"])) continue;
       let body = await readBlock(a.connection, candidate.id);
-      const correctionTarget = candidate.scope === "project" ? a.config.writeDocumentId : a.settings.personalWriteDocumentId;
+      const candidateLocation = a.settings.managedNotebookId ? await location(a.connection, candidate.id) : null;
+      const correctionTarget = candidateLocation ? candidateLocation.path.split("/").at(-1)!.slice(0, -3) : candidate.scope === "project" ? a.config.writeDocumentId : a.settings.personalWriteDocumentId;
       const corrections = await correctionIds(a.connection, correctionTarget, candidate.id);
       if (corrections.length) {
         body = "[历史条目；以下存在明确修正，不能单独依赖旧结论]\n" + body.slice(0, 400);
@@ -174,7 +197,7 @@ export async function beforeMemorySend(id: string, userText: string): Promise<{ 
   };
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    if (!getAppSettings().memory.enabled || !getMemoryProjectConfig(session.projectId).enabled || /^\s*\//.test(userText)) return { text: userText, turnId };
+    if (!getAppSettings().memory.enabled || (!getAppSettings().memory.managedNotebookId && !getMemoryProjectConfig(session.projectId).enabled) || /^\s*\//.test(userText)) return { text: userText, turnId };
     const stamp = epoch(session.projectId); if (session.stamp !== stamp) { session.first = false; session.refs.clear(); session.stamp = stamp; }
     const items = await Promise.race([prepare(), new Promise<undefined>((resolve) => { timer = setTimeout(() => resolve(undefined), 2000); })]);
     if (sessions.get(id) !== session || session.turnId !== turnId) return { text: userText, turnId };
@@ -198,7 +221,8 @@ export async function remember(projectId: string, text: string, scope: MemorySco
   const assertTurn = () => { if (sourceSession && (sourceSession.cancelled || sourceSession.turnId !== turnId || sessions.get(sessionId) !== sourceSession)) throw new MemoryError("denied", "当前回合已取消或结束，未提交记忆写入"); };
   assertTurn();
   const initial = await access(projectId, sessionId.startsWith("panel:") ? undefined : sessionId);
-  assertTurn(); const target = scope === "project" ? initial.config.writeDocumentId : initial.settings.personalWriteDocumentId;
+  assertTurn(); const rootTarget = scope === "project" ? initial.config.writeDocumentId : initial.settings.personalWriteDocumentId;
+  let target = rootTarget;
   if (!target || (scope === "personal" && (!initial.config.includePersonalMemory || !initial.settings.personalAutoWriteEnabled || !["preference", "correction"].includes(kind)))) throw new MemoryError("denied", "该范围未授权自动写入");
   let correctionId: string | undefined;
   if (kind === "correction") {
@@ -207,16 +231,22 @@ export async function remember(projectId: string, text: string, scope: MemorySco
     await assertScope(initial.connection, candidate.id, await initial.scopes(scope)); correctionId = candidate.id;
   }
   const digest = hash(normalized + (correctionId ?? ""));
-  return serialized(target, async () => {
+  return serialized(rootTarget, async () => {
     assertTurn(); initial.check(); const a = await access(projectId, sessionId.startsWith("panel:") ? undefined : sessionId); initial.check(); assertTurn();
     const all = memoryJournal.list();
-    const duplicate = all.find((r) => r.projectId === projectId && r.target === target && r.hash === digest && r.endpoint === a.connection.baseUrl && pathKey(r.workspace) === pathKey(a.settings.expectedWorkspacePath) && r.state !== "rejected");
+    const duplicate = all.find((r) => r.projectId === projectId && (initial.settings.managedNotebookId ? r.scope === scope : r.target === target) && r.anchor === a.settings.identityAnchorDocumentId && r.hash === digest && r.endpoint === a.connection.baseUrl && pathKey(r.workspace) === pathKey(a.settings.expectedWorkspacePath) && r.state !== "rejected");
     if (duplicate) return reconcileMemory(projectId, duplicate.operationId);
     // A persistent rolling project quota also prevents engine resumes from resetting protection.
     const recent = all.filter((r) => r.projectId === projectId && r.createdAt > Date.now() - 86400_000 && r.state !== "rejected");
     if (recent.length >= 20 || recent.filter((r) => r.sessionId === sessionId && r.turnId === turnId).length >= 3) throw new MemoryError("capacity", "自动记忆写入达到保护上限");
+    if (a.settings.managedNotebookId) {
+      if (correctionId) {
+        const loc = await location(a.connection, correctionId); target = loc.path.split("/").at(-1)!.slice(0, -3);
+        await assertScope(a.connection, target, await a.scopes(scope));
+      } else target = await managedWritePage(a.connection, a.settings, rootTarget, () => { a.check(); assertTurn(); });
+    }
     await documentLocation(a.connection, target);
-    if ((await children(a.connection, target)).length >= 100) throw new MemoryError("capacity", "记忆文档已达 100 块安全上限，请绑定新的写入文档"); a.check(); assertTurn();
+    if ((await children(a.connection, target)).length >= 100) throw new MemoryError("capacity", "记忆文档已达 100 块安全上限，请稍后重试或检查该页修正数量"); a.check(); assertTurn();
     const record: MemoryWriteRecord = { operationId: randomUUID(), projectId, sessionId, turnId, target, scope, workspace: a.settings.expectedWorkspacePath, endpoint: a.connection.baseUrl, anchor: a.settings.identityAnchorDocumentId, hash: digest, kind, state: "prepared", createdAt: Date.now(), updatedAt: Date.now() };
     memoryJournal.save(record); record.state = "submitted"; memoryJournal.save(record);
     try {
@@ -234,9 +264,10 @@ export async function remember(projectId: string, text: string, scope: MemorySco
 export async function reconcileMemory(projectId: string, operationId: string): Promise<MemoryWriteRecord> {
   const record = memoryJournal.list().find((r) => r.operationId === operationId && r.projectId === projectId); if (!record) throw new MemoryError("denied", "操作不存在");
   const a = await access(projectId);
-  const target = record.scope === "project" ? a.config.writeDocumentId : a.settings.personalWriteDocumentId;
+  const target = a.settings.managedNotebookId ? record.target : record.scope === "project" ? a.config.writeDocumentId : a.settings.personalWriteDocumentId;
+  if (a.settings.managedNotebookId) await assertScope(a.connection, target, await a.scopes(record.scope));
   if (record.endpoint !== a.connection.baseUrl || pathKey(record.workspace) !== pathKey(a.settings.expectedWorkspacePath) || record.anchor !== a.settings.identityAnchorDocumentId || target !== record.target || (record.scope === "personal" && (!a.config.includePersonalMemory || !a.settings.personalAutoWriteEnabled))) throw new MemoryError("workspace-mismatch", "原写入目标或授权已变化，暂停核对");
-  const ids = await children(a.connection, target); if (ids.length > 100) throw new MemoryError("capacity", "记忆文档超过 100 个直接块，暂停自动核对，请绑定新的记忆文档");
+  const ids = await children(a.connection, target); if (ids.length > 100) throw new MemoryError("capacity", "记忆文档超过 100 个直接块，暂停自动核对，请在思源检查该页内容");
   const matches: string[] = [];
   for (let i = 0; i < ids.length; i += 10) {
     const batch = await Promise.all(ids.slice(i, i + 10).map(async (id) => ({ id, attrs: await attributes(a.connection, id) })));
@@ -262,8 +293,8 @@ export async function validateProjectBinding(config: MemoryProjectConfig): Promi
 }
 export async function callMemoryTool(id: string, tool: string, value: unknown): Promise<unknown> {
   const session = requireSession(id);
-  if (tool === "memory_status") return { ...(await getMemoryStatus()), projectEnabled: getMemoryProjectConfig(session.projectId).enabled };
-  if (tool === "memory_search") { const args = z.object({ query: z.string().trim().min(2).max(300), scope: z.enum(["project", "personal", "all"]).default("project") }).strict().parse(value); return search(id, args.query, args.scope); }
+  if (tool === "memory_status") return { ...(await getMemoryStatus()), projectEnabled: getAppSettings().memory.enabled && (!!getAppSettings().memory.managedNotebookId || getMemoryProjectConfig(session.projectId).enabled) };
+  if (tool === "memory_search") { const args = z.object({ query: z.string().trim().min(2).max(300), scope: z.enum(["project", "personal", "all"]).default("all") }).strict().parse(value); return search(id, args.query, args.scope); }
   if (tool === "memory_read") { const args = z.object({ refs: z.array(z.string().uuid()).min(1).max(5) }).strict().parse(value); return { items: await read(id, args.refs), untrusted: true }; }
   if (tool === "memory_remember") { const args = z.object({ text: z.string().min(3).max(4000), scope: z.enum(["project", "personal"]).default("project"), kind: z.enum(["preference", "convention", "decision", "troubleshooting", "procedure", "correction"]), sourceRef: z.string().uuid().optional() }).strict().parse(value); const result = await remember(session.projectId, args.text, args.scope, args.kind, id, args.sourceRef); session.recall.status = result.state === "verified" ? "已保存" + (args.scope === "project" ? "项目" : "个人") + "记忆" : "记忆保存状态：" + result.state; return result; }
   throw new MemoryError("denied", "未知记忆工具");
