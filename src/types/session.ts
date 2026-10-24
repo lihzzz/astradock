@@ -158,6 +158,7 @@ export interface ChatSession extends SessionBase {
 }
 
 export interface PersistedSession extends SessionBase {
+  persistenceRevision?: number;
   messages: UIMessage[];
   contextUsage?: ContextUsage | null;
   codexGoal?: CodexThreadGoal | null;

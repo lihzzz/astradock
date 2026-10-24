@@ -159,10 +159,17 @@ export class HistorySemantic {
       if ((!previous || score > previous.score) && (top.size < 100 || score >= minimum)) {
         top.set(row.entryKey, { entryKey: row.entryKey, entryContentHash: row.entryContentHash, start: row.start, end: row.end, score });
         if (top.size > 100) {
-          const worst = [...top.values()].sort((a, b) => a.score - b.score || b.entryKey.localeCompare(a.entryKey))[0];
-          top.delete(worst.entryKey);
+          let worst: SemanticMatch | undefined;
+          for (const candidate of top.values()) {
+            if (!worst || candidate.score < worst.score || candidate.score === worst.score && candidate.entryKey.localeCompare(worst.entryKey) > 0) worst = candidate;
+          }
+          if (worst) top.delete(worst.entryKey);
         }
-        minimum = top.size < 100 ? -Infinity : Math.min(...[...top.values()].map((item) => item.score));
+        minimum = -Infinity;
+        if (top.size >= 100) {
+          minimum = Infinity;
+          for (const item of top.values()) minimum = Math.min(minimum, item.score);
+        }
       }
       if (++visited % 256 === 0) { await new Promise<void>((resolve) => setImmediate(resolve)); signal.throwIfAborted(); }
     }

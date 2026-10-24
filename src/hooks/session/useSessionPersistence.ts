@@ -1,14 +1,16 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import type { PersistedSession, ClaudeEvent, SystemInitEvent, EngineId, ACPSessionEvent, ACPPermissionEvent, ACPTurnCompleteEvent } from "@/types";
 import { canonicalizeModelValue } from "@/lib/model-utils";
 import { getSessionNotificationActor } from "@/lib/session-notifications";
 import { toMcpStatusState } from "../../lib/mcp-utils";
 import { buildPersistedSession } from "../../lib/session/records";
-import { saveSessionSmart } from "../../lib/session/persistence";
+import { patchSessionMetadata, saveSessionSmart } from "../../lib/session/persistence";
 import { createSystemMessage } from "../../lib/message-factory";
 import { isRetryableUpstreamError } from "../../lib/session/retry";
 import { normalizeToolInput as acpNormalizeToolInput, pickAutoResponseOption } from "../../lib/engine/acp-adapter";
+import { CheckpointScheduler, registerCheckpointFlusher } from "@/lib/session/checkpoint-scheduler";
+import { reportError } from "@/lib/analytics/analytics";
 import { DRAFT_ID } from "./types";
 import type { SharedSessionRefs, SharedSessionSetters, EngineHooks } from "./types";
 
@@ -55,8 +57,6 @@ export function useSessionPersistence({
     lastMessageSyncSessionRef,
     switchSessionRef,
     acpPermissionBehaviorRef,
-    saveTimerRef,
-    visibleSplitSessionIdsRef,
   } = refs;
   const activeClaudeModels = claude.supportedModels;
 
@@ -100,10 +100,7 @@ export function useSessionPersistence({
     }
 
     try {
-      const persisted = await window.claude.sessions.load(session.projectId, sessionId);
-      if (persisted) {
-        await saveSessionSmart({ ...persisted, codexGoal: goal });
-      }
+      await patchSessionMetadata(session.projectId, sessionId, { codexGoal: goal });
     } catch {
       // Goal persistence is best effort; the next session load can refresh it from Codex.
     }
@@ -275,13 +272,9 @@ export function useSessionPersistence({
     const unsub = window.claude.onEvent((event: ClaudeEvent & { _sessionId?: string }) => {
       const sid = event._sessionId;
       if (!sid) return;
-      if (sid === activeSessionIdRef.current) return;
-      // Split view: secondary pane's engine hooks handle their own events
-      if (visibleSplitSessionIdsRef.current.includes(sid)) return;
-
       // Pre-started session: route to background store AND extract MCP statuses
       if (sid === preStartedSessionIdRef.current) {
-        backgroundStoreRef.current.handleEvent(event);
+        if (!backgroundStoreRef.current.hasLive(sid)) backgroundStoreRef.current.handleEvent(event);
         if (event.type === "system" && "subtype" in event && event.subtype === "init") {
           const init = event as SystemInitEvent;
           if (init.mcp_servers?.length) {
@@ -294,21 +287,19 @@ export function useSessionPersistence({
         return;
       }
 
-      backgroundStoreRef.current.handleEvent(event);
+      if (!backgroundStoreRef.current.hasLive(sid)) backgroundStoreRef.current.handleEvent(event);
     });
     const unsubAcp = window.claude.acp.onEvent((event: ACPSessionEvent) => {
       const sid = event._sessionId;
       if (!sid) return;
-      if (sid === activeSessionIdRef.current) return;
-      if (visibleSplitSessionIdsRef.current.includes(sid)) return;
-      if (sid === draftAcpSessionIdRef.current) return;
+      if (backgroundStoreRef.current.hasLive(sid)) return;
       backgroundStoreRef.current.handleACPEvent(event);
     });
 
     // Route permission requests for non-active Claude sessions to the background store
     const unsubBgPerm = window.claude.onPermissionRequest((data) => {
       const sid = data._sessionId;
-      if (!sid || sid === activeSessionIdRef.current || visibleSplitSessionIdsRef.current.includes(sid) || sid === preStartedSessionIdRef.current) return;
+      if (!sid || backgroundStoreRef.current.hasLive(sid)) return;
       backgroundStoreRef.current.setPermission(sid, {
         requestId: data.requestId,
         toolName: data.toolName,
@@ -323,8 +314,7 @@ export function useSessionPersistence({
     // (auto-respond if the client-side permission behavior allows it)
     const unsubBgAcpPerm = window.claude.acp.onPermissionRequest((data: ACPPermissionEvent) => {
       const sid = data._sessionId;
-      if (!sid || sid === activeSessionIdRef.current || visibleSplitSessionIdsRef.current.includes(sid)) return;
-      if (sid === draftAcpSessionIdRef.current) return;
+      if (!sid || backgroundStoreRef.current.hasLive(sid)) return;
 
       // Auto-respond for background ACP sessions when behavior is configured
       const autoOptionId = pickAutoResponseOption(data.options, acpPermissionBehaviorRef.current);
@@ -349,21 +339,21 @@ export function useSessionPersistence({
     // (clears isProcessing so the session doesn't appear stuck when switching back)
     const unsubBgAcpTurn = window.claude.acp.onTurnComplete((data: ACPTurnCompleteEvent) => {
       const sid = data._sessionId;
-      if (!sid || sid === activeSessionIdRef.current || visibleSplitSessionIdsRef.current.includes(sid)) return;
+      if (!sid || backgroundStoreRef.current.hasLive(sid)) return;
       backgroundStoreRef.current.handleACPTurnComplete(sid, data.stopReason);
     });
 
     // Route Codex events for non-active sessions to the background store
     const unsubCodex = window.claude.codex.onEvent((event) => {
       const sid = event._sessionId;
-      if (!sid || sid === activeSessionIdRef.current || visibleSplitSessionIdsRef.current.includes(sid)) return;
+      if (!sid || backgroundStoreRef.current.hasLive(sid)) return;
       backgroundStoreRef.current.handleCodexEvent(event);
     });
 
-    // Route Codex approval requests for non-active sessions — auto-decline for now
+    // Retain Codex approval requests until the user returns to their session
     const unsubCodexApproval = window.claude.codex.onApprovalRequest((data) => {
       const sid = data._sessionId;
-      if (!sid || sid === activeSessionIdRef.current || visibleSplitSessionIdsRef.current.includes(sid)) return;
+      if (!sid || backgroundStoreRef.current.hasLive(sid)) return;
       if (data.method === "item/tool/requestUserInput") {
         backgroundStoreRef.current.setPermission(sid, {
           requestId: String(data.rpcId),
@@ -386,7 +376,7 @@ export function useSessionPersistence({
         return;
       }
 
-      // Auto-decline background Codex approvals (user must switch to the session)
+      // Keep the request pending; never silently decline an unseen approval
       backgroundStoreRef.current.setPermission(sid, {
         requestId: String(data.rpcId),
         toolName: data.method.includes("commandExecution") ? "Bash" : "Edit",
@@ -399,45 +389,42 @@ export function useSessionPersistence({
     return () => { unsub(); unsubAcp(); unsubBgPerm(); unsubBgAcpPerm(); unsubBgAcpTurn(); unsubCodex(); unsubCodexApproval(); };
   }, []);
 
-  // Debounced auto-save
+  // A single checkpoint owner saves primary, split and background sessions alike.
+  const latest = useRef({ refs, codex });
+  latest.current = { refs, codex };
   useEffect(() => {
-    const activeSession = activeSessionId
-      ? sessionsRef.current.find((session) => session.id === activeSessionId)
-      : undefined;
-    if (!activeSessionId || activeSessionId === DRAFT_ID || (messages.length === 0 && activeSession?.engine !== "codex")) return;
-
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      const session = sessionsRef.current.find((s) => s.id === activeSessionId);
-      if (!session) return;
-      // Never persist queued messages — unsent queue state is runtime-only.
-      const msgs = messagesRef.current.filter((m) => !m.isQueued);
-      const data: PersistedSession = {
-        id: activeSessionId,
-        conversationId: session.conversationId ?? activeSessionId,
-        projectId: session.projectId,
-        title: session.title,
-        createdAt: session.createdAt,
-        messages: msgs,
-        model: session.model || sessionInfo?.model,
-        effort: session.effort,
-        permissionMode: session.permissionMode,
-        planMode: session.planMode,
-        totalCost: totalCostRef.current,
-        contextUsage: contextUsageRef.current,
-        engine: session.engine,
-        ...(session.agentId ? { agentId: session.agentId } : {}),
-        ...(session.agentSessionId ? { agentSessionId: session.agentSessionId } : {}),
-        ...(session.engine === "codex" && session.codexThreadId ? { codexThreadId: session.codexThreadId } : {}),
-        ...(session.engine === "codex" ? { codexGoal: codex.codexGoal ?? null } : {}),
-      };
-      void persistSessionWithCodexFallback(data);
-    }, 2000);
-
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    const store = latest.current.refs.backgroundStoreRef.current;
+    const scheduler = new CheckpointScheduler((id) => {
+      const current = latest.current;
+      const session = current.refs.sessionsRef.current.find((entry) => entry.id === id);
+      const state = store.get(id);
+      if (!session || id === DRAFT_ID || !state) return null;
+      if (!state.messages.length && session.engine !== "codex") return null;
+      return buildPersistedSession({ ...session,
+        ...(session.engine === "codex" ? { codexGoal: state.codexGoal ?? null } : {}),
+      }, state.messages.filter((message) => !message.isQueued), state.totalCost, state.contextUsage);
+    }, persistSessionWithCodexFallback, (error) => {
+      reportError("SESSION_CHECKPOINT", error);
+      toast.error("Could not save conversation. Your changes remain in memory; retry before quitting.", { id: "session-save-error" });
+    });
+    store.onChanged = (id) => {
+      scheduler.mark(id, store.checkpointUrgent(id));
     };
-  }, [messages, activeSessionId, sessionInfo?.model, codex.codexGoal, persistSessionWithCodexFallback]);
+    const unregister = registerCheckpointFlusher(async () => {
+      for (const session of latest.current.refs.sessionsRef.current) if (store.has(session.id)) scheduler.mark(session.id);
+      await scheduler.flushAll();
+    });
+    return () => {
+      store.onChanged = undefined;
+      unregister();
+      void scheduler.flushAll().catch((error) => reportError("SESSION_CHECKPOINT_UNMOUNT", error)).finally(() => scheduler.dispose());
+    };
+  }, [persistSessionWithCodexFallback]);
+
+  // Materialization can change the logical session without producing another engine event.
+  useEffect(() => {
+    if (activeSessionId && activeSessionId !== DRAFT_ID) backgroundStoreRef.current.notifyChanged(activeSessionId);
+  }, [activeSessionId, backgroundStoreRef]);
 
   // Consolidated sync of session metadata to the session list (model, totalCost,
   // lastMessageAt, isProcessing, hasPendingPermission). A single effect avoids
@@ -521,7 +508,7 @@ export function useSessionPersistence({
     const session = sessionsRef.current.find((s) => s.id === id);
     if (!id || id === DRAFT_ID || !session || (messagesRef.current.length === 0 && session.engine !== "codex")) return;
     // Never persist queued messages — unsent queue state is runtime-only.
-    const msgs = messagesRef.current.filter((m) => !m.isQueued);
+    const msgs = (backgroundStoreRef.current.get(id)?.messages ?? messagesRef.current).filter((m) => !m.isQueued);
     const data: PersistedSession = buildPersistedSession(
       session.engine === "codex" ? { ...session, codexGoal: codex.codexGoal } : session,
       msgs,
@@ -543,7 +530,8 @@ export function useSessionPersistence({
           ? acp.slashCommands
           : claude.slashCommands;
 
-      backgroundStoreRef.current.initFromState(currentId, {
+      const live = backgroundStoreRef.current.get(currentId);
+      backgroundStoreRef.current.initFromState(currentId, live ?? {
         messages: messagesRef.current,
         isProcessing: isProcessingRef.current,
         isConnected: isConnectedRef.current,
@@ -552,7 +540,7 @@ export function useSessionPersistence({
         totalCost: totalCostRef.current,
         contextUsage: contextUsageRef.current,
         pendingPermission: pendingPermissionRef.current ?? null,
-        rawAcpPermission: null, // ACP ref is internal to useACP — will be restored via initialRawAcpPermission
+        rawAcpPermission: sessionEngine === "acp" ? acp.getRawPermission() : null,
         slashCommands,
         codexGoal: sessionEngine === "codex" ? codex.codexGoal : null,
         codexGoalSupported: sessionEngine === "codex" ? codex.codexGoalSupported : null,
@@ -597,13 +585,7 @@ export function useSessionPersistence({
         );
 
         // Persist the new title
-        const data = await window.claude.sessions.load(
-          current.projectId,
-          sessionId,
-        );
-        if (data) {
-          await saveSessionSmart({ ...data, title });
-        }
+        await patchSessionMetadata(current.projectId, sessionId, { title });
       } catch {
         setSessions((prev) =>
           prev.map((s) =>

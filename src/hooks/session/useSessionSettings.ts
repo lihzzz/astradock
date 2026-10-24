@@ -4,7 +4,7 @@ import type { PersistedSession, ClaudeEffort } from "../../types";
 import { toMcpStatusState } from "../../lib/mcp-utils";
 import { capture, captureException } from "../../lib/analytics/analytics";
 import { suppressNextSessionCompletion } from "../../lib/notification-utils";
-import { saveSessionSmart } from "../../lib/session/persistence";
+import { patchSessionMetadata } from "../../lib/session/persistence";
 import {
   DRAFT_ID,
   DEFAULT_PERMISSION_MODE,
@@ -60,7 +60,7 @@ export function useSessionSettings({
 
   const persistSessionPatch = useCallback((
     sessionId: string,
-    patch: Partial<PersistedSession>,
+    patch: Partial<Pick<PersistedSession, "model" | "effort" | "permissionMode" | "planMode">>,
   ) => {
     const session = sessionsRef.current.find((entry) => entry.id === sessionId);
     if (!session) return;
@@ -69,11 +69,10 @@ export function useSessionSettings({
       prev.map((entry) => (entry.id === sessionId ? { ...entry, ...patch } : entry)),
     );
 
-    window.claude.sessions.load(session.projectId, sessionId).then((data) => {
-      if (data) {
-        void saveSessionSmart({ ...data, ...patch });
-      }
-    }).catch(() => { /* session may have been deleted */ });
+    void patchSessionMetadata(session.projectId, sessionId, patch).catch((error) => {
+      captureException(error, { label: "SESSION_SETTINGS_SAVE" });
+      toast.error("Failed to save session settings");
+    });
   }, [sessionsRef, setSessions]);
 
   // ── Active model ──

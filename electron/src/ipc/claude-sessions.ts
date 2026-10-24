@@ -17,7 +17,7 @@ import type { McpServerInput } from "@shared/lib/mcp-config";
 import { getClaudeBinaryPath, getClaudeBinaryStatus, getClaudeVersion, scanClaudeBinaries } from "../lib/claude-binary";
 import { captureEvent } from "../lib/posthog";
 import { withComputerUseMcpServer } from "../lib/computer-use-runtime";
-import { withHindsightMcpServers, registerMemorySession, unregisterMemorySession, beforeMemorySend, observeClaudeEvent, completeMemoryTurn } from "../lib/memory/service";
+import { withMemoryMcpServers, registerMemorySession, unregisterMemorySession, cancelMemoryTurn, beforeMemorySend, isMemoryTool } from "../lib/memory/service";
 import { beginUsageTurn, endUsageTurn, stopUsageSession } from "../lib/usage";
 import { bindSessionTokenUsage, createClaudeTokenObserver } from "../lib/token-usage";
 import { observeClaudeTaskEvent } from "../lib/tasks/engine-events";
@@ -318,7 +318,6 @@ function startEventLoop(
         if (msgObj.type === "user" || msgObj.type === "result") {
           log("EVENT_FULL", message);
         }
-        observeClaudeEvent(sessionId, msgObj);
         tokenObserver.observe(msgObj);
         if (!session.stopping) observeClaudeTaskEvent(sessionId, msgObj);
         if (msgObj.type === "system" && typeof msgObj.task_id === "string") {
@@ -344,7 +343,6 @@ function startEventLoop(
 
         // Track session completion on result events
         if (msgObj.type === "result") {
-          void completeMemoryTurn(sessionId);
           void captureEvent("session_completed", {
             engine: "claude",
             total_cost: msgObj.total_cost_usd,
@@ -593,12 +591,14 @@ async function startSession(options: StartOptions, getMainWindow: () => BrowserW
     };
     ownedSession = session;
     sessions.set(sessionId, session);
-    if (options.memoryContext?.projectId) registerMemorySession(sessionId, options.memoryContext.projectId, "claude");
+    const memoryProjectId = options.source?.projectId ?? options.memoryContext?.projectId;
+      if (memoryProjectId) await registerMemorySession(sessionId, memoryProjectId, "claude");
 
     const canUseTool = (toolName: string, input: unknown, context: { toolUseID: string; suggestions: unknown; decisionReason: string }) => {
       return new Promise<PermissionResult>((resolve) => {
         try { assertClaudeSessionActive(sessionId, session); }
         catch { resolve({ behavior: "deny", message: "Session stopped" }); return; }
+        if (isMemoryTool(toolName)) { resolve({ behavior: "allow" }); return; }
         const requestId = crypto.randomUUID();
         session.pendingPermissions.set(requestId, { resolve });
         taskRuntimeEvents.wait(sessionId, "claude", requestId, toolName === "AskUserQuestion" ? "waiting_user" : "waiting_permission");
@@ -664,7 +664,7 @@ async function startSession(options: StartOptions, getMainWindow: () => BrowserW
 
     await registerProjectAppAgentSession(sessionId, options.source?.projectId ?? options.memoryContext?.projectId, options.cwd || process.cwd());
     assertClaudeSessionActive(sessionId, session);
-    const mcpServers = withProjectAppMcpServer(withHindsightMcpServers(withComputerUseMcpServer(options.mcpServers), sessionId), sessionId);
+    const mcpServers = withProjectAppMcpServer(withMemoryMcpServers(withComputerUseMcpServer(options.mcpServers), sessionId), sessionId);
     if (mcpServers.length) {
       queryOptions.mcpServers = await buildSdkMcpConfig(mcpServers, mcpConfigOptions);
     }
@@ -896,6 +896,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
   );
 
   ipcMain.handle("claude:interrupt", async (_event, sessionId: string) => {
+    cancelMemoryTurn(sessionId);
     cancelProjectAppAgentPermissions(sessionId);
     const session = sessions.get(sessionId);
     if (!session) {
@@ -1088,7 +1089,8 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     model?: string;
     memoryContext?: { projectId: string };
   }) => {
-    if (memoryContext?.projectId) registerMemorySession(sessionId, memoryContext.projectId, "claude");
+    const current = sessions.get(sessionId);
+    if (memoryContext && current?.startOptions) current.startOptions.memoryContext = memoryContext;
     return restartSession(sessionId, getMainWindow, mcpServers, cwd, effort, model);
   });
 }

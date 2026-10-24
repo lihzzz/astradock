@@ -37,7 +37,7 @@ describe("durable runtime replacement", () => {
       expect(await repository.load("project", "old")).toBeNull();
       expect((await repository.list("project")).map((meta) => meta.id)).toEqual(["new"]);
     }
-    await expect(repository.save({ ...session(), projectId: "unrelated" })).resolves.toBeUndefined();
+    await expect(repository.save({ ...session(), projectId: "unrelated" })).resolves.toEqual(expect.any(Number));
   });
 
   it("preserves archive metadata and the new runtime lease when the logical identity changes", async () => {
@@ -97,7 +97,7 @@ describe("durable runtime replacement", () => {
       if (String(file).endsWith(`${path.sep}old.jsonl`)) throw new Error("old file locked");
       return unlink(file);
     });
-    await expect(repository.save(session("new", "new-thread"), "old")).resolves.toBeUndefined();
+    await expect(repository.save(session("new", "new-thread"), "old")).resolves.toEqual(expect.any(Number));
     expect(await repository.load("project", "old")).toBeNull();
     expect([...((await scan()).conversations.values())].map((item) => item.runtimeSessionId)).toEqual(["new"]);
     failure.mockRestore();
@@ -125,8 +125,8 @@ describe("durable runtime replacement", () => {
     vi.restoreAllMocks();
     repository = new SessionRepository(root, vi.fn());
     expect((await repository.list("project")).map((meta) => meta.id)).toEqual(["old"]);
-    await expect(repository.save(session())).resolves.toBeUndefined();
-    await expect(repository.save(session("retry"), "old")).resolves.toBeUndefined();
+    await expect(repository.save(session())).resolves.toEqual(expect.any(Number));
+    await expect(repository.save(session("retry"), "old")).resolves.toEqual(expect.any(Number));
   });
 
   it("coordinates a changed-identity handoff with deletion and rejects an old write queued behind it", async () => {
@@ -169,7 +169,7 @@ describe("durable runtime replacement", () => {
     expect(await fs.readdir(path.join(root, "sessions/.replacements"))).toEqual([]);
     failure.mockRestore();
     repository = new SessionRepository(root, vi.fn());
-    await expect(repository.save(session())).resolves.toBeUndefined();
+    await expect(repository.save(session())).resolves.toEqual(expect.any(Number));
   });
 
   it("rejects a damaged replacement record and resumes initialization after repair", async () => {
@@ -270,7 +270,7 @@ describe("durable runtime replacement", () => {
     expect(await repository.load("project", "old")).toMatchObject({ codexThreadId: "new-thread", messages: [session().messages[0], expect.objectContaining({ id: "m2" })] });
     repository = new SessionRepository(root, vi.fn());
     await expect(repository.append({ ...session(), appendedMessages: [], messageCount: 2 })).rejects.toMatchObject({ code: "SESSION_REPLACED" });
-    await expect(repository.updateMeta("project", "old", { archived: true })).resolves.toBeUndefined();
+    await expect(repository.updateMeta("project", "old", { archived: true })).resolves.toEqual(expect.any(Number));
   });
 
   it.each([false, true])("restores legacy JSON after a failed in-place commit (rollback failure: %s)", async (failRollback) => {
@@ -291,7 +291,7 @@ describe("durable runtime replacement", () => {
     expect((await repository.list("project")).map((meta) => meta.codexThreadId)).toEqual(["thread"]);
     expect(JSON.parse(await fs.readFile(path.join(folder, "old.json"), "utf8"))).toEqual(session());
     await expect(fs.access(path.join(folder, "old.jsonl"))).rejects.toMatchObject({ code: "ENOENT" });
-    await expect(repository.save(session("old", "retry-thread"))).resolves.toBeUndefined();
+    await expect(repository.save(session("old", "retry-thread"))).resolves.toEqual(expect.any(Number));
   });
 
   it("queues a legacy alias writer behind the handoff even if it reports another logical key", async () => {
@@ -370,7 +370,7 @@ describe("durable runtime replacement", () => {
       if (String(file).endsWith(".json.backup")) throw new Error("backup locked");
       return rm(file, options);
     });
-    await expect(repository.save(session("old", "new-thread"))).resolves.toBeUndefined();
+    await expect(repository.save(session("old", "new-thread"))).resolves.toEqual(expect.any(Number));
     await expect(repository.remove("project", "old", async () => {})).rejects.toMatchObject({ code: "DELETE_INCOMPLETE" });
     expect(await repository.load("project", "old")).toBeNull();
     failure.mockRestore();

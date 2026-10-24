@@ -1,3 +1,4 @@
+import { snapshotStreamingMessages } from "@/lib/session/message-snapshot";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import type {
@@ -105,7 +106,7 @@ export function useClaude({ sessionId, initialMessages, initialMeta, initialPerm
 
     // If restoring a mid-stream session, seed the buffer with existing content
     // so that new deltas are appended rather than replacing old content.
-    const msgs = initialMessages ?? [];
+    const msgs = base.messagesRef.current;
     const streamingMsg = msgs.findLast(
       (m) => m.role === "assistant" && m.isStreaming,
     );
@@ -1067,6 +1068,7 @@ export function useClaude({ sessionId, initialMessages, initialMeta, initialPerm
   }, []);
 
   return {
+    getMessagesSnapshot: () => snapshotStreamingMessages(base.messagesRef.current, buffer.current.messageId, buffer.current.getAllText(), buffer.current.getAllThinking(), buffer.current.thinkingComplete),
     isReadyForSession: base.isReadyForSession,
     messages,
     setMessages,

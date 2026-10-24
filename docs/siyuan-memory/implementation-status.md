@@ -1,0 +1,144 @@
+# 思源长期记忆实施与验证记录
+
+日期：2026-10-23。基线：[实施计划](implementation-plan.md)。使用方式：[用户说明](user-guide.md)。
+
+## 当前结论
+
+已完成主要功能代码替换和本机自动化自测，生产构建通过；不能把这些结果表述为计划全部发布门槛均已通过。真实三引擎模型的自动总结质量、实际权限展示、完整 UI 视觉验收、跨平台安装包及真实旧数据删除尚未完成。
+
+本次未自动替用户绑定真实业务笔记、未启用个人写入，也未删除真实旧数据库/密钥。继续验收时已使用获批的临时文档权限，对真实思源 3.8.8 执行新适配器读写测试；只创建自有测试文档树，测试后全部清理。
+
+## 已落地能力
+
+- 思源是唯一活跃记忆后端；删除旧 daemon/client/bank-router/managed-server/llm-connection/golden-set 专属代码与测试。
+- 移除两个旧 @vectorize-io 依赖，更新 lockfile，并以 frozen-lockfile 同步安装依赖。
+- 主进程 loopback-only HTTP/MCP 客户端，禁止跳转，限制响应体，运行时验证响应，支持可选 Token 与安全存储失败时仅内存保存。
+- MCP session 失效后可在后续请求重新初始化；不会启动思源或安装依赖。
+- 全局工作空间路径/锚点、项目读写范围与个人权限；按文档位置复查块归属及配置 revision。
+- 最新正文读取，已删除或陈旧搜索结果丢弃；显式修正关系在指定记忆文档内有界核对。
+- 当前 Agent 的自动总结行为说明及四个受控工具；无独立提取模型、无应用级逐条写入确认。
+- 普通正文安全编码，operationId 同次追加，精确去重，持久 journal，未知写入只核对、不重放。
+- 同目标写入串行、有界队列、自动写入限额；取消或会话替换阻止尚未提交的写入。
+- 已提交操作不因客户端取消被虚假视为失败；重启后的未完成状态恢复为 unknown。
+- 三引擎接入新的 harnss_memory helper；Claude/ACP 的免确认匹配限定在精确服务器限定工具名，不放开其他工具。
+- 设置、项目绑定、最近读取/写入状态、手动保存和 /remember 接入新服务；状态变化和自动保存提供去重轻量通知。
+- 提供旧专属数据清理脚本，默认预览，实际删除需要明确参数和应用/旧服务已停止的前置条件。
+
+## 自动测试证据
+
+本轮开始时：pnpm typecheck 通过；pnpm test 为 170 个文件通过、2 个文件失败、2 个文件跳过。失败原因是当前 shell 的 PATH 找不到 Git，并非改动引入。
+
+发现本机已有 PortableGit 后，仅在测试进程 PATH 中加入其 cmd 目录；未安装 Git、未修改系统 PATH 或用户配置。
+
+最终代码验证：
+
+| 检查 | 结果 |
+| --- | --- |
+| pnpm typecheck | 通过，renderer 与 Electron 均无类型错误 |
+| pnpm test | 172 个测试文件通过、3 个跳过；1309 项通过、10 项跳过；无失败 |
+| pnpm build | 通过，生成 main/preload/memory-mcp 及 renderer；存在 Vite 大 chunk 提示，未据此声称性能验收完成 |
+| node scripts/test-memory-bridge.cjs | 通过：使用编译产物启动 stdio helper，真实 MCP tools/list 与认证 loopback 转发 |
+| node --test scripts/test-legacy-memory-cleanup.cjs | 通过：只识别专属旧目录、预览不删除、拒绝目录联接 |
+| SIYUAN_READONLY_PROBE=1 pnpm test electron/src/lib/memory/siyuan/live-readonly.test.ts | 单独执行通过；当前真实思源报告版本 3.8.8，无笔记读写 |
+| pnpm install --offline --frozen-lockfile --ignore-scripts | 通过，从当前安装依赖移除 2 个旧后端包 |
+| 构建产物残留扫描 | electron/dist 与 dist 的 JS 中 @vectorize-io/hindsight、HINDSIGHT_API、hindsight-all/client 匹配数为 0 |
+| git diff --check | 通过；Git 提示的 LF/CRLF 转换警告不是空白错误 |
+
+默认全量测试中的跳过包含现有真实 ACP/在线引擎测试，以及需要显式启用的真实思源只读探测。只读探测已另行启用执行，不将其他跳过项计为通过。
+
+测试覆盖：本机 URL 限制、重定向拒绝、鉴权与业务失败分类、响应预算、真实 loopback MCP 握手、范围边界、输入序列化、敏感信息规则、取消、配置变更、工作空间不匹配、陈旧搜索、写后核对、丢失响应、重复调用、修改后不覆盖、限额、journal 损坏/恢复、bridge 认证/撤销、IPC 来源和表单解析。测试使用模拟服务器/模拟块状态，不将其误称为真实思源崩溃测试。
+
+本地详细日志位于 .cache/siyuan-typecheck-final.log、.cache/siyuan-tests-final.log、.cache/siyuan-build-final.log（忽略文件，不提交含环境细节的日志）。
+
+## 实施阶段状态
+
+| 阶段 | 状态及剩余门槛 |
+| --- | --- |
+| P0 契约 | 本机版本/能力探测及接口 fixture 已有；本机构建对应源码 commit、跨平台和大规模能力仍未锁定 |
+| P1 连接 | 已实现并测试；真正重启思源导致的 session 失效尚未在用户实例主动制造 |
+| P2 绑定权限 | 已实现并测试；真实临时文档移出范围后撤销读取、工作空间身份不匹配拒绝访问已通过；未切换用户真实工作空间 |
+| P3 只读召回 | 已实现；先前本机陈旧索引证据有对应回归测试；20 个固定中文关键词检索 Recall@5 为 20/20；不是自然语言模型理解评测 |
+| P4 自动写入 | 已实现模拟测试和 journal 恢复；新序列化器真实追加/去重/核对/用户编辑/删除回归已通过；不声称 exactly-once |
+| P5 自动总结 | 行为规则、工具、去重及修正链已实现；未调用额外模型，也未执行真实模型的 20 场景质量验收 |
+| P6 三引擎 | 接线、取消、恢复及精确权限白名单已有，生命周期回归通过；真实模型/ACP 实现的工具标题和免确认体验需联调 |
+| P7 UI | 界面与轻量事件已实现，表单解析/构建通过；已完成 Windows 设置页连通及离线状态截图验收；记忆面板、窄窗口及跨平台仍待验收，新的详细状态文案以中文为主 |
+| P8 完整退役 | 代码、依赖、旧 IPC 与构建残留已移除；专属真实数据/密钥清理仍待审核清单后执行，不标记全部完成 |
+
+## 相对计划的明确收敛
+
+1. 提示预算采用 UTF-8 字节保守上限：摘要 800、正文总计 2000，不伪称精确 tokenizer 结果。
+2. 自动写入除每轮 3 条外，使用持久化的“项目滚动 24 小时最多 20 条”，比原单会话限额更保守，防止引擎恢复绕过计数。
+3. 写入文档直接子块上限 100；超过后拒绝新追加/有界核对，提示绑定新文档。没有自动拆分或重组用户文档。
+4. 写入 journal 最多 5000 条，保存时清理超过 30 天的已完成记录，未知记录不静默丢弃。
+5. 文档绑定采用显式 ID 表单，未提供文档树选择器。
+6. MCP 仍需会话级轻量 stdio 转发 helper；没有 Python、独立数据库或记忆模型进程，不等于完全零辅助进程。
+7. 工作空间路径 + 锚点是误操作保护，不是密码学身份；复制整个工作空间的歧义仍保留明确限制。
+
+## 真实数据与旧后端清理
+
+旧运行时不会自动启动，但本次没有删除应用数据根目录中的旧历史库、profile 或旧密钥。清理工具：scripts/cleanup-legacy-memory.cjs。
+
+- 默认只预览精确候选，不输出密钥内容。
+- 必须显式指定 openacpui-data 绝对路径。
+- 实际删除需要审核/归档选择、--apply、--confirm=DELETE-HINDSIGHT、--app-and-legacy-service-stopped。
+- 对目录链接、越界、占用的旧端口拒绝操作。
+- 不触碰思源、会话数据、共享 uv/Python、全局 pnpm store 或模型缓存。
+- 本轮只在 OS 临时目录运行了安全单测，未对真实 profile 执行 --apply。
+
+## 工作区保护与后续验收
+
+工作区原本存在其它会话/持久化/Git/文件预算方面的未提交改动。本次没有重置、暂存或提交它们，也没有以工作区清理名义删除无关文件。所有构建是 pnpm build，没有打包、发布或自行增加版本号。
+
+后续应依次：三引擎实际模型自动记忆与免确认联调 → 固定场景模型质量评测 → 补齐记忆面板及窄窗口 UI 验收 → 旧数据清理 → 按发布要求完成安装包/跨平台验收。未执行项不能以此次自动测试通过替代。
+
+## 继续验收记录（2026-10-23）
+
+### 最新回归基线
+
+此表覆盖上方首次实施阶段的计数；同一工作区存在其他任务的并发改动，新增测试数量不全属于记忆模块。
+
+| 检查 | 结果 |
+| --- | --- |
+| pnpm typecheck | 通过 |
+| pnpm test | 182 文件通过、4 文件跳过；1345 项通过、19 项跳过，0 失败 |
+| pnpm build | 通过；保留大 chunk 提示，未打安装包 |
+| node scripts/test-memory-bridge.cjs | 编译产物 stdio MCP 发现及认证转发通过 |
+| node --test scripts/test-legacy-memory-cleanup.cjs | 专属目录清理边界测试通过 |
+| OPENCODE_E2E=1 pnpm test electron/src/lib/__tests__/opencode-acp.test.ts | 真实 OpenCode ACP 两种启动路径均通过，2/2；无模型调用 |
+
+日志：.cache/siyuan-typecheck-acceptance.log、.cache/siyuan-tests-acceptance.log、.cache/siyuan-build-acceptance.log、.cache/siyuan-acp-acceptance.log。默认跳过项不是通过；真实思源写入和真实 ACP 已显式单独启用运行。
+
+### 真实思源读写与检索
+
+新增可重复执行的验收测试：electron/src/lib/memory/siyuan/live-acceptance.test.ts；固定检索样本：shared/lib/memory-acceptance-cases.ts。默认关闭，须显式设置 SIYUAN_WRITE_ACCEPTANCE=1 和 SIYUAN_WRITE_NOTEBOOK；仅适用于本机无 Token 的此次环境。SIYUAN_ACCEPTANCE_REPORT 可指定本地 JSON 证据路径。测试调用真实 service 与真实思源，只将应用配置、密钥读取、日志及元数据目录隔离。
+
+9/9 通过，两次运行均清理完整测试树：
+1. 中文、emoji、特殊符号、伪 SQL/IAL 作为普通文本的真实追加及读回一致。
+2. 重复调用不增加块。
+3. 将 journal 模拟为 unknown 且移除返回块 ID 后，按 operationId 枚举核对成功；这不是实际断网/崩溃测试。
+4. 子文档允许、同级范围外文档拒绝。
+5. 真实移动临时子文档到范围外后，旧引用失效。
+6. 配置预期工作空间不匹配时拒绝访问，不切换用户工作空间。
+7. 用户编辑后召回重新读取正文，核对标为 changed，不覆盖编辑。
+8. 删除块后旧引用不返回已删正文。
+9. 20 条固定中文关键词检索 Recall@5 = 20/20，另有无结果检查。
+
+最后一轮证据：.cache/siyuan-live-acceptance.json。思源版本 3.8.8，创建 4 个临时文档、清理 4 个、errors 为空。未修改已有业务笔记。关键词由样本预先给定，因此不能声称完成了 20 场景 Agent 自动提炼、查询生成或语义召回验收。
+
+### Windows UI 与引擎边界
+
+- 使用隔离 Electron user-data-dir，未复制真实凭据，未修改用户主应用配置。冻结构建并通过独立本地静态服务器验证，避免其他任务 Vite HMR 干扰。
+- 真实点击设置页探测按钮：成功显示思源 3.8.8；将未保存的地址草稿改成不可达本机端口后，显示“思源未连接或响应超时，长期记忆暂时失效”。
+- 截图已检查：.cache/siyuan-ui-acceptance/memory-connected.png、memory-offline.png；当前窗口未见裁切。验收 Electron 进程及自有静态服务器已停止。未宣称面板写入、窄窗口、其他平台已完成。
+- Claude 2.1.309：本机 auth status 返回 loggedIn=false，未登录、未创建凭据，真实模型自动记忆验收受阻。
+- Codex 0.163.0-alpha.11.1：已确认本机可执行版本；未执行真实模型回合，不能算通过。
+- OpenCode 1.19.3：真实 ACP 初始化、新建、恢复、列表、分叉、关闭和工具隔离通过；未调用模型，不等于自动总结或记忆工具免确认体验已通过。
+
+### 尚未关闭的发布门槛
+
+1. 三引擎真实模型自动提炼、写入工具调用及免确认体验；固定 20 场景质量评测。
+2. 真实思源进程重启/断电等故障注入；当前没有为了测试停止用户思源实例。
+3. 记忆面板完整交互、窄窗口与跨平台安装包验收。
+4. 审核真实旧数据清单并在应用/旧服务停止后删除；旧代码退役不代表真实旧数据库/密钥已删除。
+
+因此当前结论是“核心读写链路、Windows 设置探测和自动化回归通过”，不是“全部发布验收通过”。

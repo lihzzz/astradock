@@ -33,7 +33,7 @@ AstraDock（原 Harnss）是基于 Electron 与 React 的 AI 编程桌面工作�
 | 项目应用 | 从 Apps 管理项目启动命令、端口、运行状态、日志与浏览器预览，将应用上下文带入代理会话。 |
 | 历史检索 | 跨项目和 Space 搜索会话，按引擎、日期及归档状态过滤；查看活动热力图和时间线，跳回原始消息。可选本地语义与混合检索。 |
 | 快捷输入与整理 | 系统快捷键唤醒、语音输入、剪贴板分析；会话多选、批量归档、删除和 Markdown 导出，以及工具结果复制。 |
-| 扩展与记忆 | 按项目配置 MCP，浏览 ACP Agent Store 和本机 Skills；可选 Hindsight 长期记忆与 Cua Driver 桌面操作。 |
+| 扩展与记忆 | 按项目配置 MCP，浏览 ACP Agent Store 和本机 Skills；可选思源长期记忆与 Cua Driver 桌面操作。 |
 | 个性化与统计 | 中英文界面、主题预设、按时间切换主题、密度和动效设置、色觉辅助配色、环境音，以及本地消息与活跃时长统计。 |
 
 模型、权限选项、上下文压缩和子代理能力取决于所用引擎及其版本。Claude 与 Codex 支持计划模式；Codex 另有目标与 token 预算控制，以及模型指纹诊断入口。
@@ -109,7 +109,7 @@ MCP 服务器在项目右侧工具栏的 **MCP Servers** 面板管理。支持 `
 
 #### 长期记忆与桌面操作
 
-**设置 → 长期记忆（Long-term memory）** 提供本地 Hindsight 服务。配置模型提供商、模型、可选 Base URL 和 API key，测试连接并保存密钥；按界面提示准备 `uv`/`uvx` 及服务依赖后启用。默认端口为 `8888`，支持用户与项目记忆、召回注入、记忆浏览和维护。长期记忆与自动保留均默认关闭。服务运行在本机，提取和召回仍可能调用你配置的外部模型服务。
+**设置 → 长期记忆（Long-term memory）** 连接你已经启动的本机思源（默认 `http://127.0.0.1:6806`）。探测连接后确认工作空间路径、身份锚点文档，并为项目绑定只读范围与唯一写入文档。启用后当前 Agent 自动总结有依据的新结论并追加，不逐条确认，不使用额外提取模型。最终召回会重新读取正文；思源不可用时提示记忆暂时失效，不使用离线副本。个人读取和自动写入单独授权。写入结果未知时先核对、不重复提交。
 
 **设置 → 引擎 → Computer Use runtime** 可为新会话提供独立的 Cua Driver MCP 桌面工具。默认关闭，可使用随应用提供的原生运行时或指定外部 `cua-driver`。启用后查看运行状态并按系统提示授予必要权限；已有会话需重新启动以加载工具。
 
@@ -187,7 +187,7 @@ pnpm exec tsc --project electron/tsconfig.json --noEmit
 src/                    React 界面、hooks、状态与主题
 electron/src/           主进程、preload、IPC 与本地服务
   lib/history/          历史索引、查询与语义模型 worker
-  lib/memory/           Hindsight 服务与记忆配置
+  lib/memory/           思源连接、权限与写入核对
 shared/                 跨进程类型、协议和公共逻辑
 scripts/                构建辅助与运行时/UI 验证脚本
 docs/                   设计分析与实施验证记录
@@ -202,11 +202,11 @@ public/                 静态资源
 
 品牌更名为 AstraDock 后，为继续读取已有会话和设置，Electron 的 `{userData}` 仍使用原 **Harnss** 用户数据目录。`openacpui-data`、`harnss-*` 的 `localStorage` 键和记忆库标识，以及 `.harnss/worktree.json` 配置路径也保留兼容名称。
 
-应用数据主要保存在 `{userData}/openacpui-data/`。会话位于 `sessions/`，主进程设置位于 `settings.json`，历史派生索引位于 `history/`，Hindsight 使用 `hindsight/`；部分界面偏好保存在 renderer 的 `localStorage`。
+应用数据主要保存在 `{userData}/openacpui-data/`。会话位于 `sessions/`，主进程设置位于 `settings.json`，历史派生索引位于 `history/`，思源集成仅在应用目录保存绑定和最小写入记录，笔记正文仍在思源；部分界面偏好保存在 renderer 的 `localStorage`。
 
 - 本地用量面板展示消息数量、活跃时长、代理运行时长及工具使用排行。它与向外部发送使用统计的开关独立。
 - 历史语义检索和 Whisper 在模型下载后于本机执行；代理请求和 MCP 服务按各自的配置联网。
-- Hindsight 的本地存储不代表模型处理完全离线；具体取决于所配置的模型提供商。
+- 记忆子系统仅连接本机；当前会话模型的运行位置由引擎配置决定。旧后端已移除，历史数据不会在升级时被静默删除。
 - 当前默认启用 PostHog 使用统计与错误追踪，可在 **设置 → 分析（Analytics）** 关闭。
 
 开发日志位于仓库 `logs/main-*.log`；安装版日志位于 `{userData}/logs/main-*.log`。
@@ -256,7 +256,7 @@ This README describes the **`hy_dev` development branch** of [lihzzz/astradock](
 | Project Apps | Manage project launch commands, ports, runtime status, logs, and browser previews through Apps, and bring app context into agent conversations. |
 | Conversation history | Search across projects and Spaces, filter by engine, date, or archive status, explore an activity heatmap and timeline, and return to the original message. Local semantic and hybrid search are optional. |
 | Capture and organize | Wake the app with global shortcuts, dictate, analyze clipboard text, select multiple sessions, batch archive/delete/export to Markdown, and copy tool results. |
-| Extensions and memory | Configure MCP per project, browse the ACP Agent Store and local Skills, and optionally enable Hindsight memory or Cua Driver desktop tools. |
+| Extensions and memory | Configure MCP per project, browse the ACP Agent Store and local Skills, and optionally enable local SiYuan memory or Cua Driver desktop tools. |
 | Personalization and usage | Switch between Chinese and English, choose theme presets and time-based themes, adjust density and motion, use color-vision palettes and ambient sound, and inspect local message and activity statistics. |
 
 Models, permission options, context compaction, and subagent capabilities depend on the engine and its version. Claude and Codex support plan mode. Codex also has goal and token-budget controls and a model fingerprint diagnostic panel.
@@ -332,7 +332,7 @@ Manage MCP servers in the **MCP Servers** panel on the project's right-hand tool
 
 #### Long-term memory and desktop tools
 
-**Settings → Long-term memory** manages a local Hindsight service. Configure the model provider, model, optional Base URL, and API key; test the connection and save the key. Prepare `uv`/`uvx` and service dependencies through the setup flow, then enable memory. The default port is `8888`. Features include user and project memory, recall injection, and memory browsing and maintenance. Memory and automatic retention are off by default. The service runs locally, but extraction and recall may call your configured external model provider.
+**Settings → Long-term memory** connects to your running local SiYuan instance (default `http://127.0.0.1:6806`). Probe the connection, confirm its workspace and anchor document, then bind project read scopes and one append-only memory document. The current agent summarizes verified knowledge and saves it without per-item approval or a separate extraction model. Selected blocks are read again before use. Offline SiYuan means unavailable memory, never a stale note fallback. Personal reads and automatic writes are separately authorized. Unconfirmed writes are reconciled, not blindly retried.
 
 **Settings → Engines → Computer Use runtime** adds independent Cua Driver MCP desktop tools to newly started sessions. It is off by default and can use the bundled native runtime or an external `cua-driver` executable. Check runtime status and grant the required operating-system permissions after enabling it. Restart existing sessions to load the tools.
 
@@ -410,7 +410,7 @@ The main stack is Electron 40, React 19, TypeScript 5.9, Vite 7, tsup, Tailwind 
 src/                    React UI, hooks, state, and themes
 electron/src/           Main process, preload, IPC, and local services
   lib/history/          History indexing, search, and embedding workers
-  lib/memory/           Hindsight service and memory configuration
+  lib/memory/           SiYuan connection, access policy and write reconciliation
 shared/                 Cross-process types, protocols, and shared logic
 scripts/                Build helpers and runtime/UI verification scripts
 docs/                   Design analysis and validation records
@@ -425,11 +425,11 @@ public/                 Static assets
 
 After the AstraDock rename, Electron's `{userData}` continues to use the original **Harnss** user data directory to preserve existing conversations and settings. The `openacpui-data` directory, `harnss-*` localStorage keys and memory bank identifiers, and `.harnss/worktree.json` configuration path also retain their compatibility names.
 
-Most application data lives in `{userData}/openacpui-data/`. Conversations live in `sessions/`, main-process settings in `settings.json`, the derived history index in `history/`, and Hindsight data in `hindsight/`. Some interface preferences use renderer `localStorage`.
+Most application data lives in `{userData}/openacpui-data/`. Conversations live in `sessions/`, main-process settings in `settings.json`, the derived history index in `history/`, and SiYuan bindings/write metadata in dedicated files (note bodies stay in SiYuan). Some interface preferences use renderer `localStorage`.
 
 - The local usage dashboard shows message counts, active time, agent runtime, and tool rankings. It operates independently of the external usage-reporting toggle.
 - Semantic history search and Whisper inference run locally after model downloads. Agent requests and MCP servers use the network according to their configuration.
-- Local Hindsight storage does not imply offline model processing; that depends on the configured model provider.
+- The memory subsystem only connects locally; the conversation model location depends on engine settings. The old backend is removed; upgrades do not silently delete historical user data.
 - PostHog usage reporting and error tracking are currently enabled by default. Disable them in **Settings → Analytics**.
 
 Development logs are in the repository's `logs/main-*.log`; packaged application logs are in `{userData}/logs/main-*.log`.

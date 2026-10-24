@@ -91,7 +91,7 @@ import {
   isNearBottomDockZone,
 } from "@/lib/workspace/drag";
 import { AgentProvider, type AgentContextValue } from "./AgentContext";
-import { WorkflowCenter } from "./workflow/WorkflowCenter";
+const WorkflowCenter = lazy(() => import("./workflow/WorkflowCenter").then(module => ({ default: module.WorkflowCenter })));
 import { makeWorkflowId } from "@/lib/workflow/workflow-store";
 import {
   getInputHistory,
@@ -1227,6 +1227,7 @@ export function AppLayout() {
       />
 
       {workflowOpen && (
+        <Suspense fallback={null}>
         <WorkflowCenter
           taskActions={{ agents, onPrepareDraft: taskActions.prepareDraft, onOpenConversation: taskActions.openConversation }}
           sessions={manager.sessions}
@@ -1237,6 +1238,7 @@ export function AppLayout() {
           onClose={() => setWorkflowOpen(false)}
           onHandoff={handleWorkflowHandoff}
         />
+        </Suspense>
       )}
 
       <div ref={contentRef} className={`flex min-w-0 flex-1 flex-col ${settings.islandLayout ? "m-[var(--island-gap)]" : sidebar.isOpen ? "flat-divider-s" : ""} ${isResizing ? "select-none" : ""}`}>

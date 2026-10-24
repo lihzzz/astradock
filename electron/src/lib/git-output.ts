@@ -25,7 +25,8 @@ export function parseGitStatus(raw: string): GitStatus {
   const records = raw.split("\0");
   for (let index = 0; index < records.length; index++) {
     const record = records[index];
-    if (record.startsWith("# branch.head ")) result.branch = record.slice(14);
+    if (record.startsWith("# branch.oid ")) result.head = record.slice(13);
+    else if (record.startsWith("# branch.head ")) result.branch = record.slice(14);
     else if (record.startsWith("# branch.upstream ")) result.upstream = record.slice(18);
     else if (record.startsWith("# branch.ab ")) {
       const counts = /\+(\d+) -(\d+)/.exec(record);

@@ -61,7 +61,7 @@ describe("logical session coordination", () => {
     })).rejects.toMatchObject({ code: "STOP_FAILED" });
     expect(stopped.sort()).toEqual(["one", "two"]);
     expect(await repository.load("project", "one")).not.toBeNull();
-    await expect(repository.save(session("after-rollback"))).resolves.toBeUndefined();
+    await expect(repository.save(session("after-rollback"))).resolves.toEqual(expect.any(Number));
   });
 
   it("recovers pending deletion on startup and keeps unrelated conversations", async () => {
@@ -97,7 +97,7 @@ describe("logical session coordination", () => {
     repository = new SessionRepository(root, report);
     expect(await repository.list("project")).toEqual([expect.objectContaining({ id: "healthy" })]);
     expect(report).toHaveBeenCalledOnce();
-    await expect(repository.save({ ...session("healthy"), codexThreadId: "healthy-thread" })).resolves.toBeUndefined();
+    await expect(repository.save({ ...session("healthy"), codexThreadId: "healthy-thread" })).resolves.toEqual(expect.any(Number));
     await expect(repository.save(session("late"))).rejects.toMatchObject({ code: "SESSION_DELETING" });
     expect(await repository.pendingDeletions()).toEqual([expect.objectContaining({ conversationKey: conversationKey(session()), id: "one", state: "pending" })]);
     failure.mockRestore();
@@ -126,7 +126,7 @@ describe("logical session coordination", () => {
     repository.onChange(() => { throw new Error("index unavailable"); });
     const nextListener = vi.fn();
     repository.onChange(nextListener);
-    await expect(repository.save(session())).resolves.toBeUndefined();
+    await expect(repository.save(session())).resolves.toEqual(expect.any(Number));
     expect(await repository.load("project", "one")).not.toBeNull();
     expect(report).toHaveBeenCalledOnce();
     expect(nextListener).toHaveBeenCalledOnce();
@@ -151,7 +151,7 @@ describe("logical session coordination", () => {
     expect(stop).not.toHaveBeenCalled();
     expect(repository.isHistoryBlocked(conversationKey(session()))).toBe(false);
     failure.mockRestore();
-    await expect(repository.save(session())).resolves.toBeUndefined();
+    await expect(repository.save(session())).resolves.toEqual(expect.any(Number));
     expect(await repository.load("project", "one")).not.toBeNull();
   });
 

@@ -1,0 +1,23 @@
+/** Fixed synthetic Chinese keyword retrieval set; not an LLM judgement benchmark. */
+export const MEMORY_ACCEPTANCE_CASES = [
+  { question: "项目用哪个包管理器？", query: "包管理器", text: "项目约定：包管理器使用 pnpm，不使用 npm 或 yarn。" },
+  { question: "PowerShell 中文乱码怎么处理？", query: "UTF8编码", text: "排障经验：PowerShell 运行前初始化 UTF8编码，并显式指定读取编码。" },
+  { question: "桌面应用用什么技术？", query: "桌面框架", text: "技术决策：桌面框架采用 Electron，前端使用 React。" },
+  { question: "会话记录在哪里保存？", query: "会话目录", text: "项目约定：会话目录为应用数据下的 sessions，不放在源码目录。" },
+  { question: "如何检查类型？", query: "类型检查", text: "可复用流程：提交前运行 pnpm typecheck 完成类型检查。" },
+  { question: "单元测试怎么运行？", query: "单元测试", text: "可复用流程：运行 pnpm test 执行单元测试，失败项不可算通过。" },
+  { question: "发布包版本有什么规则？", query: "打包版本", text: "发布约定：每次生成安装包前必须提升打包版本，不能复用旧版本号。" },
+  { question: "思源搜索为什么还能找到已删内容？", query: "索引延迟", text: "排障经验：思源可能存在索引延迟，搜索候选必须重新读取正文。" },
+  { question: "写入超时后怎么办？", query: "结果未知", text: "技术决策：写入超时标记为结果未知，先核对操作标记，不盲目重试。" },
+  { question: "Token 存在哪里？", query: "凭据存储", text: "安全约定：凭据存储只用主进程安全存储，不放进 renderer 或日志。" },
+  { question: "长聊天列表怎么优化？", query: "列表虚拟化", text: "性能决策：长聊天使用列表虚拟化，不能只隐藏保留的全部 DOM。" },
+  { question: "流式更新怎么减少重渲染？", query: "流式渲染", text: "性能经验：流式渲染保留未变化消息的对象引用，只刷新末尾内容。" },
+  { question: "子文档是否能检索？", query: "子文档授权", text: "权限约定：只有显式开启子文档授权，检索才包含文档后代。" },
+  { question: "换工作空间后能继续读记忆吗？", query: "工作空间身份", text: "安全约定：工作空间身份不匹配时暂停记忆，要求重新绑定。" },
+  { question: "怎么验证追加没有重复？", query: "操作标记", text: "可复用流程：通过 operationId 操作标记核对目标文档中的实际写入。" },
+  { question: "进程重启后会补发写入吗？", query: "重启恢复", text: "恢复约定：重启恢复只核对未完成操作，不自动重放未知写入。" },
+  { question: "相同记忆反复保存怎么办？", query: "精确去重", text: "技术决策：规范化正文和目标生成摘要用于精确去重，不粗暴删除数字。" },
+  { question: "个人偏好与项目记忆怎么分？", query: "个人作用域", text: "权限约定：个人作用域写入单独授权，项目经验默认不进入个人库。" },
+  { question: "模型能自动改旧笔记吗？", query: "追加模式", text: "技术决策：自动记忆使用追加模式，不擅自修改或删除用户原有笔记。" },
+  { question: "离线后会用缓存记忆吗？", query: "离线降级", text: "技术决策：思源不可用时离线降级为记忆暂时失效，不使用旧正文兜底。" },
+] as const;

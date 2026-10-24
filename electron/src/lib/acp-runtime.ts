@@ -4,12 +4,12 @@ export function isAcpMethodUnsupported(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === -32601;
 }
 
-export function withAcpTimeout<T>(promise: Promise<T>, timeoutMs: number, stage: string, signal?: AbortSignal): Promise<T> {
+export function withAcpTimeout<T>(promise: Promise<T>, timeoutMs: number | null, stage: string, signal?: AbortSignal): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const cleanup = () => { clearTimeout(timer); signal?.removeEventListener("abort", abort); };
+    const cleanup = () => { if (timer) clearTimeout(timer); signal?.removeEventListener("abort", abort); };
     const fail = (error: unknown) => { cleanup(); reject(error); };
     const abort = () => fail(new Error(stage + ": cancelled or connection closed"));
-    const timer = setTimeout(() => fail(new Error(stage + " timed out after " + timeoutMs + "ms")), timeoutMs);
+    const timer = timeoutMs === null ? null : setTimeout(() => fail(new Error(stage + " timed out after " + timeoutMs + "ms")), timeoutMs);
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) abort();
     promise.then(value => { cleanup(); resolve(value); }, fail);

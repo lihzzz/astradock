@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockGetAppSetting, mockSpawnSync, mockMacStatus, mockMacRequest } = vi.hoisted(() => ({
+const { mockGetAppSetting, mockExecFile, mockMacStatus, mockMacRequest } = vi.hoisted(() => ({
   mockGetAppSetting: vi.fn(),
-  mockSpawnSync: vi.fn(),
+  mockExecFile: vi.fn(),
   mockMacStatus: vi.fn(),
   mockMacRequest: vi.fn(),
 }));
-vi.mock("child_process", () => ({ spawnSync: mockSpawnSync }));
+vi.mock("child_process", () => ({ execFile: mockExecFile }));
 vi.mock("@trycua/cua-driver", () => ({ currentMacOsPermissionStatus: mockMacStatus }));
 vi.mock("@trycua/cua-driver/electron", () => ({ requestMacOSPermissions: mockMacRequest }));
 vi.mock("../error-utils", () => ({ reportError: (_label: string, error: unknown) => error instanceof Error ? error.message : String(error) }));
@@ -25,7 +25,7 @@ afterEach(() => Object.defineProperty(process, "platform", originalPlatform));
 
 describe("computer-use runtime configuration", () => {
   beforeEach(() => {
-    mockSpawnSync.mockReset().mockReturnValue({ status: 0, stdout: '{"driverVersion":"0.33.0"}', stderr: "" });
+    mockExecFile.mockReset().mockImplementation((_command: string, _args: string[], _options: unknown, callback: (error: Error | null, stdout: string, stderr: string) => void) => { queueMicrotask(() => callback(null, '{"driverVersion":"0.33.0"}', "")); });
     mockMacStatus.mockReset().mockReturnValue({ accessibility: true, screenRecording: true });
     mockMacRequest.mockReset().mockReturnValue({ accessibility: true, screenRecording: true });
     mockGetAppSetting.mockReset();
@@ -72,6 +72,27 @@ describe("computer-use runtime configuration", () => {
     expect(await requestComputerUsePermissions()).toBeUndefined();
     expect(mockMacStatus).not.toHaveBeenCalled();
     expect(mockMacRequest).not.toHaveBeenCalled();
+  });
+
+  it("coalesces concurrent asynchronous probes without caching permissions", async () => {
+    enabledOn("win32");
+    let finish!: (error: Error | null, stdout: string, stderr: string) => void;
+    mockExecFile.mockImplementation((_command, _args, _options, callback) => { finish = callback; });
+    const { getComputerUseRuntimeStatus } = await loadModule();
+    const first = getComputerUseRuntimeStatus(); const second = getComputerUseRuntimeStatus();
+    expect(mockExecFile).toHaveBeenCalledOnce();
+    finish(null, '{"driverVersion":"test"}', "");
+    expect((await Promise.all([first, second])).map(status => status.ready)).toEqual([true, true]);
+  });
+
+  it("reports failed async probes and enforces a bounded output buffer", async () => {
+    enabledOn("win32");
+    mockExecFile.mockImplementation((_command, _args, options, callback) => {
+      expect(options.maxBuffer).toBe(1024 * 1024);
+      queueMicrotask(() => callback(new Error("probe timed out"), "", ""));
+    });
+    const { getComputerUseRuntimeStatus } = await loadModule();
+    expect(await getComputerUseRuntimeStatus()).toMatchObject({ installed: false, ready: false, error: "probe timed out" });
   });
 
   it("does not inject a server when the runtime is disabled", async () => {

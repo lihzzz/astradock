@@ -8,7 +8,6 @@ import {
   Wrench,
   Palette,
   Sparkles,
-  Users,
   BarChart3,
   PanelLeft,
   Archive,
@@ -24,7 +23,6 @@ import { NotificationsSettings } from "@/components/settings/NotificationsSettin
 import { McpSettings } from "@/components/settings/McpSettings";
 import { AdvancedSettings } from "@/components/settings/AdvancedSettings";
 import { EngineSettings } from "@/components/settings/EngineSettings";
-import { PlaceholderSection } from "@/components/settings/PlaceholderSection";
 import { AnalyticsSettings } from "@/components/settings/AnalyticsSettings";
 import { useSettingsStore } from "@/stores/settings-store";
 import { isMac } from "@/lib/utils";
@@ -39,14 +37,12 @@ import { HistorySettings } from "@/components/settings/HistorySettings";
 
 // ── Section definitions ──
 
-export type SettingsSection = "general" | "appearance" | "notifications" | "analytics" | "agents" | "mcp" | "engines" | "memory" | "skills" | "custom-agents" | "advanced" | "archived" | "history";
+export type SettingsSection = "general" | "appearance" | "notifications" | "analytics" | "agents" | "mcp" | "engines" | "memory" | "skills" | "advanced" | "archived" | "history";
 
 interface NavItem {
   id: SettingsSection;
   labelKey: TranslationKey;
   icon: LucideIcon;
-  /** Renders a subtle "soon" indicator next to the label */
-  comingSoon?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -60,7 +56,6 @@ const NAV_ITEMS: NavItem[] = [
   { id: "memory", labelKey: "memory", icon: Brain },
   { id: "history", labelKey: "Conversation history", icon: Search },
   { id: "skills", labelKey: "skills", icon: Sparkles },
-  { id: "custom-agents", labelKey: "agents", icon: Users, comingSoon: true },
   { id: "advanced", labelKey: "advanced", icon: Wrench },
   { id: "archived", labelKey: "archived", icon: Archive },
 ];
@@ -224,19 +219,10 @@ export const SettingsView = memo(function SettingsView({
         );
       case "skills":
         return <SkillsSettings />;
-      case "custom-agents":
-        return (
-          <PlaceholderSection
-            title={t("agents")}
-            description={t("customAgentsDescription")}
-            icon={Users}
-            comingSoon
-          />
-        );
       default:
         return null;
     }
-  }, [activeSection, appSettings, updateAppSettings, agents, saveAgent, deleteAgent, glassSupported, macLiquidGlassSupported, onReplayWelcome, t, sessions, activeSessionId, sessionAgents, onSelectSession, onDeleteSession, onArchiveSession, onRenameSession, onOpenInSplitView, canOpenInSplitView, islandLayout]);
+  }, [activeSection, appSettings, updateAppSettings, agents, saveAgent, deleteAgent, glassSupported, macLiquidGlassSupported, onReplayWelcome, sessions, activeSessionId, sessionAgents, onSelectSession, onDeleteSession, onArchiveSession, onRenameSession, onOpenInSplitView, canOpenInSplitView, islandLayout]);
 
   return (
     <div className={`island flex flex-1 flex-col overflow-hidden bg-background ${islandLayout ? "rounded-[var(--island-radius)]" : "rounded-none"}`}>
@@ -280,11 +266,6 @@ export const SettingsView = memo(function SettingsView({
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   <span className="flex-1">{t(item.labelKey)}</span>
-                  {item.comingSoon && (
-                    <span className="rounded bg-foreground/[0.06] px-1.5 py-px text-[10px] font-medium text-muted-foreground/70">
-                      {t("soon")}
-                    </span>
-                  )}
                 </button>
               );
             })}

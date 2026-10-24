@@ -24,7 +24,7 @@ import {
   getComputerUseRuntimeStatus,
   getCodexMcpServerOverrides,
 } from "../lib/computer-use-runtime";
-import { getHindsightCodexMcpOverrides, registerMemorySession, unregisterMemorySession, beforeMemorySend, observeCodexNotification, completeMemoryTurn } from "../lib/memory/service";
+import { memoryMcpDefinition, registerMemorySession, unregisterMemorySession, cancelMemoryTurn, beforeMemorySend } from "../lib/memory/service";
 import { cancelProjectAppAgentPermissions, registerProjectAppAgentSession, revokeProjectAppAgentSession, getProjectAppMcpServer } from "../lib/project-apps/agent-bridge";
 import { beginUsageTurn, endUsageTurn, stopUsageSession } from "../lib/usage";
 import { bindSessionTokenUsage, createCodexTokenObserver } from "../lib/token-usage";
@@ -149,7 +149,8 @@ function getCodexAppServerArgs(sessionId?: string): string[] {
     // runtime without mutating the user's ~/.codex/config.toml.
     args.push(...getCodexMcpServerOverrides(computerUse));
   }
-  if (sessionId) args.push(...getHindsightCodexMcpOverrides(sessionId));
+  const memory = sessionId ? memoryMcpDefinition(sessionId) : null;
+  if (memory) args.push(...getCodexMcpServerOverrides(memory));
   const apps = sessionId ? getProjectAppMcpServer(sessionId) : null;
   if (apps) args.push(...getCodexMcpServerOverrides(apps));
   return args;
@@ -510,12 +511,9 @@ function setupCodexHandlers(
     } else if (notification.method === "turn/completed") {
       endUsageTurn(internalId, notification.params.turn.id);
       session.activeTurnId = null;
-      void completeMemoryTurn(internalId);
     } else if (notification.method === "error" && !notification.params.willRetry) {
       endUsageTurn(internalId, notification.params.turnId);
     }
-
-    observeCodexNotification(internalId, notification.method, notification.params as Record<string, unknown>);
 
     safeSend(getMainWindow, "codex:event", {
       _sessionId: internalId,
@@ -589,7 +587,8 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
         runtimeLease?.assertActive();
         log("codex",` Starting app-server: ${codexPath} (session=${internalId})`);
 
-        if (options.memoryContext?.projectId) registerMemorySession(internalId, options.memoryContext.projectId, "codex");
+        const memoryProjectId = options.memoryContext?.projectId;
+      if (memoryProjectId) await registerMemorySession(internalId, memoryProjectId, "codex");
         await registerProjectAppAgentSession(internalId, options.memoryContext?.projectId, options.cwd);
         runtimeLease?.assertActive();
         const proc = spawnCodexAppServer(codexPath, options.cwd, internalId);
@@ -791,6 +790,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
 
   // ─── codex:interrupt ───
   ipcMain.handle("codex:interrupt", async (_, sessionId: string) => {
+    cancelMemoryTurn(sessionId);
     cancelProjectAppAgentPermissions(sessionId);
     const session = codexSessions.get(sessionId);
     if (!session?.threadId || !session.activeTurnId) return { error: "No active turn" };
@@ -1116,7 +1116,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
         runtimeLease.assertActive();
         log("codex",` Resuming thread ${data.threadId} in new process (session=${internalId})`);
 
-        if (data.memoryContext?.projectId) registerMemorySession(internalId, data.memoryContext.projectId, "codex");
+        await registerMemorySession(internalId, data.source.projectId, "codex");
         await registerProjectAppAgentSession(internalId, data.source.projectId, data.cwd);
         runtimeLease.assertActive();
         const proc = spawnCodexAppServer(codexPath, data.cwd, internalId);

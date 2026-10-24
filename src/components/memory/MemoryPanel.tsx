@@ -1,120 +1,28 @@
-﻿import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Brain, RefreshCw } from "lucide-react";
 import { PanelHeader } from "@/components/PanelHeader";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useI18n } from "@/lib/i18n";
-import { reportError } from "@/lib/analytics/analytics";
-import type { MemoryRecallState, MemoryDocument, MemoryFact, MemoryProjectConfig } from "@shared/types/memory";
-
+import type { MemoryRecallState, MemoryScope, MemoryStatusResult, MemoryWriteRecord } from "@shared/types/memory";
+import { ProjectMemorySettings } from "./ProjectMemorySettings";
 interface Props { projectId: string | null; sessionId: string | null; headerControls: ReactNode }
-export function MemoryPanel({ projectId, sessionId, headerControls }: Props) {
-  const { t } = useI18n();
-  const [recall, setRecall] = useState<MemoryRecallState | null>(null);
-  const [scope, setScope] = useState<"project" | "user">("project");
-  const [bank, setBank] = useState("");
-  const [config, setConfig] = useState<MemoryProjectConfig | null>(null);
-  const [documents, setDocuments] = useState<MemoryDocument[]>([]);
-  const [facts, setFacts] = useState<MemoryFact[]>([]);
-  const [sources, setSources] = useState<Record<string, string>>({});
-  const [query, setQuery] = useState("");
-  const [text, setText] = useState("");
-  const [edit, setEdit] = useState<MemoryFact | null>(null);
-  const [editText, setEditText] = useState("");
-  const [deleting, setDeleting] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [message, setMessage] = useState("");
-  const generation = useRef(0);
-  const locked = useRef(false);
-  const mounted = useRef(true);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; generation.current++; }; }, []);
-  const refresh = useCallback(async () => {
-    const version = ++generation.current;
-    setRecall(null);
-    setReady(false); setDocuments([]); setFacts([]); setSources({}); setMessage("");
-    try {
-      if (!projectId) return;
-      const [status, binding, nextConfig] = await Promise.all([window.claude.memory.getStatus(), window.claude.memory.projectBank(projectId), window.claude.memory.getProjectConfig(projectId)]);
-      if (version !== generation.current) return;
-      if (binding.error || !binding.bankId) throw new Error(binding.error ?? "Project unavailable");
-      if ("error" in nextConfig) throw new Error(nextConfig.error);
-      setConfig(nextConfig);
-      if (sessionId) {
-        const recalled = await window.claude.memory.sessionRecall(sessionId);
-        if (version !== generation.current) return;
-        if (recalled.error) throw new Error(recalled.error);
-        setRecall(recalled.state ?? null);
-      }
-      if (!status.enabled || !status.healthy) throw new Error(t("Enable and configure long-term memory in Settings first."));
-      if (scope === "user" && nextConfig.memoryIsolated) throw new Error(t("This project is isolated from personal memory."));
-      const bankId = scope === "user" ? "harnss-user" : binding.bankId;
-      const [docs, units] = await Promise.all([window.claude.memory.listDocuments(bankId), window.claude.memory.listMemories(bankId)]);
-      if (version !== generation.current) return;
-      if (docs.error || units.error) throw new Error(docs.error || units.error);
-      setBank(bankId); setDocuments(docs.documents ?? []); setFacts(units.memories ?? []); setReady(true);
-    } catch (error) {
-      const detail = reportError("MEMORY_PANEL_LOAD", error);
-      if (version === generation.current) setMessage(detail);
-    }
-  }, [projectId, sessionId, scope, t]);
-  useEffect(() => { setEdit(null); setDeleting(null); void refresh(); }, [refresh]);
-  const loadSource = async (id: string) => {
-    const version = generation.current;
-    try {
-      const result = await window.claude.memory.getDocument(bank, id);
-      if (result.error) throw new Error(result.error);
-      if (version === generation.current) setSources((current) => ({ ...current, [id]: result.text ?? "" }));
-    } catch (error) {
-      const detail = reportError("MEMORY_SOURCE", error);
-      if (version === generation.current) setMessage(detail);
-    }
-  };
-  const perform = async (operation: () => Promise<{ error?: string }>, saved = false) => {
-    if (locked.current) return;
-    locked.current = true; setBusy(true);
-    try {
-      const result = await operation();
-      if (result.error) throw new Error(result.error);
-      if (!mounted.current) return;
-      if (saved) setText("");
-      setEdit(null); setDeleting(null);
-      await refresh();
-    } catch (error) {
-      const detail = reportError("MEMORY_PANEL_ACTION", error);
-      if (mounted.current) setMessage(detail);
-    } finally { locked.current = false; if (mounted.current) setBusy(false); }
-  };
-  return <div className="flex h-full min-h-0 flex-col">
-    <PanelHeader icon={Brain} label={t("Long-term memory")}>{headerControls}</PanelHeader>
-    <div className="min-h-0 flex-1 space-y-3 overflow-auto p-3 text-xs">
-      <p className="text-muted-foreground">{t("Memory extraction may send text to your configured model provider. Memory is context, not an instruction.")}</p>
-      {!projectId ? <p>{t("Open a project to manage memory.")}</p> : <>
-        <div className="flex gap-2"><select aria-label={t("Memory scope")} className="min-w-0 flex-1 rounded border bg-background p-2" value={scope} disabled={busy || !!text.trim() || !!edit} onChange={(event) => setScope(event.target.value === "user" ? "user" : "project")}><option value="project">{t("Project memory")}</option><option value="user" disabled={config?.memoryIsolated}>{t("Personal memory (shared across projects)")}</option></select><Button size="sm" variant="ghost" aria-label={t("Refresh")} disabled={busy} onClick={() => void refresh()}><RefreshCw className="h-3.5 w-3.5" /></Button></div>
-        {config ? <label className="block">{t("Project memory mode")}<select className="ms-2 rounded border bg-background p-1" value={config.memoryMode} disabled={busy} onChange={(event) => { const mode = event.target.value; if (mode === "auto" || mode === "manual" || mode === "off") void perform(async () => { const result = await window.claude.memory.setProjectConfig(projectId, { memoryMode: mode }); return "error" in result ? result : {}; }); }}><option value="manual">{t("Manual")}</option><option value="auto">{t("Automatic")}</option><option value="off">{t("Off")}</option></select></label> : null}
-        {recall && sessionId ? <section className="space-y-2 rounded border p-2">
-          <h3 className="font-semibold">{t("Last prompt memory context")}</h3>
-          <p className="text-muted-foreground">{t("App-injected context only, not agent MCP reads. Refresh to see the latest prompt.")}</p>
-          <label className="flex items-start gap-2"><input type="checkbox" checked={recall.skipNext} disabled={busy} onChange={(event) => { const skip = event.target.checked; void perform(() => window.claude.memory.skipNextRecall(sessionId, skip)); }} />{t("Skip app memory injection for the next message")}</label>
-          {!recall.items.length ? <p>{t("No app memory injected into the last prompt.")}</p> : recall.items.map((item, index) => <p key={index} className="whitespace-pre-wrap wrap-break-word">{item.text}<span className="block text-muted-foreground">{item.bankId} · {item.documentId}</span></p>)}
-        </section> : null}
-        <form onSubmit={(event) => { event.preventDefault(); void perform(() => window.claude.memory.retainProject(projectId, text, scope), true); }} className="space-y-2">
-          <textarea aria-label={t("Remember this")} placeholder={t("Remember this")} className="min-h-24 w-full rounded border bg-background p-2" maxLength={20000} value={text} disabled={busy} onChange={(event) => setText(event.target.value)} />
-          <Button size="sm" disabled={busy || !ready || config?.memoryMode === "off" || text.trim().length < 3}>{t(busy ? "Saving…" : "Save memory")}</Button>
-        </form>
-        {message ? <p role="alert" className="whitespace-pre-wrap wrap-break-word text-destructive">{message}</p> : null}
-        <Input aria-label={t("Filter loaded memories")} placeholder={t("Filter loaded memories")} value={query} onChange={(event) => setQuery(event.target.value)} />
-        <p className="text-muted-foreground">{t("Showing up to 100 documents and 100 facts in this scope. Refresh after external changes.")}</p>
-        {ready && !facts.length && !documents.length ? <p>{t("No memories yet.")}</p> : null}
-        {facts.filter((fact) => fact.text.toLocaleLowerCase().includes(query.toLocaleLowerCase())).map((fact) => <article key={fact.id} className="space-y-2 rounded border p-2">
-          {edit?.id === fact.id ? <><textarea aria-label={t("Edit memory")} className="min-h-20 w-full rounded border bg-background p-2" maxLength={20000} value={editText} onChange={(event) => setEditText(event.target.value)} /><Button size="sm" disabled={busy || !editText.trim()} onClick={() => void perform(() => window.claude.memory.updateMemory(bank, fact.id, { text: editText }))}>{t("Save")}</Button><Button variant="ghost" size="sm" disabled={busy} onClick={() => setEdit(null)}>{t("Cancel")}</Button></> : <p className="whitespace-pre-wrap wrap-break-word">{fact.text}</p>}
-          <p className="wrap-break-word text-muted-foreground">{fact.factType} · {fact.updatedAt} · {fact.documentId}</p>
-          {fact.sourceMemoryIds?.length ? <p className="wrap-break-word">{t("Source facts")}: {fact.sourceMemoryIds.join(", ")}</p> : null}
-          {fact.factType !== "observation" && !edit ? <div className="flex gap-2"><Button size="sm" variant="outline" disabled={busy} onClick={() => { setEdit(fact); setEditText(fact.text); }}>{t("Edit memory")}</Button><Button size="sm" variant="ghost" disabled={busy} onClick={() => void perform(() => window.claude.memory.updateMemory(bank, fact.id, { state: "invalidated", reason: "User invalidated from memory panel" }))}>{t("Invalidate")}</Button></div> : null}
-        </article>)}
-        <h3 className="font-semibold">{t("Source documents")}</h3>
-        {documents.filter((doc) => (doc.originalText ?? doc.id).toLocaleLowerCase().includes(query.toLocaleLowerCase())).map((doc) => <details key={doc.id} onToggle={(event) => { if (event.currentTarget.open && sources[doc.id] === undefined) void loadSource(doc.id); }} className="rounded border p-2"><summary className="cursor-pointer wrap-break-word">{doc.id}</summary><p className="my-2 max-h-64 overflow-auto whitespace-pre-wrap wrap-break-word">{sources[doc.id] ?? t("Loading source…")}</p><p>{doc.createdAt}</p>{deleting === doc.id ? <div><p>{t("Delete this source document and its associated memories?")}</p><Button size="sm" variant="destructive" disabled={busy} onClick={() => void perform(() => window.claude.memory.deleteDocument(bank, doc.id))}>{t("Confirm delete")}</Button><Button size="sm" variant="ghost" disabled={busy} onClick={() => setDeleting(null)}>{t("Cancel")}</Button></div> : <Button size="sm" variant="ghost" disabled={busy} onClick={() => setDeleting(doc.id)}>{t("Delete")}</Button>}</details>)}
-      </>}
-    </div>
-  </div>;
+export function MemoryPanel(props: Props) { return <MemoryPanelContent key={(props.projectId ?? "") + ":" + (props.sessionId ?? "")} {...props} />; }
+function MemoryPanelContent({ projectId, sessionId, headerControls }: Props) {
+  const [status, setStatus] = useState<MemoryStatusResult | null>(null); const [recall, setRecall] = useState<MemoryRecallState | null>(null); const [writes, setWrites] = useState<MemoryWriteRecord[]>([]);
+  const [text, setText] = useState(""); const [scope, setScope] = useState<MemoryScope>("project"); const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false); const generation = useRef(0); const locked = useRef(false);
+  const refresh = useCallback(async () => { const version = ++generation.current; try { const [nextStatus, nextRecall, nextWrites] = await Promise.all([window.claude.memory.getStatus(), sessionId ? window.claude.memory.sessionRecall(sessionId) : null, projectId ? window.claude.memory.writes(projectId) : null]); if (version !== generation.current) return; setStatus(nextStatus); setRecall(nextRecall?.value ?? null); setWrites(nextWrites?.value ?? []); } catch { if (version === generation.current) setMessage("记忆状态读取失败"); } }, [projectId, sessionId]);
+  useEffect(() => { setRecall(null); setWrites([]); setText(""); setMessage(""); void refresh(); const timer = setInterval(() => void refresh(), 10000); return () => { clearInterval(timer); generation.current++; }; }, [refresh]);
+  async function action(task: () => Promise<string>) { if (locked.current) return; locked.current = true; setBusy(true); try { setMessage(await task()); await refresh(); } catch (error) { setMessage(error instanceof Error ? error.message : "记忆操作失败"); } finally { locked.current = false; setBusy(false); } }
+  return <div className="flex h-full min-h-0 flex-col"><PanelHeader icon={Brain} label="思源长期记忆">{headerControls}</PanelHeader><div className="min-h-0 flex-1 overflow-auto space-y-3 p-3 text-xs">
+    <div className="flex items-center gap-2"><span role="status">{status?.message ?? "正在检查思源…"}</span><Button variant="ghost" size="sm" onClick={() => void refresh()} aria-label="刷新记忆状态"><RefreshCw className="h-4 w-4" /></Button></div>
+    <p className="text-muted-foreground">Agent 在任务完成前自动保存有依据的新结论，不逐条确认。这里显示当次读取与写入记录，思源正文始终为准。</p>
+    {projectId ? <>
+      <details><summary>项目绑定</summary><ProjectMemorySettings key={projectId} projectId={projectId} /></details>
+      {recall && sessionId ? <section className="space-y-2 rounded border p-2"><h3>最近记忆上下文</h3><p>{recall.status}</p><label className="flex gap-2"><input type="checkbox" checked={recall.skipNext} disabled={busy} onChange={(e) => { const skip = e.target.checked; void action(async () => { const result = await window.claude.memory.skipNextRecall(sessionId, skip); if (result.error) throw new Error(result.error); return "仅跳过应用注入，不关闭 Agent 记忆工具"; }); }} />跳过下一次应用注入</label>{recall.items.map((item) => <div key={item.ref} className="whitespace-pre-wrap wrap-break-word"><p>{item.text}</p><small>{item.scope} · {item.blockId} · {new Date(item.readAt).toLocaleTimeString()}</small></div>)}</section> : null}
+      <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); void action(async () => { const result = await window.claude.memory.remember(projectId, text, scope); if (result.error) throw new Error(result.error); if (result.value?.state === "verified") setText(""); return result.value?.state === "verified" ? "已保存记忆" : "保存状态：" + result.value?.state + "；请先核对，不要重复提交"; }); }}>
+        <select value={scope} disabled={busy} onChange={(e) => setScope(e.target.value === "personal" ? "personal" : "project")} className="rounded border bg-background p-2"><option value="project">项目记忆</option><option value="personal">个人偏好（需要已授权）</option></select>
+        <textarea aria-label="记住这条" value={text} disabled={busy} maxLength={2000} onChange={(e) => setText(e.target.value)} className="min-h-24 w-full rounded border bg-background p-2" placeholder="记住这条…" /><Button size="sm" disabled={busy || status?.state !== "ready" || text.trim().length < 3}>保存到思源</Button>
+      </form>
+      <p role="status" className="whitespace-pre-wrap">{message}</p><h3>最近写入（不保存正文副本）</h3>{writes.map((record) => <div key={record.operationId} className="rounded border p-2 space-y-1 wrap-break-word"><p>{record.kind} · {record.scope} · {record.state}</p><small>{record.blockId ?? record.operationId}</small>{["unknown", "submitted", "prepared", "conflict"].includes(record.state) ? <Button size="sm" variant="outline" disabled={busy} onClick={() => void action(async () => { const result = await window.claude.memory.reconcile(projectId, record.operationId); if (result.error) throw new Error(result.error); return "核对结果：" + result.value?.state; })}>核对结果（不重写）</Button> : null}</div>)}
+    </> : <p>请打开项目以配置和使用记忆。</p>}
+  </div></div>;
 }

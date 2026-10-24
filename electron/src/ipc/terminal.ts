@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { log } from "../lib/logger";
 import { safeSend } from "../lib/safe-send";
 import { captureEvent } from "../lib/posthog";
+import { OutputBatcher } from "../lib/output-batcher";
 import { reportError } from "../lib/error-utils";
 import {
   appendTerminalHistory,
@@ -28,6 +29,7 @@ interface TerminalEntry {
   exited: boolean;
   exitCode: number | null;
   destroyed: boolean;
+  output: OutputBatcher;
 }
 
 export const terminals = new Map<string, TerminalEntry>();
@@ -71,20 +73,25 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
         exited: false,
         exitCode: null,
         destroyed: false,
+        output: new OutputBatcher((data) => {
+          if (entry.destroyed) return;
+          entry.history = appendTerminalHistory(entry.history, data);
+          entry.seq += 1;
+          safeSend(getMainWindow, "terminal:data", { terminalId, data, seq: entry.seq });
+        }),
       };
       terminals.set(terminalId, entry);
       void captureEvent("terminal_created");
 
       ptyProcess.onData((data: string) => {
         if (entry.destroyed) return;
-        entry.history = appendTerminalHistory(entry.history, data);
-        entry.seq += 1;
-        safeSend(getMainWindow, "terminal:data", { terminalId, data, seq: entry.seq });
+        entry.output.push(data);
       });
 
       ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
         if (entry.destroyed) return;
         log("TERMINAL", `Terminal ${terminalId.slice(0, 8)} exited with code ${exitCode}`);
+        entry.output.flush();
         entry.exited = true;
         entry.exitCode = exitCode;
         const exitNotice = "\r\n\x1b[2m[process exited]\x1b[0m\r\n";
@@ -139,7 +146,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     const term = terminals.get(terminalId);
     if (!term) return { error: "Terminal not found" };
     return {
-      output: readTerminalHistory(term.history),
+      output: (term.output.flush(), readTerminalHistory(term.history)),
       seq: term.seq,
       cols: term.cols,
       rows: term.rows,
@@ -166,6 +173,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     const term = terminals.get(terminalId);
     if (term) {
       term.destroyed = true;
+      term.output.dispose();
       if (!term.exited) term.pty.kill();
       terminals.delete(terminalId);
       log("TERMINAL", `Destroyed terminal ${terminalId.slice(0, 8)}`);
@@ -177,6 +185,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
     for (const [terminalId, term] of terminals.entries()) {
       if (term.spaceId !== spaceId) continue;
       term.destroyed = true;
+      term.output.dispose();
       if (!term.exited) term.pty.kill();
       terminals.delete(terminalId);
       log("TERMINAL", `Destroyed terminal ${terminalId.slice(0, 8)} for space ${spaceId}`);

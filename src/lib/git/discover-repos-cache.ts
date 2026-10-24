@@ -45,7 +45,9 @@ export async function discoverReposCached(
   const request = window.claude.git
     .discoverRepos(projectPath)
     .then((result) => {
+      resultCache.delete(projectPath);
       resultCache.set(projectPath, { result, timestamp: Date.now() });
+      while (resultCache.size > 64) { const oldest = resultCache.keys().next().value; if (oldest !== undefined) resultCache.delete(oldest); }
       return result;
     })
     .finally(() => {

@@ -5,7 +5,7 @@ import type { ChatSession, McpServerConfig, PersistedSession, Project, ACPConfig
 import { suppressNextSessionCompletion } from "../../lib/notification-utils";
 import { capture } from "../../lib/analytics/analytics";
 import { bgAgentStore } from "../../lib/background/agent-store";
-import { invalidatePersistedCursor, saveSessionSmart } from "../../lib/session/persistence";
+import { invalidatePersistedCursor, patchSessionMetadata, saveSessionSmart } from "../../lib/session/persistence";
 import { startBatchJob, waitForBatchJob } from "@/lib/session/batch-runtime";
 import { conversationKey } from "@shared/lib/session-identity";
 import type { HistoryLocation } from "@shared/types/productivity";
@@ -106,10 +106,8 @@ export function useSessionCrud({
         : entry
     )));
 
-    window.claude.sessions.load(session.projectId, session.id).then((data) => {
-      if (!data?.planMode) return;
-      return saveSessionSmart({ ...data, planMode: false });
-    }).catch(() => { /* session may have been deleted */ });
+    if (session.planMode) void patchSessionMetadata(session.projectId, session.id, { planMode: false })
+      .catch((error) => toast.error("Failed to save session mode", { description: String(error) }));
 
     if ((session.engine ?? "claude") !== "claude" || !liveSessionIdsRef.current.has(session.id)) {
       return;
@@ -433,11 +431,9 @@ export function useSessionCrud({
     setSessions((prev) =>
       prev.map((s) => (s.id === id ? { ...s, title, titleGenerating: false } : s)),
     );
-    window.claude.sessions.load(session.projectId, id).then((data) => {
-      if (data) {
-        void saveSessionSmart({ ...data, title });
-      }
-    }).catch(() => { /* session may have been deleted */ });
+    void patchSessionMetadata(session.projectId, id, { title }).catch((error) => {
+      toast.error("Failed to rename session", { description: String(error) });
+    });
   }, []);
 
   // ── Deselect the active session ──

@@ -56,8 +56,8 @@ vi.mock("../lib/computer-use-runtime", () => ({
   withComputerUseMcpServer: (servers: unknown[] = []) => servers,
 }));
 vi.mock("../lib/memory/service", () => ({
-  withHindsightMcpServers: (servers: unknown[] = []) => servers, getHindsightCodexMcpOverrides: () => [],
-  registerMemorySession: vi.fn(), unregisterMemorySession: vi.fn(), beforeMemorySend: state.beforeSend,
+  withMemoryMcpServers: (servers: unknown[] = []) => servers, memoryMcpDefinition: () => null, isMemoryTool: () => false,
+  registerMemorySession: vi.fn(), unregisterMemorySession: vi.fn(), cancelMemoryTurn: vi.fn(), beforeMemorySend: state.beforeSend,
   observeClaudeEvent: vi.fn(), observeCodexNotification: vi.fn(), observeAcpUpdate: vi.fn(), completeMemoryTurn: vi.fn(),
 }));
 // Application bridge authentication/scope/approval behavior is covered by its

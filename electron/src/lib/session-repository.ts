@@ -4,6 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { conversationKey } from "@shared/lib/session-identity";
 import { extractSessionMeta, type SessionMeta } from "@shared/lib/session-persistence";
 import { writeJsonAtomically, writeTextAtomically } from "./atomic-file";
+import { repairJsonlTail } from "./jsonl-tail";
 import { parseSessionJsonl, serializeAppendLines, serializeSessionJsonl } from "./session-jsonl";
 import { assertStorageId, isMissingFile, isRecord, ProductivityError } from "./productivity-errors";
 import type { SessionResumeSource } from "@shared/types/productivity";
@@ -13,7 +14,7 @@ import { assertReplacementKeys, readSessionReplacements, replacementPath, replac
   SESSION_SOURCE_FORMATS, type SessionReplacement, type SessionSourceFormat } from "./session-replacements";
 
 export type SessionData = Record<string, unknown> & { id: string; projectId: string };
-export interface SessionMetaPatch { archived?: boolean; pinned?: boolean; folderId?: string | null; branch?: string | null }
+export type SessionMetaPatch = import("@shared/lib/session-persistence").SessionMetadataPatch;
 export interface SessionChange { kind: "upsert" | "delete"; conversationKey: string; projectId: string; runtimeSessionId: string }
 interface Deletion {
   version: 1;
@@ -35,7 +36,8 @@ export interface DeletionTarget {
 }
 export interface SessionRuntimeLease { assertActive: () => void; release: () => void }
 interface BoundRuntime { cancelled: boolean; stop: () => Promise<void> }
-const META_FIELDS = ["archived", "pinned", "folderId", "branch"] as const;
+const META_FIELDS = ["archived", "pinned", "folderId", "branch", "title", "model", "effort", "permissionMode", "planMode"] as const;
+const PATCH_FIELDS = [...META_FIELDS, "codexGoal"] as const;
 
 function asSession(value: unknown, projectId: string, id: string): SessionData {
   if (!isRecord(value) || value.id !== id || value.projectId !== projectId) {
@@ -478,7 +480,17 @@ export class SessionRepository {
 
   private async readMeta(projectId: string, id: string): Promise<SessionMeta | null> {
     try {
-      const data = asSession(JSON.parse(await fs.readFile(this.sourceFile(projectId, id, "meta.json"), "utf8")), projectId, id);
+      const metaFile = this.sourceFile(projectId, id, "meta.json");
+      const data = asSession(JSON.parse(await fs.readFile(metaFile, "utf8")), projectId, id);
+      // JSONL is authoritative. A crash can commit it without updating the sidecar.
+      const source = this.sourceFile(projectId, id, "jsonl");
+      try {
+        const [sourceStat, metaStat] = await Promise.all([fs.stat(source), fs.stat(metaFile)]);
+        if (sourceStat.mtimeMs > metaStat.mtimeMs) {
+          const raw = await this.readRaw(projectId, id);
+          if (raw) return extractSessionMeta(raw, lastUserTime(raw));
+        }
+      } catch (error) { if (!isMissingFile(error)) throw error; }
       return extractSessionMeta(data, lastUserTime(data));
     } catch (error) { if (!isMissingFile(error)) throw error; }
     const data = await this.readRaw(projectId, id);
@@ -541,6 +553,16 @@ export class SessionRepository {
     });
   }
 
+  /** Exact-runtime lookup for committed change events, without scanning every conversation. */
+  async currentMetadata(projectId: string, id: string): Promise<SessionMeta | null> {
+    this.file(projectId, id, "jsonl");
+    await this.initialize();
+    if (this.isProjectBlocked(projectId) || this.hiddenRuntime(projectId, id)) return null;
+    const meta = await this.readMeta(projectId, id);
+    if (!meta || this.isProjectBlocked(projectId) || this.hiddenRuntime(projectId, id) || this.isHistoryBlocked(conversationKey(meta))) return null;
+    return meta;
+  }
+
   async resolve(projectId: string, key: string): Promise<SessionMeta> {
     const meta = (await this.list(projectId)).find((meta) => conversationKey(meta) === this.currentKey(key));
     if (!meta) throw new ProductivityError("SOURCE_GONE", "The conversation is no longer available");
@@ -563,7 +585,7 @@ export class SessionRepository {
     return data;
   }
 
-  private async writeOperation(data: SessionData, task: (header: SessionData, key: string) => Promise<void>, previousId?: string): Promise<void> {
+  private async writeOperation(data: SessionData, task: (header: SessionData, key: string) => Promise<void>, previousId?: string): Promise<number> {
     this.file(data.projectId, data.id, "jsonl");
     if (previousId) assertStorageId(previousId);
     await this.initialize();
@@ -578,12 +600,17 @@ export class SessionRepository {
     const replacing = previous !== null && (sourceId !== data.id || previousKey !== key);
     const destination = sourceId === data.id ? previous : await this.readMeta(data.projectId, data.id);
     await this.seedMetadata(data.projectId);
-    await this.locked([key, previousKey, ...(destination ? [conversationKey(destination)] : []), this.runtimeLock(data.projectId, data.id), this.runtimeLock(data.projectId, sourceId)], async () => {
+    return this.locked([key, previousKey, ...(destination ? [conversationKey(destination)] : []), this.runtimeLock(data.projectId, data.id), this.runtimeLock(data.projectId, sourceId)], async () => {
       this.assertCurrent(key, data.projectId, data.id);
       if (previous) this.assertCurrent(previousKey, data.projectId, sourceId);
-      const header: SessionData = { ...data, lastMessageAt: lastUserTime(data) };
-      const current = this.metadata.get(previousKey);
-      if (current) for (const field of META_FIELDS) header[field] = current[field] ?? null;
+      const diskMeta = await this.readMeta(data.projectId, sourceId);
+      const revision = diskMeta?.persistenceRevision ?? 0;
+      if (data.persistenceRevision !== undefined && data.persistenceRevision !== revision) {
+        throw new ProductivityError("REVISION_CONFLICT", "The conversation changed since this snapshot was read. Reload before replacing its messages.", true);
+      }
+      const header: SessionData = { ...data, persistenceRevision: revision + 1, lastMessageAt: lastUserTime(data) };
+      const current = diskMeta ?? this.metadata.get(previousKey);
+      if (current) for (const field of META_FIELDS) if (current[field] !== undefined) header[field] = current[field];
       await fs.mkdir(path.dirname(this.file(data.projectId, data.id, "jsonl")), { recursive: true });
       if (replacing) {
         if (sourceId !== data.id && await this.readMeta(data.projectId, data.id)) throw new ProductivityError("INVALID_ARGUMENT", "The replacement runtime already has a saved conversation");
@@ -631,11 +658,12 @@ export class SessionRepository {
         // an obsolete file is locked. The record hides it and startup retries.
         try { await this.cleanupReplacement(record); }
         catch (error) { this.report("SESSIONS:REPLACEMENT_CLEANUP_ERR", error); }
-        return;
+        return revision + 1;
       } else {
         await task(header, key);
       }
       this.emit("upsert", extractSessionMeta(header, lastUserTime(header)));
+      return revision + 1;
     });
   }
 
@@ -645,8 +673,21 @@ export class SessionRepository {
     this.metadata.set(key, meta);
   }
 
-  async save(data: SessionData, previousId?: string): Promise<void> {
-    await this.writeOperation(data, async (header, key) => {
+  async save(data: SessionData, previousId?: string): Promise<number> {
+    return this.writeOperation(data, async (header, key) => {
+      // Check under the write lock: even a current revision can carry only a
+      // partial background snapshot. Ordinary saves must retain historical IDs.
+      // Explicit recovery/revert uses previousId (including the same runtime).
+      if (!previousId) {
+        const current = await this.readRaw(data.projectId, data.id);
+        const previousMessages: unknown[] = Array.isArray(current?.messages) ? current.messages : [];
+        const nextMessages: unknown[] = Array.isArray(header.messages) ? header.messages : [];
+        const ids = new Set(nextMessages.filter(isRecord).map(message => message.id));
+        if (nextMessages.length < previousMessages.length || previousMessages.some(message =>
+          isRecord(message) && typeof message.id === "string" && !ids.has(message.id))) {
+          throw new ProductivityError("INCOMPLETE_SNAPSHOT", "Refusing to overwrite saved history with an incomplete snapshot. Reload the conversation before retrying.", true);
+        }
+      }
       const file = this.file(data.projectId, data.id, "jsonl");
       await writeTextAtomically(file, serializeSessionJsonl(header));
       this.appendLines.delete(file);
@@ -655,8 +696,8 @@ export class SessionRepository {
     }, previousId);
   }
 
-  async append(data: SessionData, previousId?: string): Promise<void> {
-    await this.writeOperation(data, async (incoming, key) => {
+  async append(data: SessionData, previousId?: string): Promise<number> {
+    return this.writeOperation(data, async (incoming, key) => {
       const { appendedMessages, messageCount, messages: _messages, ...header } = incoming;
       const appended: Record<string, unknown>[] = Array.isArray(appendedMessages) ? appendedMessages.filter(isRecord) : [];
       const file = this.file(data.projectId, data.id, "jsonl");
@@ -673,6 +714,7 @@ export class SessionRepository {
         this.appendLines.delete(file);
         if (!exists) await fs.unlink(this.file(data.projectId, data.id, "json"));
       } else {
+        await repairJsonlTail(file);
         await fs.appendFile(file, serializeAppendLines(header, appended), "utf8");
         this.appendLines.set(file, lines);
       }
@@ -680,22 +722,33 @@ export class SessionRepository {
     }, previousId);
   }
 
-  async updateMeta(projectId: string, id: string, patch: SessionMetaPatch): Promise<void> {
+  async updateMeta(projectId: string, id: string, patch: SessionMetaPatch): Promise<number> {
     this.file(projectId, id, "jsonl");
     await this.initialize();
     this.assertCurrent("", projectId, id);
     const meta = await this.readMeta(projectId, id);
     if (!meta) throw new ProductivityError("SOURCE_GONE");
     const key = conversationKey(meta);
-    await this.locked([key, this.runtimeLock(projectId, id)], async () => {
+    return this.locked([key, this.runtimeLock(projectId, id)], async () => {
       this.assertCurrent(key, projectId, id);
       const current = await this.readMeta(projectId, id);
       if (!current) throw new ProductivityError("SOURCE_GONE");
       const fields: Record<string, unknown> = {};
-      for (const field of META_FIELDS) if (field in patch) fields[field] = patch[field] ?? null;
+      if (!isRecord(patch)) throw new ProductivityError("INVALID_ARGUMENT", "Invalid metadata patch");
+      for (const field of PATCH_FIELDS) if (field in patch) {
+        const value = patch[field];
+        if (["archived", "pinned", "planMode"].includes(field) ? typeof value !== "boolean"
+          : field === "codexGoal" ? value !== null && !isRecord(value)
+          : value !== null && (typeof value !== "string" || value.length > 10_000)) {
+          throw new ProductivityError("INVALID_ARGUMENT", "Invalid metadata field: " + field);
+        }
+        fields[field] = value ?? null;
+      }
+      // Metadata patches do not advance the message revision: they never replace messages.
+      fields.persistenceRevision = current.persistenceRevision ?? 0;
       const next = { ...current, ...fields };
       const file = this.file(projectId, id, "jsonl");
-      try { await fs.access(file); await fs.appendFile(file, serializeAppendLines(fields, []), "utf8"); }
+      try { await repairJsonlTail(file); await fs.appendFile(file, serializeAppendLines(fields, []), "utf8"); }
       catch (error) {
         if (!isMissingFile(error)) throw error;
         const data = await this.readRaw(projectId, id);
@@ -704,6 +757,7 @@ export class SessionRepository {
       }
       await this.saveMeta(next, key);
       this.emit("upsert", extractSessionMeta(next, current.lastMessageAt));
+      return current.persistenceRevision ?? 0;
     });
   }
 

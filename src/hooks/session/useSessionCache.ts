@@ -10,6 +10,15 @@ import { invalidatePersistedCursor } from "@/lib/session/persistence";
 import { bgAgentStore } from "@/lib/background/agent-store";
 
 const MAX_SESSION_PAYLOAD_CACHE = 6;
+const MAX_SESSION_PAYLOAD_BYTES = 32 * 1024 * 1024;
+const payloadSizes = new WeakMap<PersistedSession, number>();
+function payloadBytes(data: PersistedSession): number {
+  const cached = payloadSizes.get(data);
+  if (cached !== undefined) return cached;
+  const bytes = JSON.stringify(data).length * 2;
+  payloadSizes.set(data, bytes);
+  return bytes;
+}
 
 interface UseSessionCacheParams {
   refs: SharedSessionRefs;
@@ -65,10 +74,14 @@ export function useSessionCache({
     if (isSessionFrozen(data.id) || !refs.projectsRef.current.some((project) => project.id === data.projectId)) return;
     const cache = sessionPayloadCacheRef.current;
     cache.delete(data.id);
+    if (payloadBytes(data) > MAX_SESSION_PAYLOAD_BYTES) return;
     cache.set(data.id, data);
-    while (cache.size > MAX_SESSION_PAYLOAD_CACHE) {
+    let bytes = [...cache.values()].reduce((total, value) => total + payloadBytes(value), 0);
+    while (cache.size > MAX_SESSION_PAYLOAD_CACHE || bytes > MAX_SESSION_PAYLOAD_BYTES) {
       const oldest = cache.keys().next().value;
       if (!oldest) break;
+      const evicted = cache.get(oldest);
+      if (evicted) bytes -= payloadBytes(evicted);
       cache.delete(oldest);
     }
   }, [refs.projectsRef]);

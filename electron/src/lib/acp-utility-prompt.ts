@@ -12,7 +12,7 @@ import { reportError } from "./error-utils";
 import { openCodeUtilityConfig } from "./opencode-utility-config";
 
 /** Generic ACP cannot promise tool-free inference. Fail closed rather than cancel after execution. */
-export async function acpUtilityPrompt(internalId: string, prompt: string, timeoutMs = 15000, signal?: AbortSignal): Promise<string> {
+export async function acpUtilityPrompt(internalId: string, prompt: string, timeoutMs: number | null = 15000, signal?: AbortSignal): Promise<string> {
   const entry = acpSessions.get(internalId);
   if (!entry) throw new Error("ACP session not found");
   if (entry.agentId !== "opencode") throw new Error("This ACP agent has no verified tool-free utility mode");
@@ -20,7 +20,7 @@ export async function acpUtilityPrompt(internalId: string, prompt: string, timeo
   const directory = await mkdtemp(path.join(tmpdir(), "astradock-acp-utility-"));
   const agent = "astradock-utility-" + crypto.randomUUID();
   const controller = new AbortController();
-  const deadline = setTimeout(() => controller.abort(), timeoutMs);
+  const deadline = timeoutMs === null ? null : setTimeout(() => controller.abort(), timeoutMs);
   const abort = AbortSignal.any([controller.signal, entry.connection.signal, ...(signal ? [signal] : [])]);
   const env = { ...process.env, ...entry.agentEnv, OPENCODE_CONFIG: "", OPENCODE_CONFIG_DIR: directory,
     OPENCODE_DISABLE_PROJECT_CONFIG: "true", OPENCODE_CONFIG_CONTENT: JSON.stringify(openCodeUtilityConfig(agent, entry.agentEnv.OPENCODE_CONFIG_CONTENT ?? process.env.OPENCODE_CONFIG_CONTENT, getAcpSessionModel(internalId))) };
@@ -65,7 +65,7 @@ export async function acpUtilityPrompt(internalId: string, prompt: string, timeo
     reportError("ACP_UTILITY_ERR", error, { internalId });
     throw error;
   } finally {
-    clearTimeout(deadline);
+    if (deadline) clearTimeout(deadline);
     // Hard-stop only the owned utility process, never the conversation process.
     try {
       if (child) await stopProcessAndWait(child);

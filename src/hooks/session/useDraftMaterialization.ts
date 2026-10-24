@@ -1,3 +1,4 @@
+import { materializedState } from "@/lib/session/materialized-state";
 import { useCallback, useRef } from "react";
 import { toast } from "sonner";
 import type { UIMessage, ChatSession, McpServerConfig, Project, ImageAttachment, EngineId } from "../../types";
@@ -372,7 +373,6 @@ export function useDraftMaterialization({
       let sessionId: string;
       let sessionModel = options.model;
       let codexThreadId: string | undefined;
-      let reusedPreStarted = false;
       let preStartedBackgroundState: BackgroundSessionState | undefined;
 
       let cwd: string;
@@ -412,7 +412,6 @@ export function useDraftMaterialization({
           sessionId = eagerSessionId;
           draftAcpSessionIdRef.current = null;
           setDraftAcpSessionId(null);
-          reusedPreStarted = true;
         } else {
           const result = await window.claude.acp.start({
             agentId: options.agentId,
@@ -610,7 +609,6 @@ export function useDraftMaterialization({
           sessionId = preStarted;
           preStartedSessionIdRef.current = null;
           setPreStartedSessionId(null);
-          reusedPreStarted = true;
 
           // Consume background store state accumulated during draft. If the
           // user switches away while materialization is still running, this
@@ -681,12 +679,16 @@ export function useDraftMaterialization({
       // stay in the background instead of taking focus back from the session
       // the user selected.
       const draftUserMessage = createUserMessage(text, images, displayText);
+      // Keep the initial persisted user ID in the event accumulator and the pane.
+      // Otherwise the first ordinary checkpoint appears to delete that message.
+      const seeded = materializedState(backgroundStoreRef.current.get(sessionId) ?? preStartedBackgroundState ?? undefined, draftUserMessage);
+      backgroundStoreRef.current.initFromState(sessionId, seeded);
 
       // Persist as soon as the engine session exists. The normal debounced
       // save happens later, after the first event, which is too late if the
       // user switches chats during startup.
       await window.claude.sessions.save(
-        buildPersistedSession(newSession, [draftUserMessage], 0, null),
+        buildPersistedSession(newSession, seeded.messages, seeded.totalCost, seeded.contextUsage),
       );
 
       // Re-check after persistence: switching chats can happen while the IPC
@@ -706,54 +708,14 @@ export function useDraftMaterialization({
       });
 
       if (ownsDraft) {
-        if (preStartedBackgroundState) {
-          setInitialMessages(preStartedBackgroundState.messages);
-          setInitialMeta({
-            isProcessing: preStartedBackgroundState.isProcessing,
-            isConnected: preStartedBackgroundState.isConnected,
-            sessionInfo: preStartedBackgroundState.sessionInfo,
-            totalCost: preStartedBackgroundState.totalCost,
-            contextUsage: preStartedBackgroundState.contextUsage,
-            isCompacting: preStartedBackgroundState.isCompacting,
-            reconnectMessage: preStartedBackgroundState.reconnectMessage,
-          });
-        } else if (!reusedPreStarted) {
-          if (draftEngine === "acp") {
-            // Preserve the user message + processing state through useACP's
-            // reset effect when the session ID changes.
-            setInitialMessages([draftUserMessage]);
-            setInitialMeta({
-              isProcessing: true,
-              isConnected: true,
-              sessionInfo: null,
-              totalCost: 0,
-              contextUsage: null,
-            });
-          } else {
-            setInitialMessages([]);
-            setInitialMeta(null);
-          }
-        }
-        setInitialPermission(null);
-        setInitialRawAcpPermission(null);
+        // Persistence yielded; keep events received in the meantime, not the
+        // older pre-start/bootstrap snapshot. The base hook re-reads at commit.
+        const current = backgroundStoreRef.current.get(sessionId) ?? seeded;
+        setInitialMessages(current.messages);
+        setInitialMeta(current);
+        setInitialPermission(current.pendingPermission);
+        setInitialRawAcpPermission(current.rawAcpPermission);
         setActiveSessionId(sessionId);
-      } else {
-        const backgroundState = preStartedBackgroundState ?? backgroundStoreRef.current.consume(sessionId);
-        backgroundStoreRef.current.initFromState(sessionId, {
-          messages: backgroundState?.messages ?? [],
-          isProcessing: true,
-          isConnected: backgroundState?.isConnected ?? true,
-          isCompacting: backgroundState?.isCompacting ?? false,
-          sessionInfo: backgroundState?.sessionInfo ?? null,
-          totalCost: backgroundState?.totalCost ?? 0,
-          contextUsage: backgroundState?.contextUsage ?? null,
-          pendingPermission: backgroundState?.pendingPermission ?? null,
-          rawAcpPermission: backgroundState?.rawAcpPermission ?? null,
-          slashCommands: backgroundState?.slashCommands ?? [],
-          codexGoal: backgroundState?.codexGoal ?? null,
-          codexGoalSupported: backgroundState?.codexGoalSupported ?? null,
-          reconnectMessage: backgroundState?.reconnectMessage ?? null,
-        });
       }
 
       if (ownsDraft && draftEngine === "acp") {

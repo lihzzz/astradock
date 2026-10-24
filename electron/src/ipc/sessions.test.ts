@@ -145,7 +145,7 @@ describe("session persistence across runtime restarts", () => {
     await invoke("sessions:save", session("latest", 200));
     await invoke("sessions:save", { ...session("separate"), conversationId: "separate", codexThreadId: "another-thread" });
 
-    expect(await invoke("sessions:delete", "project", "latest")).toEqual({ ok: true });
+    expect(await invoke("sessions:delete", "project", "latest")).toMatchObject({ ok: true });
     expect(await invoke("sessions:list", "project")).toEqual([expect.objectContaining({ id: "separate" })]);
     expect(fs.existsSync(jsonlPath("original"))).toBe(false);
     expect(fs.existsSync(jsonlPath("latest"))).toBe(false);
@@ -193,8 +193,8 @@ describe("incremental JSONL append", () => {
     const toolCall = { id: "t1", role: "tool_call", toolName: "Bash", timestamp: 300 };
     const toolCallWithResult = { ...toolCall, toolResult: { content: "ok" } };
 
-    expect(await invoke("sessions:append", appendPayload("s1", [toolCall]))).toEqual({ ok: true });
-    expect(await invoke("sessions:append", appendPayload("s1", [toolCallWithResult, { id: "a1", role: "assistant", content: "done", timestamp: 400 }]))).toEqual({ ok: true });
+    expect(await invoke("sessions:append", appendPayload("s1", [toolCall]))).toMatchObject({ ok: true });
+    expect(await invoke("sessions:append", appendPayload("s1", [toolCallWithResult, { id: "a1", role: "assistant", content: "done", timestamp: 400 }]))).toMatchObject({ ok: true });
 
     const loaded = await invoke("sessions:load", "project", "s1") as { messages: Array<Record<string, unknown>> };
     expect(loaded.messages.map((m) => m.id)).toEqual(["user", "t1", "a1"]);
@@ -204,7 +204,7 @@ describe("incremental JSONL append", () => {
   it("migrates a legacy .json snapshot on first append and retires the legacy file", async () => {
     await fs.promises.writeFile(getSessionFilePath("project", "legacy"), JSON.stringify(session("legacy")));
 
-    expect(await invoke("sessions:append", appendPayload("legacy", [{ id: "m2", role: "assistant", content: "new", timestamp: 600 }]))).toEqual({ ok: true });
+    expect(await invoke("sessions:append", appendPayload("legacy", [{ id: "m2", role: "assistant", content: "new", timestamp: 600 }]))).toMatchObject({ ok: true });
 
     expect(fs.existsSync(getSessionFilePath("project", "legacy"))).toBe(false);
     expect(fs.existsSync(jsonlPath("legacy"))).toBe(true);

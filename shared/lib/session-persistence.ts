@@ -5,7 +5,14 @@
 import { parseThreadGoal } from "./codex-goal";
 import type { ProjectAppSessionOrigin, WorkspaceBinding } from "../types/workspace";
 
+export interface SessionMetadataPatch {
+  title?: string; model?: string; effort?: string; permissionMode?: string; planMode?: boolean;
+  archived?: boolean; pinned?: boolean; folderId?: string | null; branch?: string | null;
+  codexGoal?: import("../types/codex-protocol/v2/ThreadGoal").ThreadGoal | null;
+}
+
 export interface SessionMeta {
+  persistenceRevision?: number;
   workspaceBinding?: WorkspaceBinding;
   origin?: ProjectAppSessionOrigin;
   conversationId?: string;
@@ -56,6 +63,7 @@ export function getLastUserMessageTimestamp(
  */
 export function extractSessionMeta(data: Record<string, unknown>, lastMessageAt: number): SessionMeta {
   return {
+    persistenceRevision: typeof data.persistenceRevision === "number" ? data.persistenceRevision : 0,
     workspaceBinding: parseWorkspaceBinding(data.workspaceBinding),
     origin: parseSessionOrigin(data.origin),
     id: data.id as string,

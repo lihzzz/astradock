@@ -47,6 +47,8 @@ function getOrCreateDir(root: Map<string, TreeBuildNode>, segments: string[]): T
   return lastNode!;
 }
 
+const fileNameCollator = new Intl.Collator(undefined, { sensitivity: "base" });
+
 function toBuildTree(root: Map<string, TreeBuildNode>): FileTreeNode[] {
   const dirs: FileTreeNode[] = [];
   const files: FileTreeNode[] = [];
@@ -65,7 +67,7 @@ function toBuildTree(root: Map<string, TreeBuildNode>): FileTreeNode[] {
   }
 
   // Sort: directories first (alphabetical), then files (alphabetical)
-  const cmp = (a: FileTreeNode, b: FileTreeNode) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  const cmp = (a: FileTreeNode, b: FileTreeNode) => fileNameCollator.compare(a.name, b.name);
   dirs.sort(cmp);
   files.sort(cmp);
 

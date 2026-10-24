@@ -40,6 +40,8 @@ export interface GitRepoInfo {
 }
 
 export interface GitStatus {
+  /** Present when porcelain output includes branch.oid (absent for legacy sources). */
+  head?: string;
   branch: string;
   upstream?: string;
   ahead: number;

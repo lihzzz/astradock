@@ -92,7 +92,7 @@ describe("durable project deletion", () => {
     await expect(repository.removeProject("project", async () => {})).rejects.toMatchObject({ code: "DELETE_INCOMPLETE" });
     repository = new SessionRepository(root, vi.fn());
     expect(await repository.list("project")).toEqual([]);
-    await expect(repository.save(data("new", "other"))).resolves.toBeUndefined();
+    await expect(repository.save(data("new", "other"))).resolves.toEqual(expect.any(Number));
     expect(readProjectCatalog(root).map((p) => p.id)).toContain("project");
     failure.mockRestore();
     repository = new SessionRepository(root, vi.fn());

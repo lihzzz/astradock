@@ -9,6 +9,9 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { UIMessage, SessionInfo, PermissionRequest, ContextUsage, BackgroundSessionSnapshot } from "@/types";
+import { sharedSessionStore } from "@/lib/background/shared-session-store";
+import type { BackgroundSessionState } from "@/lib/background/session-store";
+import { registerStreamFlusher } from "@/lib/session/stream-flush";
 import { streamTick } from "@/lib/audio/stream-tick";
 
 export interface UseEngineBaseOptions {
@@ -42,6 +45,7 @@ export interface EngineBaseState {
   // Refs
   sessionIdRef: React.RefObject<string | null>;
   messagesRef: React.RefObject<UIMessage[]>;
+  restoredStateRef: React.RefObject<BackgroundSessionState | undefined>;
   isReadyForSession: (id: string) => boolean;
 
   // rAF scheduling — engine hooks call scheduleFlush after pushing data to their buffer
@@ -57,7 +61,7 @@ export function useEngineBase({
   initialMeta,
   initialPermission,
 }: UseEngineBaseOptions): EngineBaseState {
-  const [messages, setMessages] = useState<UIMessage[]>(initialMessages ?? []);
+  const [messages, setMessagesState] = useState<UIMessage[]>(initialMessages ?? []);
   const [isProcessing, setIsProcessing] = useState(initialMeta?.isProcessing ?? false);
   const [isConnected, setIsConnected] = useState(initialMeta?.isConnected ?? false);
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(initialMeta?.sessionInfo ?? null);
@@ -68,15 +72,21 @@ export function useEngineBase({
   const [reconnectMessage, setReconnectMessage] = useState<string | null>(initialMeta?.reconnectMessage ?? null);
 
   const sessionIdRef = useRef(sessionId);
-  sessionIdRef.current = sessionId;
+  const restoredStateRef = useRef<BackgroundSessionState | undefined>(undefined);
   const messagesRef = useRef<UIMessage[]>(messages);
-  messagesRef.current = messages;
+  // IPC events and pane handoffs need the latest state even before React paints.
+  const setMessages = useCallback<Dispatch<SetStateAction<UIMessage[]>>>((update) => {
+    const next = typeof update === "function" ? update(messagesRef.current) : update;
+    messagesRef.current = next;
+    setMessagesState(next);
+  }, []);
   const readySessionRef = useRef<string | null>(null);
   const isReadyForSession = useCallback((id: string) => readySessionRef.current === id && sessionIdRef.current === id, []);
 
   // rAF scheduling refs
   const pendingFlush = useRef(false);
   const rafId = useRef(0);
+  const pendingFlushFn = useRef<(() => void) | null>(null);
 
   // Reset state when sessionId changes, restoring background state if available
   useEffect(() => {
@@ -85,13 +95,18 @@ export function useEngineBase({
     cancelAnimationFrame(rafId.current);
     pendingFlush.current = false;
 
-    setMessages(initialMessages ?? []);
-    if (initialMeta) {
-      setIsProcessing(initialMeta.isProcessing);
-      setIsConnected(initialMeta.isConnected);
-      setSessionInfo(initialMeta.sessionInfo);
-      setTotalCost(initialMeta.totalCost);
-      setContextUsage(initialMeta.contextUsage);
+    // Re-read at commit: another pane may have received events after bootstrap was captured.
+    const transferred = sessionId ? sharedSessionStore.get(sessionId) : undefined;
+    restoredStateRef.current = transferred;
+    sessionIdRef.current = sessionId;
+    const meta = transferred ?? initialMeta;
+    setMessages(transferred?.messages ?? initialMessages ?? []);
+    if (meta) {
+      setIsProcessing(meta.isProcessing);
+      setIsConnected(meta.isConnected);
+      setSessionInfo(meta.sessionInfo);
+      setTotalCost(meta.totalCost);
+      setContextUsage(meta.contextUsage);
     } else {
       setIsProcessing(false);
       setIsConnected(false);
@@ -99,15 +114,16 @@ export function useEngineBase({
       setTotalCost(0);
       setContextUsage(null);
     }
-    setPendingPermission(initialPermission ?? null);
-    setIsCompacting(initialMeta?.isCompacting ?? false);
-    setReconnectMessage(initialMeta?.reconnectMessage ?? null);
+    setPendingPermission(transferred ? transferred.pendingPermission : initialPermission ?? null);
+    setIsCompacting(meta?.isCompacting ?? false);
+    setReconnectMessage(meta?.reconnectMessage ?? null);
     readySessionRef.current = sessionId;
     return () => { readySessionRef.current = null; };
   }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Shared rAF scheduling — engines provide their own flush function
   const scheduleFlush = useCallback((flushFn: () => void) => {
+    pendingFlushFn.current = flushFn;
     if (pendingFlush.current) return;
     pendingFlush.current = true;
     rafId.current = requestAnimationFrame(() => {
@@ -123,6 +139,16 @@ export function useEngineBase({
       cancelAnimationFrame(rafId.current);
       pendingFlush.current = false;
     }
+  }, []);
+
+  useEffect(() => {
+    const flush = () => {
+      if (!pendingFlush.current) return;
+      cancelAnimationFrame(rafId.current);
+      pendingFlush.current = false;
+      pendingFlushFn.current?.();
+    };
+    return registerStreamFlusher(flush);
   }, []);
 
   // Cleanup rAF on unmount
@@ -147,6 +173,7 @@ export function useEngineBase({
     reconnectMessage, setReconnectMessage,
     sessionIdRef,
     messagesRef,
+    restoredStateRef,
     pendingFlush,
     rafId,
     scheduleFlush,

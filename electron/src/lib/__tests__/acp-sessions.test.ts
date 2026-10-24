@@ -22,7 +22,7 @@ vi.mock("../error-utils", () => ({ extractErrorMessage: String, reportError: (_l
 vi.mock("../posthog", () => ({ captureEvent: vi.fn() }));
 vi.mock("../mcp-oauth-flow", () => ({ getMcpAuthHeaders: async () => ({}) }));
 vi.mock("../computer-use-runtime", () => ({ withComputerUseMcpServer: (servers: unknown[] = []) => servers }));
-vi.mock("../memory/service", () => ({ withHindsightMcpServers: (servers: unknown[]) => servers, registerMemorySession: vi.fn(), unregisterMemorySession: vi.fn(), beforeMemorySend: async (_id: string, text: string) => ({ text }), observeAcpUpdate: f.observe, completeMemoryTurn: vi.fn() }));
+vi.mock("../memory/service", () => ({ withMemoryMcpServers: (servers: unknown[]) => servers, registerMemorySession: vi.fn(), unregisterMemorySession: vi.fn(), cancelMemoryTurn: vi.fn(), beforeMemorySend: async (_id: string, text: string) => ({ text }), isMemoryTool: () => false }));
 vi.mock("../project-apps/agent-bridge", () => ({ withProjectAppMcpServer: (servers: unknown[]) => servers, registerProjectAppAgentSession: vi.fn(), unregisterProjectAppAgentSession: vi.fn(), revokeProjectAppAgentSession: vi.fn(), cancelProjectAppAgentPermissions: vi.fn() }));
 vi.mock("../usage", () => ({ beginUsageTurn: vi.fn(), endUsageTurn: vi.fn(), stopUsageSession: vi.fn() }));
 vi.mock("../token-usage", () => ({ bindSessionTokenUsage: vi.fn(), recordAcpTokenUsage: vi.fn() }));

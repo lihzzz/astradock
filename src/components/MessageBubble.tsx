@@ -4,8 +4,7 @@ import ReactMarkdown from "react-markdown";
 import { MarkdownFileLink } from "./MarkdownFileLink";
 import { markdownUrlTransform } from "@/lib/markdown-links";
 import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
+import { useThrottledStreamingText } from "@/hooks/useThrottledStreamingText";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
@@ -29,8 +28,12 @@ import {
 } from "@/components/lib/chat-layout";
 
 // Stable references to avoid re-creating on every render
-const REMARK_PLUGINS = [remarkGfm, remarkMath];
-const REHYPE_PLUGINS = [rehypeKatex];
+const REMARK_PLUGINS = [remarkGfm];
+const MathMarkdown = lazy(() => import("./MathMarkdown").then(module => ({ default: module.MathMarkdown })));
+const MarkdownContent = memo(function MarkdownContent({ content }: { content: string }) {
+  const plain = <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MD_COMPONENTS} urlTransform={markdownUrlTransform}>{content}</ReactMarkdown>;
+  return content.includes("$") ? <Suspense fallback={plain}><MathMarkdown content={content} components={MD_COMPONENTS} /></Suspense> : plain;
+});
 
 const AUTO_RETRY_BUTTON_CLASS = "rounded-full px-1.5 py-0.5 text-foreground/60 transition-colors hover:bg-foreground/[0.08] hover:text-foreground";
 
@@ -337,7 +340,8 @@ export const MessageBubble = memo(function MessageBubble({
   const [rememberMenu, setRememberMenu] = useState<{ x: number; y: number } | null>(null);
   const time = useMemo(() => new Date(message.timestamp).toLocaleTimeString(), [message.timestamp]);
   const displayContent = useMemo(() => isUser ? (message.displayContent ?? stripFileContext(message.content)) : message.content, [isUser, message.content, message.displayContent]);
-  const markdownContent = useMemo(() => normalizeMathDelimiters(message.content), [message.content]);
+  const displayedMarkdown = useThrottledStreamingText(message.content, message.role === "assistant" && !!message.isStreaming);
+  const markdownContent = useMemo(() => isUser ? "" : normalizeMathDelimiters(displayedMarkdown), [displayedMarkdown, isUser]);
   const [isUserMessageExpanded, setIsUserMessageExpanded] = useChatPersistedState(
     `user-message:${message.id}`,
     false,
@@ -376,7 +380,7 @@ export const MessageBubble = memo(function MessageBubble({
   // splits trailing text nodes into [old | animated-new] before each paint.
   const proseRef = useStreamingTextReveal(
     message.role === "assistant" ? message.isStreaming : undefined,
-    message.role === "assistant" ? message.content : "",
+    message.role === "assistant" ? displayedMarkdown : "",
   );
 
   if (message.role === "system") {
@@ -592,14 +596,7 @@ export const MessageBubble = memo(function MessageBubble({
                     )}
                   >
                     <IsStreamingMarkdownContext.Provider value={!!message.isStreaming}>
-                      <ReactMarkdown
-                        remarkPlugins={REMARK_PLUGINS}
-                        rehypePlugins={REHYPE_PLUGINS}
-                        components={MD_COMPONENTS}
-                        urlTransform={markdownUrlTransform}
-                      >
-                        {markdownContent}
-                      </ReactMarkdown>
+                      <MarkdownContent content={markdownContent} />
                     </IsStreamingMarkdownContext.Provider>
                   </div>
                 ) : null}

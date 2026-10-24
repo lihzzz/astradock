@@ -152,7 +152,7 @@ describe("batch session operations", () => {
         if (!meta) throw new Error("Unknown fixture");
         return meta;
       });
-      const update = vi.spyOn(repository, "updateMeta").mockResolvedValue(undefined);
+      const update = vi.spyOn(repository, "updateMeta").mockResolvedValue(0);
       const progress = vi.fn((job: BatchJob) => { if (job.completedAt !== null) finish(job); });
       operations = new SessionOperations({ repository, remove: vi.fn(), chooseDirectory: vi.fn(), prepare: vi.fn(), progress });
       await operations.start({ requestId: "five-hundred", action: "archive", targets: records.map((meta) => ({ projectId: meta.projectId, conversationKey: conversationKey(meta) })) });

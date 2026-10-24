@@ -52,6 +52,35 @@ type PermissionRequestCallback = (sessionId: string, permission: PermissionReque
  */
 export class BackgroundSessionStore {
   private sessions = new Map<string, InternalState>();
+  private removed = new Set<string>();
+  private live = new Map<string, Map<symbol, () => BackgroundSessionState>>();
+  onChanged?: (sessionId: string) => void;
+  hasLive(sessionId: string): boolean { return !!this.live.get(sessionId)?.size; }
+  registerLive(sessionId: string, snapshot: () => BackgroundSessionState): () => void {
+    const owners = this.live.get(sessionId) ?? new Map<symbol, () => BackgroundSessionState>();
+    const owner = Symbol();
+    owners.set(owner, snapshot); this.live.set(sessionId, owners);
+    return () => {
+      const state = snapshot();
+      owners.delete(owner);
+      if (!owners.size) {
+        this.live.delete(sessionId);
+        if (!this.removed.has(sessionId)) {
+          this.initFromState(sessionId, state);
+          this.onChanged?.(sessionId);
+        }
+      }
+    };
+  }
+  notifyChanged(sessionId: string): void { this.onChanged?.(sessionId); }
+  checkpointUrgent(sessionId: string): boolean {
+    const state = this.liveState(sessionId) ?? this.sessions.get(sessionId);
+    return !!state && (!state.isProcessing || !!state.pendingPermission);
+  }
+  private liveState(sessionId: string): BackgroundSessionState | undefined {
+    const providers = this.live.get(sessionId);
+    return providers ? [...providers.values()].at(-1)?.() : undefined;
+  }
   onProcessingChange?: (sessionId: string, isProcessing: boolean) => void;
   onPermissionRequest?: PermissionRequestCallback;
   onGoalChange?: (sessionId: string, goal: CodexThreadGoal | null) => void;
@@ -90,6 +119,7 @@ export class BackgroundSessionStore {
 
     const state = this.getOrCreate(sessionId);
     const result = handleClaudeEvent(state, event);
+    this.onChanged?.(sessionId);
     if (result?.processingChanged) {
       this.onProcessingChange?.(sessionId, result.isProcessing);
     }
@@ -101,6 +131,7 @@ export class BackgroundSessionStore {
 
     const state = this.getOrCreate(sessionId);
     acpHandler(state, event);
+    this.onChanged?.(sessionId);
   }
 
   /** Handle ACP turn completion — finalize streaming, close tools, reset processing. */
@@ -108,6 +139,7 @@ export class BackgroundSessionStore {
     const state = this.sessions.get(sessionId);
     if (!state) return;
     acpTurnComplete(state, stopReason);
+    this.onChanged?.(sessionId);
     this.onProcessingChange?.(sessionId, false);
   }
 
@@ -118,6 +150,7 @@ export class BackgroundSessionStore {
 
     const state = this.getOrCreate(sessionId);
     const result = codexHandler(state, event);
+    this.onChanged?.(sessionId);
     if (result?.processingChanged) {
       this.onProcessingChange?.(sessionId, result.isProcessing!);
     }
@@ -134,15 +167,16 @@ export class BackgroundSessionStore {
     const state = this.getOrCreate(sessionId);
     state.pendingPermission = permission;
     state.rawAcpPermission = rawAcpPermission ?? null;
+    this.onChanged?.(sessionId);
     this.onPermissionRequest?.(sessionId, permission);
   }
 
   has(sessionId: string): boolean {
-    return this.sessions.has(sessionId);
+    return this.hasLive(sessionId) || this.sessions.has(sessionId);
   }
 
   get(sessionId: string): BackgroundSessionState | undefined {
-    const state = this.sessions.get(sessionId);
+    const state = this.liveState(sessionId) ?? this.sessions.get(sessionId);
     if (!state) return undefined;
     // Clone messages to prevent external mutation of internal state
     return {
@@ -162,29 +196,17 @@ export class BackgroundSessionStore {
     };
   }
 
+  /**
+   * Capture bootstrap without removing the event accumulator. React may defer or
+   * abandon the transition; events in that gap must still see the full history.
+   * The pane re-reads at commit and registerLive takes over routing afterwards.
+   */
   consume(sessionId: string): BackgroundSessionState | undefined {
-    const state = this.sessions.get(sessionId);
-    if (!state) return undefined;
-    // Transfer ownership — no clone needed since we delete the store entry
-    this.sessions.delete(sessionId);
-    return {
-      messages: state.messages,
-      isProcessing: state.isProcessing,
-      isConnected: state.isConnected,
-      isCompacting: state.isCompacting,
-      sessionInfo: state.sessionInfo,
-      totalCost: state.totalCost,
-      contextUsage: state.contextUsage,
-      pendingPermission: state.pendingPermission,
-      rawAcpPermission: state.rawAcpPermission,
-      slashCommands: state.slashCommands ?? [],
-      codexGoal: state.codexGoal,
-      codexGoalSupported: state.codexGoalSupported,
-      reconnectMessage: state.reconnectMessage ?? null,
-    };
+    return this.get(sessionId);
   }
 
   delete(sessionId: string): void {
+    this.removed.add(sessionId);
     this.sessions.delete(sessionId);
   }
 
@@ -203,6 +225,7 @@ export class BackgroundSessionStore {
 
   /** Seed store with the current session state when switching away. */
   initFromState(sessionId: string, state: BackgroundSessionState): void {
+    this.removed.delete(sessionId);
     const parentToolMap = new Map<string, string>();
     // The active view treats message arrays immutably, so we can reuse the
     // existing objects here and avoid an O(n) clone on every session switch.

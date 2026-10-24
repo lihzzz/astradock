@@ -30,3 +30,11 @@ cli
 .idea/
 /outputs/
 .workbuddy-ai/
+!/docs/session-consistency.md
+
+# Track the SiYuan memory design and implementation evidence.
+!/docs/siyuan-memory/
+/docs/siyuan-memory/*
+!/docs/siyuan-memory/implementation-plan.md
+!/docs/siyuan-memory/implementation-status.md
+!/docs/siyuan-memory/user-guide.md

@@ -9,7 +9,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["electron/src/**/*.test.ts", "src/**/*.test.{ts,tsx}"],
+    include: ["electron/src/**/*.test.ts", "src/**/*.test.{ts,tsx}", "shared/**/*.test.{ts,tsx}"],
     environment: "node",
     restoreMocks: true,
   },

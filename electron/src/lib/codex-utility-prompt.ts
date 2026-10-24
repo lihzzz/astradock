@@ -12,7 +12,7 @@ import type {
 import { listModelsWithConfigured } from "@shared/lib/codex-helpers";
 
 interface CodexUtilityPromptOptions {
-  timeoutMs?: number;
+  timeoutMs?: number | null;
   model?: string;
   signal?: AbortSignal;
 }
@@ -38,14 +38,16 @@ export async function codexUtilityPrompt(
   logLabel: string,
   options?: CodexUtilityPromptOptions,
 ): Promise<string> {
-  const timeoutMs = options?.timeoutMs ?? 60000;
+  const timeoutMs = options?.timeoutMs === undefined ? 60000 : options.timeoutMs;
   const startedAt = Date.now();
 
   let rpc: CodexRpcClient | null = null;
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
   let cancelledByCaller = false;
+  let cancelCompletion: (() => void) | undefined;
   const abortFromCaller = () => {
     cancelledByCaller = true;
+    cancelCompletion?.();
     try {
       rpc?.destroy();
     } catch {
@@ -96,6 +98,12 @@ export async function codexUtilityPrompt(
         reject(error);
       };
     });
+
+    // Attach immediately: cancellation can occur during initialization, before awaiting completion.
+    void completionPromise.catch(() => {});
+    cancelCompletion = () => fail?.(new Error("Codex utility prompt cancelled"));
+
+    rpc.onExit = (code, signal) => fail?.(new Error(`Codex utility process exited (code=${code}, signal=${signal})`));
 
     rpc.onStderr = (text) => {
       log(`${logLabel}_STDERR`, text);
@@ -172,7 +180,7 @@ export async function codexUtilityPrompt(
       fail?.(new Error(`Codex utility requested unsupported input: ${msg.method}`));
     };
 
-    timeoutHandle = setTimeout(() => {
+    if (timeoutMs !== null) timeoutHandle = setTimeout(() => {
       if (!fail) return;
       fail(new Error(`Codex utility prompt timed out after ${timeoutMs}ms`));
       try {

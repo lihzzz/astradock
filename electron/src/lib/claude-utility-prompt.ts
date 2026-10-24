@@ -3,7 +3,7 @@ import { clientAppEnv, getSDK } from "./sdk";
 import { reportError } from "./error-utils";
 
 interface ClaudeUtilityPromptOptions {
-  timeoutMs?: number;
+  timeoutMs?: number | null;
   model?: string;
   signal?: AbortSignal;
 }
@@ -18,54 +18,59 @@ export async function claudeUtilityPrompt(
   cwd: string,
   options?: ClaudeUtilityPromptOptions,
 ): Promise<string> {
-  const timeoutMs = options?.timeoutMs ?? 9000;
+  const timeoutMs = options?.timeoutMs === undefined ? 9000 : options.timeoutMs;
   const model = options?.model?.trim() || undefined;
   const query = await getSDK();
   const cliPath = await getClaudeBinaryPath();
   const controller = new AbortController();
   let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
   let abortedByCaller = false;
+  let closeQuery: (() => void) | undefined;
   const abortFromCaller = () => {
     abortedByCaller = true;
     controller.abort();
+    closeQuery?.();
   };
 
   if (options?.signal?.aborted) abortFromCaller();
   else options?.signal?.addEventListener("abort", abortFromCaller, { once: true });
 
-  const q = query({
-    prompt,
-    options: {
-      cwd,
-      ...(model ? { model } : {}),
-      maxTurns: 1,
-      persistSession: false,
-      settingSources: [],
-      tools: [],
-      allowedTools: [],
-      disallowedTools: ["Bash", "Read", "Edit", "Write", "Glob", "Grep", "WebFetch", "WebSearch", "Task"],
-      permissionMode: "dontAsk",
-      abortController: controller,
-      pathToClaudeCodeExecutable: cliPath,
-      env: { ...process.env, ...clientAppEnv() },
-    },
-  });
-
-  const close = () => {
-    try {
-      q.close();
-    } catch {
-      // The SDK may already have closed its subprocess.
-    }
-  };
-
-  timeoutHandle = setTimeout(() => {
-    controller.abort();
-    close();
-  }, timeoutMs);
-
-  let assistantText = "";
   try {
+    if (abortedByCaller) throw new Error("Claude utility prompt cancelled");
+    const q = query({
+      prompt,
+      options: {
+        cwd,
+        ...(model ? { model } : {}),
+        maxTurns: 1,
+        persistSession: false,
+        settingSources: [],
+        tools: [],
+        allowedTools: [],
+        disallowedTools: ["Bash", "Read", "Edit", "Write", "Glob", "Grep", "WebFetch", "WebSearch", "Task"],
+        permissionMode: "dontAsk",
+        abortController: controller,
+        pathToClaudeCodeExecutable: cliPath,
+        env: { ...process.env, ...clientAppEnv() },
+      },
+    });
+
+    const close = () => {
+      try {
+        q.close();
+      } catch {
+        // The SDK may already have closed its subprocess.
+      }
+    };
+
+    closeQuery = close;
+
+    if (timeoutMs !== null) timeoutHandle = setTimeout(() => {
+      controller.abort();
+      close();
+    }, timeoutMs);
+
+    let assistantText = "";
     for await (const event of q) {
       const value = event as Record<string, unknown>;
       if (value.type === "assistant") {
@@ -83,6 +88,10 @@ export async function claudeUtilityPrompt(
         }
       }
       if (value.type === "result") {
+        if (value.is_error === true) {
+          const errors = Array.isArray(value.errors) ? value.errors.filter((item): item is string => typeof item === "string").join("; ") : "";
+          throw new Error(errors || (typeof value.result === "string" ? value.result : "Claude utility request failed"));
+        }
         const result = typeof value.result === "string" ? value.result : "";
         if (result.trim()) return result;
       }
@@ -95,6 +104,6 @@ export async function claudeUtilityPrompt(
   } finally {
     if (timeoutHandle) clearTimeout(timeoutHandle);
     options?.signal?.removeEventListener("abort", abortFromCaller);
-    close();
+    closeQuery?.();
   }
 }

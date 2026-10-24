@@ -1,4 +1,4 @@
-import { spawnSync } from "child_process";
+import { execFile } from "child_process";
 import fs from "fs";
 import path from "path";
 import type { McpServerInput } from "@shared/lib/mcp-config";
@@ -14,6 +14,26 @@ type RuntimeInvocation = {
   env?: Record<string, string>;
   mode: "internal" | "external";
 };
+
+type ProbeResult = { installed: boolean; version?: string; error?: string };
+function runProbe(command: string, args: string[], options: { timeout: number; encoding: string; windowsHide: boolean; env?: NodeJS.ProcessEnv }): Promise<{ stdout: string; stderr: string; status: number; error?: Error }> {
+  return new Promise(resolve => {
+    execFile(command, args, { ...options, encoding: "utf8", maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+      resolve({ stdout, stderr, status: error ? 1 : 0, ...(error ? { error } : {}) });
+    });
+  });
+}
+// Share concurrent checks, but do not cache permission state (it can change externally).
+const probes = new Map<string, Promise<ProbeResult>>();
+function probeRuntime(invocation: RuntimeInvocation): Promise<ProbeResult> {
+  const key = JSON.stringify(invocation);
+  const pending = probes.get(key);
+  if (pending) return pending;
+  const task = (invocation.mode === "external" ? readExternalVersion(invocation.command) : readInternalVersion(invocation))
+    .finally(() => { if (probes.get(key) === task) probes.delete(key); });
+  probes.set(key, task);
+  return task;
+}
 
 function configuredExternalCommand(): string {
   return getAppSetting("computerUseBinaryPath").trim();
@@ -76,13 +96,13 @@ export function getCodexMcpServerOverrides(server: McpServerInput): string[] {
   return args;
 }
 
-function readExternalVersion(command: string): { installed: boolean; version?: string; error?: string } {
+async function readExternalVersion(command: string): Promise<ProbeResult> {
   if (/[\\/]/.test(command) && !fs.existsSync(command)) {
     return { installed: false, error: "Cua Driver executable was not found at the configured path." };
   }
 
   try {
-    const result = spawnSync(command, ["--version"], {
+    const result = await runProbe(command, ["--version"], {
       encoding: "utf8",
       timeout: 5000,
       windowsHide: true,
@@ -98,9 +118,9 @@ function readExternalVersion(command: string): { installed: boolean; version?: s
   }
 }
 
-function readInternalVersion(invocation: RuntimeInvocation): { installed: boolean; version?: string; error?: string } {
+async function readInternalVersion(invocation: RuntimeInvocation): Promise<ProbeResult> {
   try {
-    const result = spawnSync(invocation.command, [...invocation.args, "--health"], {
+    const result = await runProbe(invocation.command, [...invocation.args, "--health"], {
       encoding: "utf8",
       timeout: 10000,
       windowsHide: true,
@@ -123,9 +143,7 @@ export async function getComputerUseRuntimeStatus(): Promise<ComputerUseRuntimeS
   if (!enabled) {
     return { enabled, command: invocation.command, mode: invocation.mode, installed: false, ready: false };
   }
-  const result = invocation.mode === "external"
-    ? readExternalVersion(invocation.command)
-    : readInternalVersion(invocation);
+  const result = await probeRuntime(invocation);
   let permissions: ComputerUseRuntimeStatus["permissions"];
   let permissionError: string | undefined;
   if (process.platform === "darwin") {

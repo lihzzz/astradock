@@ -1,3 +1,4 @@
+import { appendMessageOnce } from "@/lib/session/materialized-state";
 import { useCallback } from "react";
 import type { ImageAttachment, McpServerConfig, Project } from "@/types";
 import type { CollaborationMode } from "@shared/types/codex-protocol/CollaborationMode";
@@ -223,7 +224,8 @@ export function useSessionLifecycle({
             return { sessionId, error: promptResult.error };
           }
           if (!isActiveSession) {
-            const userMessage = createUserMessage(text, images, displayText);
+            const userMessage = backgroundStoreRef.current.get(sessionId)?.messages.find(message => message.role === "user")
+            ?? createUserMessage(text, images, displayText);
             const backgroundState = backgroundStoreRef.current.get(sessionId);
             const alreadyHasUserMessage = backgroundState?.messages.some((message) => (
               message.role === "user" && message.content === userMessage.content
@@ -243,10 +245,11 @@ export function useSessionLifecycle({
           if (!sessionId) return { error: "Unable to materialize the Codex session." };
           await new Promise((resolve) => setTimeout(resolve, 50));
 
-          const userMessage = createUserMessage(text, images, displayText);
+          const userMessage = backgroundStoreRef.current.get(sessionId)?.messages.find(message => message.role === "user")
+            ?? createUserMessage(text, images, displayText);
           const wasActiveBeforeSend = refs.activeSessionIdRef.current === sessionId;
           if (wasActiveBeforeSend) {
-            codex.setMessages((prev) => [...prev, userMessage]);
+            codex.setMessages((prev) => appendMessageOnce(prev, userMessage));
             codex.setIsProcessing(true);
           }
 
@@ -311,7 +314,7 @@ export function useSessionLifecycle({
 
         // Claude SDK path
         trackMessageSent();
-        const sessionId = await materializeDraft(text);
+        const sessionId = await materializeDraft(text, images, displayText);
         if (!sessionId) return { error: "Unable to materialize the Claude session." };
         await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -337,9 +340,10 @@ export function useSessionLifecycle({
             }
             return { sessionId, error: sendResult.error };
           }
-          const userMessage = createUserMessage(text, images, displayText);
+          const userMessage = backgroundStoreRef.current.get(sessionId)?.messages.find(message => message.role === "user")
+            ?? createUserMessage(text, images, displayText);
           if (isActiveSession) {
-            claude.setMessages((prev) => [...prev, userMessage]);
+            claude.setMessages((prev) => appendMessageOnce(prev, userMessage));
           } else {
             const backgroundState = backgroundStoreRef.current.get(sessionId);
             const alreadyHasUserMessage = backgroundState?.messages.some((message) => (
@@ -360,17 +364,18 @@ export function useSessionLifecycle({
       const rememberMatch = text.match(/^\s*\/remember(?:\s+([\s\S]+?))?\s*$/i);
       if (rememberMatch) {
         const content = rememberMatch[1]?.trim() ?? "";
-        const result = await window.claude.memory.retainManual(activeId, content);
-        const message = result.ok
+        const result = await window.claude.memory.rememberSession(activeId, content);
+        const saved = result.value?.state === "verified";
+        const message = saved
           ? "Saved to long-term memory."
-          : (result.error ?? "Unable to save to long-term memory.");
+          : (result.error ?? "Memory write is unconfirmed; reconcile before retrying.");
         const setMessages = activeSessionEngine === "acp"
           ? acp.setMessages
           : activeSessionEngine === "codex"
             ? codex.setMessages
             : claude.setMessages;
-        setMessages((prev) => [...prev, createSystemMessage(message, !result.ok)]);
-        return { sessionId: activeId, error: result.ok ? undefined : result.error };
+        setMessages((prev) => [...prev, createSystemMessage(message, !saved)]);
+        return { sessionId: activeId, error: saved ? undefined : result.error ?? "Memory write unconfirmed" };
       }
 
       // Queue check: if engine is processing, enqueue instead of sending directly

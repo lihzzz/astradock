@@ -91,24 +91,17 @@ export class JsonFileStore<T> {
     const filePath = this.getPath(key);
     const json = JSON.stringify(data, null, 2);
 
+    const tempPath = filePath + ".tmp-" + process.pid + "-" + Math.random().toString(36).slice(2);
     try {
-      if (this.encrypt) {
-        if (safeStorage.isEncryptionAvailable()) {
-          const encrypted = safeStorage.encryptString(json);
-          fs.writeFileSync(filePath, encrypted, { mode: 0o600 });
-        } else {
-          // Encryption unavailable -- fall back to restrictive plaintext.
-          fs.writeFileSync(filePath, json, { mode: 0o600 });
-        }
-      } else {
-        // Non-sensitive data: atomic write via temp + rename.
-        const tempPath = `${filePath}.tmp`;
-        fs.writeFileSync(tempPath, json);
-        fs.renameSync(tempPath, filePath);
-      }
+      const content = this.encrypt && safeStorage.isEncryptionAvailable()
+        ? safeStorage.encryptString(json) : json;
+      fs.writeFileSync(tempPath, content, { flag: "wx", ...(this.encrypt ? { mode: 0o600 } : {}) });
+      fs.renameSync(tempPath, filePath);
     } catch (error: unknown) {
-      reportError(`${this.label}_SAVE`, error, { key });
+      reportError(this.label + "_SAVE", error, { key });
       throw error;
+    } finally {
+      try { fs.unlinkSync(tempPath); } catch { /* Renamed or never created. */ }
     }
   }
 

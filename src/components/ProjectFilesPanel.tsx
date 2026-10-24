@@ -1,4 +1,5 @@
-import { memo, useCallback, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { memo, useEffect, useCallback, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   FolderTree,
   ChevronRight,
@@ -18,7 +19,7 @@ import {
   FolderPlus,
   Type,
 } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -98,6 +99,9 @@ export const ProjectFilesPanel = memo(function ProjectFilesPanel({
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(debounceRef.current), []);
+
+  const viewportRef = useRef<HTMLDivElement>(null);
 
   // Inline creation state: { parentDir (relative), type }
   const [creating, setCreating] = useState<{ parentDir: string; type: "file" | "folder" } | null>(null);
@@ -127,6 +131,13 @@ export const ProjectFilesPanel = memo(function ProjectFilesPanel({
     if (!filteredTree) return [];
     return flattenTree(filteredTree, effectiveExpanded);
   }, [filteredTree, effectiveExpanded]);
+  const virtualizer = useVirtualizer({
+    count: flatItems.length,
+    getScrollElement: () => viewportRef.current,
+    getItemKey: index => flatItems[index].node.path,
+    estimateSize: () => 28,
+    overscan: 8,
+  });
 
   const totalFiles = useMemo(() => (tree ? countFiles(tree) : 0), [tree]);
 
@@ -238,7 +249,7 @@ export const ProjectFilesPanel = memo(function ProjectFilesPanel({
       </div>
 
       {/* Tree content */}
-      <ScrollArea className="flex-1 min-h-0">
+      <div ref={viewportRef} className="flex-1 min-h-0 overflow-auto">
         {loading && !tree && (
           <div className="flex flex-col items-center justify-center gap-1 py-6">
             <RefreshCw className="h-3 w-3 animate-spin text-foreground/25" />
@@ -260,8 +271,10 @@ export const ProjectFilesPanel = memo(function ProjectFilesPanel({
           </div>
         )}
 
-        <div className="py-1">
-          {flatItems.map((item) => (
+        <div className="relative" style={{ height: virtualizer.getTotalSize() }}>
+          {virtualizer.getVirtualItems().map((virtualRow) => {
+            const item = flatItems[virtualRow.index];
+            return (<div key={item.node.path} data-index={virtualRow.index} ref={virtualizer.measureElement} className="absolute inset-x-0 top-0" style={{ transform: `translateY(${virtualRow.start}px)` }}>
             <FileTreeRow
               key={item.node.path}
               node={item.node}
@@ -280,7 +293,9 @@ export const ProjectFilesPanel = memo(function ProjectFilesPanel({
               onCommitCreate={handleCommitCreate}
               onCancelCreate={handleCancelCreate}
             />
-          ))}
+          </div>); })}
+        </div>
+        <div>
           {/* Inline creation at root level */}
           {creating && creating.parentDir === "" && (
             <InlineCreateInput
@@ -291,7 +306,7 @@ export const ProjectFilesPanel = memo(function ProjectFilesPanel({
             />
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 });

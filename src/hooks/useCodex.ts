@@ -1,3 +1,4 @@
+import { snapshotStreamingMessages } from "@/lib/session/message-snapshot";
 /**
  * useCodex — renderer-side hook for Codex app-server sessions.
  *
@@ -171,8 +172,8 @@ export function useCodex({
   useEffect(() => {
     setTodoItems([]);
     setAuthRequired(false);
-    setCodexGoal(initialMeta?.codexGoal ?? null);
-    setCodexGoalSupported(initialMeta?.codexGoalSupported ?? null);
+    setCodexGoal((base.restoredStateRef.current ?? initialMeta)?.codexGoal ?? null);
+    setCodexGoalSupported((base.restoredStateRef.current ?? initialMeta)?.codexGoalSupported ?? null);
     setGoalError(null);
     setGoalLoading(false);
     cancelPendingFlush();
@@ -187,8 +188,8 @@ export function useCodex({
 
     // Rebuild Codex tool mappings from restored messages so completions
     // arriving after switch-back can find their tool_call messages
-    if (initialMessages) {
-      for (const msg of initialMessages) {
+    if (base.messagesRef.current) {
+      for (const msg of base.messagesRef.current) {
         if (msg.role === "assistant" && msg.codexItemId) assistantItemMapRef.current.set(msg.codexItemId, msg.id);
         if (msg.role === "tool_call" && msg.id.startsWith("codex-tool-")) {
           const itemId = msg.id.replace("codex-tool-", "");
@@ -213,8 +214,8 @@ export function useCodex({
       }
 
       const latestPlanStreamMsg =
-        initialMessages.findLast((msg) => msg.id.startsWith("codex-plan-stream-")) ??
-        initialMessages.find((msg) => msg.id === "codex-plan-stream");
+        base.messagesRef.current.findLast((msg) => msg.id.startsWith("codex-plan-stream-")) ??
+        base.messagesRef.current.find((msg) => msg.id === "codex-plan-stream");
       const planInput = latestPlanStreamMsg?.toolInput as { plan?: string } | undefined;
       planTextRef.current = planInput?.plan ?? "";
     }
@@ -1256,6 +1257,7 @@ export function useCodex({
   }, []);
 
   return {
+    getMessagesSnapshot: () => snapshotStreamingMessages(base.messagesRef.current, bufferRef.current.messageId, bufferRef.current.getText(), bufferRef.current.getThinking(), bufferRef.current.thinkingComplete),
     isReadyForSession: base.isReadyForSession,
     messages, setMessages,
     isProcessing, setIsProcessing,

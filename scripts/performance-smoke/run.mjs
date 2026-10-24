@@ -1,0 +1,15 @@
+import { createServer } from "vite";
+import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
+import path from "node:path";
+const require = createRequire(import.meta.url);
+const root = path.resolve(import.meta.dirname, "../..");
+const server = await createServer({ root, server: { port: 0, strictPort: true, host: "127.0.0.1" } });
+await server.listen();
+const address = server.httpServer.address();
+const env = { ...process.env, PERFORMANCE_SMOKE_URL: `http://127.0.0.1:${address.port}/scripts/performance-smoke/index.html` };
+delete env.ELECTRON_RUN_AS_NODE;
+const child = spawn(require("electron"), [path.join(import.meta.dirname, "electron.cjs")], { cwd: root, env, windowsHide: true, stdio: "inherit" });
+const timer = setTimeout(() => child.kill(), 60_000);
+child.once("error", async error => { clearTimeout(timer); console.error(error); await server.close(); process.exitCode = 1; });
+child.once("exit", async code => { clearTimeout(timer); await server.close(); process.exitCode = code ?? 1; });

@@ -12,7 +12,7 @@ import path from "path";
 import fs from "fs";
 import { getDataDir } from "./data-dir";
 import type { AppSettings, EngineBinarySource, NotificationSettings } from "@shared/types/settings";
-import type { MemorySettings } from "@shared/types/memory";
+import { MEMORY_DEFAULTS, parseStoredMemory, memorySettingsSchema, localMemoryUrl } from "@shared/lib/memory";
 import { GLOBAL_SHORTCUT_DEFAULTS, HISTORY_DEFAULTS, mergeGlobalShortcuts, mergeHistorySettings, parseQuickCaptureTarget } from "@shared/lib/productivity-settings";
 
 // Re-export shared types so existing `import from "./app-settings"` consumers still work
@@ -25,21 +25,6 @@ const NOTIFICATION_DEFAULTS: NotificationSettings = {
   sessionComplete: { osNotification: "unfocused", sound: "always" },
 };
 
-const MEMORY_DEFAULTS: MemorySettings = {
-  enabled: false,
-  localPort: 8888,
-  llmProvider: "anthropic",
-  llmModel: "claude-sonnet-4-20250514",
-  llmBaseUrl: "",
-  injectionPolicy: "first-turn",
-  autoRetain: false,
-  clientSideRedact: true,
-  recallBudget: "mid",
-  recallMaxTokens: 1024,
-  recallMaxItems: 5,
-  recallTimeoutMs: 2000,
-  memoryDefense: "redact",
-};
 
 const DEFAULTS: AppSettings = {
   globalShortcuts: GLOBAL_SHORTCUT_DEFAULTS,
@@ -90,7 +75,7 @@ export function getAppSettings(): AppSettings {
     // Deep-merge `notifications` so upgrading users get defaults for each event type
     // even if their settings.json has a partial or missing notifications object.
     const parsedNotif = parsed.notifications as Partial<NotificationSettings> | undefined;
-    const parsedMemory = parsed.memory as Partial<MemorySettings> | undefined;
+
     const computerUseEnabled = typeof parsed.computerUseEnabled === "boolean"
       ? parsed.computerUseEnabled
       : parsed.codexComputerUseEnabled === true;
@@ -109,7 +94,7 @@ export function getAppSettings(): AppSettings {
         askUserQuestion: { ...NOTIFICATION_DEFAULTS.askUserQuestion, ...parsedNotif?.askUserQuestion },
         sessionComplete: { ...NOTIFICATION_DEFAULTS.sessionComplete, ...parsedNotif?.sessionComplete },
       },
-      memory: { ...MEMORY_DEFAULTS, ...parsedMemory },
+      memory: parseStoredMemory(parsed.memory),
     };
   } catch {
     cached = { ...DEFAULTS };
@@ -125,6 +110,7 @@ export function getAppSetting<K extends keyof AppSettings>(key: K): AppSettings[
 /** Update one or more settings and persist to disk. */
 export function setAppSettings(patch: Partial<AppSettings>): AppSettings {
   const current = getAppSettings();
+  if (patch.memory) { const parsed = memorySettingsSchema.safeParse(patch.memory); if (!parsed.success) throw new Error("Invalid memory settings"); patch.memory = parsed.data; patch.memory.baseUrl = localMemoryUrl(patch.memory.baseUrl); }
   const next = {
     ...current,
     ...patch,
@@ -133,7 +119,7 @@ export function setAppSettings(patch: Partial<AppSettings>): AppSettings {
     globalShortcuts: mergeGlobalShortcuts(patch.globalShortcuts, current.globalShortcuts),
     quickCaptureTarget: "quickCaptureTarget" in patch ? parseQuickCaptureTarget(patch.quickCaptureTarget) : current.quickCaptureTarget,
     history: mergeHistorySettings(patch.history, current.history),
-    ...(patch.memory ? { memory: { ...current.memory, ...patch.memory } } : {}),
+    ...(patch.memory ? { memory: patch.memory } : {}),
   };
   const destination = filePath();
   const temporary = `${destination}.${process.pid}-${Date.now()}.tmp`;

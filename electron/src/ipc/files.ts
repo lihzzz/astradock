@@ -11,11 +11,11 @@ import { getAppSetting } from "../lib/app-settings";
 import { captureEvent } from "../lib/posthog";
 import { reportError } from "../lib/error-utils";
 import { safeSend } from "../lib/safe-send";
+import { CONTEXT_BYTE_LIMIT, CONTEXT_FILE_LIMIT, readBoundedText, scopedFile } from "../lib/file-read-budget";
 
-function parseGitignore(gitignorePath: string): string[] {
+async function parseGitignore(gitignorePath: string): Promise<string[]> {
   try {
-    if (!fs.existsSync(gitignorePath)) return [];
-    return fs.readFileSync(gitignorePath, "utf-8")
+    return (await fsPromises.readFile(gitignorePath, "utf-8"))
       .split("\n")
       .map((l) => l.trim())
       .filter((l) => l && !l.startsWith("#"));
@@ -43,10 +43,11 @@ function yieldToEventLoop(): Promise<void> {
 async function listFilesWalk(cwd: string, maxFiles = 10000): Promise<string[]> {
   const files: string[] = [];
   const queue: string[] = [""];
+  let queueIndex = 0;
   let visitedDirs = 0;
 
-  while (queue.length > 0 && files.length < maxFiles) {
-    const rel = queue.shift()!;
+  while (queueIndex < queue.length && files.length < maxFiles) {
+    const rel = queue[queueIndex++];
     const abs = rel ? path.join(cwd, rel) : cwd;
 
     let entries: fs.Dirent[];
@@ -56,7 +57,7 @@ async function listFilesWalk(cwd: string, maxFiles = 10000): Promise<string[]> {
       continue;
     }
 
-    const localIgnore = parseGitignore(path.join(abs, ".gitignore"));
+    const localIgnore = await parseGitignore(path.join(abs, ".gitignore"));
 
     for (const entry of entries) {
       if (entry.name.startsWith(".") && entry.name !== ".gitignore") continue;
@@ -103,6 +104,7 @@ interface ProjectWatchState {
   refCount: number;
   watcher: fs.FSWatcher;
   notifyTimer?: ReturnType<typeof setTimeout>;
+  structuralChange: boolean;
 }
 
 const projectWatchers = new Map<string, ProjectWatchState>();
@@ -125,14 +127,18 @@ function startProjectWatcher(
     }
 
     const state = projectWatchers.get(cwd);
-    if (!state || state.notifyTimer) return;
+    if (!state) return;
+    state.structuralChange ||= _eventType === "rename" || !filename;
+    if (state.notifyTimer) return;
 
     // Debounce: coalesce rapid changes into a single notification
     state.notifyTimer = setTimeout(() => {
       const current = projectWatchers.get(cwd);
       if (!current) return;
       current.notifyTimer = undefined;
-      safeSend(getMainWindow, "files:changed", { cwd });
+      const structural = current.structuralChange;
+      current.structuralChange = false;
+      safeSend(getMainWindow, "files:changed", { cwd, structural });
     }, 200);
   });
 
@@ -141,7 +147,7 @@ function startProjectWatcher(
     stopProjectWatcher(cwd);
   });
 
-  projectWatchers.set(cwd, { refCount: 1, watcher });
+  projectWatchers.set(cwd, { refCount: 1, watcher, structuralChange: false });
 }
 
 function stopProjectWatcher(cwd: string): void {
@@ -164,10 +170,11 @@ function stopProjectWatcher(cwd: string): void {
 async function listAllFiles(cwd: string, maxFiles = 10000): Promise<string[]> {
   const files: string[] = [];
   const queue: string[] = [""];
+  let queueIndex = 0;
   let visitedDirs = 0;
 
-  while (queue.length > 0 && files.length < maxFiles) {
-    const rel = queue.shift()!;
+  while (queueIndex < queue.length && files.length < maxFiles) {
+    const rel = queue[queueIndex++];
     const abs = rel ? path.join(cwd, rel) : cwd;
 
     let entries: fs.Dirent[];
@@ -178,6 +185,7 @@ async function listAllFiles(cwd: string, maxFiles = 10000): Promise<string[]> {
     }
 
     for (const entry of entries) {
+      if (files.length >= maxFiles) break;
       const entryRel = rel ? `${rel}/${entry.name}` : entry.name;
 
       if (entry.isDirectory()) {
@@ -434,106 +442,40 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
   ipcMain.handle("files:read-multiple", async (_event, { cwd, paths, deepPaths }: { cwd: string; paths: string[]; deepPaths?: string[] }) => {
     const results: Array<{ path: string; content?: string; error?: string; isDir?: boolean; tree?: string }> = [];
     const deepPathsSet = new Set(deepPaths ?? []);
-
-    // Token limit: ~100k tokens = ~400KB of text (4 chars/token average)
-    const MAX_TOTAL_SIZE = 400_000; // bytes
-    let totalContentSize = 0;
-
-    for (const relPath of paths) {
+    const seen = new Set<string>();
+    const seenDirectories = new Set<string>();
+    const root = await fsPromises.realpath(cwd);
+    let remaining = CONTEXT_BYTE_LIMIT;
+    let projectFiles: string[] | undefined;
+    const addFile = async (relative: string) => {
       try {
-        const absPath = path.resolve(cwd, relPath);
-        if (!absPath.startsWith(path.resolve(cwd) + path.sep) && absPath !== path.resolve(cwd)) {
-          results.push({ path: relPath, error: "Path outside project directory" });
-          continue;
-        }
-        const stat = await fsPromises.stat(absPath);
-        if (stat.isDirectory()) {
-          const allFiles = await listProjectFiles(cwd);
-          const dirPrefix = relPath.endsWith("/") ? relPath : relPath + "/";
-          const matchingFiles = allFiles.filter((f) => f.startsWith(dirPrefix));
-          const tree = buildFolderTree(dirPrefix, matchingFiles);
-
-          // If this is a deep folder (@#), also include all file contents
-          if (deepPathsSet.has(relPath)) {
-            // Add tree first
-            results.push({ path: relPath, isDir: true, tree });
-
-            // Calculate total size first to check limit
-            let folderContentSize = 0;
-            const filesToRead: string[] = [];
-            for (const file of matchingFiles) {
-              const fileAbsPath = path.resolve(cwd, file);
-              const projectRoot = path.resolve(cwd);
-              if (!fileAbsPath.startsWith(projectRoot + path.sep) && fileAbsPath !== projectRoot) {
-                results.push({ path: file, error: "Path outside project directory" });
-                continue;
-              }
-              try {
-                const fileStat = await fsPromises.stat(fileAbsPath);
-                if (!fileStat.isDirectory() && fileStat.size <= 500_000) {
-                  folderContentSize += fileStat.size;
-                  filesToRead.push(file);
-                }
-              } catch {
-                // Skip files that can't be statted
-              }
-            }
-
-            // Check if adding this folder would exceed the global limit
-            if (totalContentSize + folderContentSize > MAX_TOTAL_SIZE) {
-              results.push({
-                path: relPath,
-                error: `Deep folder content too large: ${Math.round(folderContentSize / 1024)}KB (would exceed ${Math.round(MAX_TOTAL_SIZE / 1024)}KB limit). Try a smaller folder or use regular @mention for tree only.`,
-              });
-              continue;
-            }
-
-            // Read all files in the folder with batching to avoid blocking
-            // Process files in batches of 10 to periodically yield to event loop
-            const BATCH_SIZE = 10;
-            for (let i = 0; i < filesToRead.length; i += BATCH_SIZE) {
-              const batch = filesToRead.slice(i, i + BATCH_SIZE);
-
-              // Process batch in parallel
-              await Promise.all(
-                batch.map(async (file) => {
-                  const fileAbsPath = path.resolve(cwd, file);
-                  try {
-                    const fileStat = await fsPromises.stat(fileAbsPath);
-                    if (fileStat.size > 500_000) {
-                      results.push({ path: file, error: "File too large" });
-                      return;
-                    }
-                    const content = await fsPromises.readFile(fileAbsPath, "utf-8");
-                    results.push({ path: file, content });
-                    totalContentSize += content.length;
-                  } catch (fileErr) {
-                    results.push({ path: file, error: fileErr instanceof Error ? fileErr.message : String(fileErr) });
-                  }
-                })
-              );
-
-              // Yield to event loop between batches
-              if (i + BATCH_SIZE < filesToRead.length) {
-                await new Promise(resolve => setImmediate(resolve));
-              }
-            }
-          } else {
-            // Regular folder mention - just the tree
-            results.push({ path: relPath, isDir: true, tree });
+        const file = await scopedFile(root, relative);
+        if (seen.has(file)) return;
+        const value = await readBoundedText(file, Math.min(CONTEXT_FILE_LIMIT, remaining));
+        seen.add(file);
+        remaining -= value.bytes;
+        results.push({ path: relative, content: value.content });
+      } catch (error) { results.push({ path: relative, error: error instanceof Error ? error.message : String(error) }); }
+    };
+    for (const relative of paths) {
+      try {
+        const file = await scopedFile(root, relative);
+        if ((await fsPromises.stat(file)).isDirectory()) {
+          projectFiles ??= await listProjectFiles(root);
+          const directory = path.relative(root, file).split(path.sep).join("/");
+          const prefix = directory ? directory + "/" : "";
+          const matching = projectFiles.filter((name) => name.startsWith(prefix));
+          if (!seenDirectories.has(file)) {
+            const tree = buildFolderTree(prefix, matching);
+            const bytes = Buffer.byteLength(tree, "utf8");
+            if (bytes > remaining) throw new Error("Directory tree exceeds the remaining content byte limit");
+            remaining -= bytes;
+            results.push({ path: relative, isDir: true, tree });
+            seenDirectories.add(file);
           }
-        } else {
-          if (stat.size > 500_000) {
-            results.push({ path: relPath, error: "File too large" });
-            continue;
-          }
-          const content = await fsPromises.readFile(absPath, "utf-8");
-          results.push({ path: relPath, content });
-          totalContentSize += content.length;
-        }
-      } catch (err) {
-        results.push({ path: relPath, error: err instanceof Error ? err.message : String(err) });
-      }
+          if (deepPathsSet.has(relative)) for (const child of matching) await addFile(child);
+        } else await addFile(relative);
+      } catch (error) { results.push({ path: relative, error: error instanceof Error ? error.message : String(error) }); }
     }
     return results;
   });
@@ -545,7 +487,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
       if (!absPath || absPath === path.sep) {
         return { error: "Invalid file path" };
       }
-      const content = fs.readFileSync(absPath, "utf-8");
+      const { content } = await readBoundedText(absPath, 10 * 1024 * 1024);
       return { content };
     } catch (err) {
       const errMsg = reportError("FILE:READ_ERR", err, { filePath });

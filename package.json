@@ -1,6 +1,6 @@
 {
   "name": "astradock",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "productName": "AstraDock",
   "description": "A desktop development workbench for Claude Code, Codex, and ACP agents, with tasks, tools, and project context.",
   "author": {
@@ -31,7 +31,9 @@
     "typecheck": "pnpm typecheck:renderer && pnpm typecheck:electron",
     "typecheck:renderer": "tsc --noEmit -p tsconfig.json",
     "typecheck:electron": "tsc --noEmit -p electron/tsconfig.json",
-    "test:watch": "vitest --config vitest.config.electron.ts"
+    "test:watch": "vitest --config vitest.config.electron.ts",
+    "perf:bench": "node scripts/performance-bench.mjs",
+    "perf:smoke": "node scripts/performance-smoke/run.mjs"
   },
   "packageManager": "pnpm@10.26.0",
   "dependencies": {
@@ -44,8 +46,6 @@
     "@posthog/react": "^1.8.2",
     "@tanstack/react-virtual": "^3.13.22",
     "@trycua/cua-driver": "^0.33.0",
-    "@vectorize-io/hindsight-all": "0.10.2",
-    "@vectorize-io/hindsight-client": "0.10.2",
     "dompurify": "^3.3.3",
     "electron-context-menu": "^4.1.1",
     "electron-liquid-glass": "github:darkkatarsis/electron-liquid-glass",

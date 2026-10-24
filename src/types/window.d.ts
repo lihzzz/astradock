@@ -7,7 +7,7 @@ import type { PermissionUpdate } from "./permissions";
 import type { GitRepoInfo, GitStatus, GitBranch, GitLogEntry } from "@shared/types/git";
 import type { InstalledAgent } from "@shared/types/registry";
 import type { AppSettings, EngineBinaryScanResult, MacBackgroundEffect, ThemeOption } from "@shared/types/settings";
-import type { MemoryRecallState, MemoryDocument, MemoryFact, MemoryGoldenReport, MemoryProjectConfig, MemoryStatusResult } from "@shared/types/memory";
+import type { MemoryApi } from "@shared/types/memory";
 import type { SkillsListResult } from "@shared/types/skills";
 import type { SessionTokenUsage, UsageRange, UsageReport } from "@shared/types/usage";
 import type {
@@ -167,13 +167,15 @@ declare global {
         reorder: (projectId: string, targetProjectId: string) => Promise<IpcResult>;
       };
       sessions: {
+        onFlush: (callback: (id: string) => void) => () => void;
+        flushed: (id: string, error?: string) => void;
         batch: SessionBatchApi;
-        save: (data: PersistedSession, previousSessionId?: string) => Promise<IpcResult>;
+        save: (data: PersistedSession, previousSessionId?: string) => Promise<IpcResult & { revision?: number }>;
         append: (data: Omit<PersistedSession, "messages"> & {
           appendedMessages: UIMessage[];
           messageCount: number;
           lastMessageAt: number;
-        }, previousSessionId?: string) => Promise<IpcResult>;
+        }, previousSessionId?: string) => Promise<IpcResult & { revision?: number }>;
         load: (projectId: string, sessionId: string) => Promise<PersistedSession | null>;
         list: (projectId: string) => Promise<SessionListItem[]>;
         delete: (projectId: string, sessionId: string) => Promise<IpcResult>;
@@ -181,12 +183,7 @@ declare global {
           messageResults: SearchMessageResult[];
           sessionResults: SearchSessionResult[];
         }>;
-        updateMeta: (projectId: string, sessionId: string, patch: {
-          pinned?: boolean;
-          folderId?: string | null;
-          branch?: string;
-          archived?: boolean;
-        }) => Promise<IpcResult>;
+        updateMeta: (projectId: string, sessionId: string, patch: import("@shared/lib/session-persistence").SessionMetadataPatch) => Promise<IpcResult & { revision?: number }>;
         saveTransferContext: (markdown: string) => Promise<{ filePath: string } | { error: string }>;
         exportMarkdown: (projectId: string, sessionId: string) => Promise<{
           ok?: boolean;
@@ -239,7 +236,7 @@ declare global {
             | { path: string; error: string; content?: undefined; isDir?: undefined }
           >
         >;
-        onChanged: (callback: (data: { cwd: string }) => void) => () => void;
+        onChanged: (callback: (data: { cwd: string; structural?: boolean }) => void) => () => void;
       };
       git: {
         discoverRepos: (projectPath: string) => Promise<GitRepoInfo[]>;
@@ -424,28 +421,7 @@ declare global {
       skills: {
         list: () => Promise<SkillsListResult>;
       };
-      memory: {
-        sessionRecall: (sessionId: string) => Promise<{ state?: MemoryRecallState | null; error?: string }>;
-        skipNextRecall: (sessionId: string, skip: boolean) => Promise<IpcResult>;
-        getDocument: (bankId: string, documentId: string) => Promise<{ text?: string; tags?: string[]; error?: string }>;
-        projectBank: (projectId: string) => Promise<{ bankId?: string; error?: string }>;
-        retainProject: (projectId: string, content: string, scope: "project" | "user") => Promise<IpcResult>;
-        getStatus: () => Promise<MemoryStatusResult>;
-        setLlmKey: (key: string) => Promise<IpcResult & { hasLlmKey?: boolean }>;
-        clearLlmKey: () => Promise<IpcResult>;
-        testConnection: (key?: string) => Promise<{ ok: boolean; error?: string }>;
-        daemonStart: () => Promise<{ ok?: boolean; error?: string; status?: MemoryStatusResult }>;
-        daemonStop: () => Promise<{ ok?: boolean; error?: string }>;
-        daemonInstallDeps: () => Promise<{ ok?: boolean; error?: string; status?: MemoryStatusResult }>;
-        listDocuments: (bankId: string) => Promise<{ documents?: MemoryDocument[]; total?: number; error?: string }>;
-        listMemories: (bankId: string) => Promise<{ memories?: MemoryFact[]; total?: number; error?: string }>;
-        updateMemory: (bankId: string, memoryId: string, patch: Record<string, unknown>) => Promise<IpcResult>;
-        runGoldenSet: (bankId: string) => Promise<{ report?: MemoryGoldenReport; error?: string }>;
-        deleteDocument: (bankId: string, documentId: string) => Promise<IpcResult>;
-        retainManual: (sessionId: string, content: string) => Promise<IpcResult>;
-        getProjectConfig: (projectId: string) => Promise<MemoryProjectConfig | { error: string }>;
-        setProjectConfig: (projectId: string, patch: Partial<MemoryProjectConfig>) => Promise<MemoryProjectConfig | { error: string }>;
-      };
+      memory: MemoryApi;
       analytics: {
         /** Fire-and-forget analytics event via the main process PostHog client. */
         capture: (event: string, properties?: Record<string, unknown>) => void;

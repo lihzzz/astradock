@@ -1,10 +1,13 @@
+import { toast } from "sonner";
 import { StrictMode } from "react";
+import { flushStreamingBuffers } from "./lib/session/stream-flush";
+import { flushSync } from "react-dom";
+import { flushAllCheckpoints } from "./lib/session/checkpoint-scheduler";
+import { drainSessionWrites } from "./lib/session/persistence";
 import { createRoot } from "react-dom/client";
-import { PostHogProvider } from "@posthog/react";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { migrateLocalStorage } from "./lib/local-storage-migration";
 import { migrateSettingsIfNeeded } from "./stores/settings-store";
-import { initPostHog, posthog } from "./lib/analytics/posthog";
 import { App } from "./App";
 import "./index.css";
 
@@ -15,18 +18,26 @@ migrateLocalStorage();
 // Must run before createRoot() so components read correct initial values.
 migrateSettingsIfNeeded();
 
-// Initialize posthog-js (starts opted-out until settings confirm opt-in)
-initPostHog();
+// Telemetry is delivered only by the main-process consent/privacy gateway.
 
-// Analytics opt-in sync is deferred to after React mount (in App.tsx useEffect)
-// to avoid firing IPC calls before first paint.
+window.claude.sessions.onFlush((id) => {
+  flushSync(flushStreamingBuffers);
+  void flushAllCheckpoints().then(() => drainSessionWrites()).then(
+    () => window.claude.sessions.flushed(id),
+    (error: unknown) => window.claude.sessions.flushed(id, error instanceof Error ? error.message : String(error)),
+  );
+});
+
+const removeMemoryListener = window.claude.memory.onEvent((event) => {
+  if (event.level === "warning") toast.warning(event.message, { id: "memory:" + event.projectId });
+  else toast.message(event.message, { id: "memory:" + event.projectId });
+});
+if (import.meta.hot) import.meta.hot.dispose(removeMemoryListener);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <PostHogProvider client={posthog}>
-      <ErrorBoundary>
-        <App />
-      </ErrorBoundary>
-    </PostHogProvider>
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 );

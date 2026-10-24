@@ -79,3 +79,17 @@ it("serializes configuration mutations without poisoning the queue on failure", 
   await Promise.resolve(); expect(calls).toEqual(["first"]); release();
   await failure; expect(await second).toBe("ok"); expect(calls).toEqual(["first", "second"]);
 });
+
+
+it("supports cancellation-only waits without a deadline", async () => {
+  vi.useFakeTimers();
+  try {
+    const controller = new AbortController();
+    const waiting = withAcpTimeout(new Promise<never>(() => {}), null, "prediction", controller.signal);
+    const assertion = expect(waiting).rejects.toThrow("cancelled");
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(vi.getTimerCount()).toBe(0);
+    controller.abort();
+    await assertion;
+  } finally { vi.useRealTimers(); }
+});

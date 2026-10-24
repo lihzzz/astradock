@@ -86,7 +86,7 @@ export function useFolderManager({ projects, setSessions }: UseFolderManagerOpti
       const session = prev.find((s) => s.id === sessionId);
       if (!session) return prev;
       // Fire IPC in the background (don't block the state update)
-      window.claude.sessions.updateMeta(session.projectId, sessionId, { pinned: pinned || undefined })
+      window.claude.sessions.updateMeta(session.projectId, sessionId, { pinned })
         .catch((err) => reportError("handlePinSession", err));
       return prev.map((s) => (s.id === sessionId ? { ...s, pinned: pinned || undefined } : s));
     });

@@ -7,6 +7,7 @@ import contextMenu from "electron-context-menu";
 import { getBootstrapMinWindowWidth } from "../../src/lib/layout/constants";
 import { fitWindowToWorkArea } from "./lib/window-bounds";
 import { isAllowedPreviewUrl } from "./lib/browser-safety";
+import { flushRendererSessions } from "./lib/renderer-flush";
 import { prepareManagedQuit } from "./lib/app-quit";
 import * as projectAppsIpc from "./ipc/project-apps";
 import * as tasksIpc from "./ipc/tasks";
@@ -77,9 +78,10 @@ app.commandLine.appendSwitch("enable-zero-copy"); // avoid CPU→GPU memory copi
 app.commandLine.appendSwitch("enable-features", [app.commandLine.getSwitchValue("enable-features"), "CanvasOopRasterization", ...(process.platform === "linux" ? ["GlobalShortcutsPortal"] : [])].filter(Boolean).join(","));
 
 // --- Liquid Glass command-line switches ---
-if (glassEnabled) {
+const remoteGlassDebugging = glassEnabled && !app.isPackaged;
+if (remoteGlassDebugging) {
+  app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");
   app.commandLine.appendSwitch("remote-debugging-port", "9222");
-  app.commandLine.appendSwitch("remote-allow-origins", "*");
 }
 
 let mainWindow: BrowserWindow | null = null;
@@ -173,29 +175,36 @@ app.on("second-instance", showMainWindow);
 app.on("activate", () => { if (app.isReady()) showMainWindow(); });
 let managedQuitApproved = false;
 let preparingQuit = false;
+let forceQuitRequested = false;
 app.on("before-quit", (event) => {
   if (managedQuitApproved) { quitting = true; return; }
   event.preventDefault();
   if (preparingQuit) return;
   preparingQuit = true;
   void prepareManagedQuit({
-    stop: () => getProjectAppsService().shutdown(),
+    stop: async () => {
+      await getProjectAppsService().shutdown();
+      await Promise.all([claudeSessionsIpc.stopAll(), acpSessionsIpc.stopAll(), codexSessionsIpc.stopAll()]);
+      await flushRendererSessions(mainWindow);
+    },
     onFailure: async (error) => {
       reportError("PROJECT_APPS:QUIT", error);
       const chinese = app.getLocale().startsWith("zh");
       const response = await dialog.showMessageBox({
         type: "error", title: "AstraDock",
-        message: chinese ? "部分应用未能停止，AstraDock 暂时保留运行。" : "Some applications could not be stopped. AstraDock is still running.",
+        message: chinese ? "应用停止或会话保存未完成，AstraDock 暂时保留运行。" : "Application cleanup or conversation saving did not finish. AstraDock is still running.",
         detail: error instanceof Error ? error.message : String(error),
         buttons: chinese ? ["重试", "取消退出", "强制退出"] : ["Retry", "Cancel quit", "Force quit"],
         defaultId: 0, cancelId: 1, noLink: true,
       });
-      return response.response === 0 ? "retry" : response.response === 2 ? "force" : "cancel";
+      forceQuitRequested = response.response === 2;
+      return response.response === 0 ? "retry" : forceQuitRequested ? "force" : "cancel";
     },
   }).then((approved) => {
     if (!approved) { showMainWindow(); return; }
     managedQuitApproved = true;
     quitting = true;
+    if (forceQuitRequested) { app.exit(0); return; }
     app.quit();
   }).catch((error) => { reportError("PROJECT_APPS:QUIT", error); showMainWindow(); })
     .finally(() => { preparingQuit = false; });
@@ -544,6 +553,8 @@ function openDevToolsWindow(): void {
     return;
   }
 
+  if (!remoteGlassDebugging) return;
+
   if (devToolsWindow && !devToolsWindow.isDestroyed()) {
     devToolsWindow.focus();
     return;
@@ -631,15 +642,6 @@ app.whenReady().then(() => {
   screen.on("display-removed", fitMainWindowToDisplay);
   powerMonitor.on("resume", () => { void getProjectAppsService().recheckHealth().catch((error) => reportError("PROJECT_APPS:RESUME", error)); });
 
-  // Restore an explicitly enabled memory daemon in the background. If its
-  // dependency is unavailable, the memory service remains fail-safe and the
-  // settings panel exposes the installation/retry action.
-  if (getAppSettings().memory.enabled) {
-    void import("./lib/memory/daemon").then(({ startMemoryDaemon }) => startMemoryDaemon()).catch((error) => {
-      reportError("MEMORY_DAEMON_STARTUP", error);
-    });
-  }
-
   // Initialize PostHog analytics (if enabled in settings) — fire-and-forget to avoid blocking startup
   initPostHog().catch((err) => {
     reportError("POSTHOG", err, { context: "startup-init" });
@@ -698,8 +700,8 @@ app.on("will-quit", (event) => {
   // For normal quits, delay process exit until PostHog has flushed pending events.
   event.preventDefault();
 
-  const shutdownMemory = import("./lib/memory/daemon")
-    .then(({ stopMemoryDaemon }) => stopMemoryDaemon())
+  const shutdownMemory = import("./lib/memory/agent-bridge")
+    .then(({ shutdownMemoryBridge }) => shutdownMemoryBridge())
     .catch((err) => reportError("MEMORY_DAEMON", err, { context: "shutdown" }));
   Promise.all([
     shutdownProjectAppAgentBridge().catch((err) => reportError("PROJECT_APPS:BRIDGE_SHUTDOWN", err)),

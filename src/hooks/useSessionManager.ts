@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import type { ChatSession, UIMessage, PermissionRequest, McpServerStatus, McpServerConfig, ModelInfo, AcpPermissionBehavior, EngineId, Project, ACPAuthenticateResult, ACPConfigOption, ACPPermissionEvent } from "@/types";
 import { toMcpStatusState } from "../lib/mcp-utils";
 import { toChatSession } from "../lib/session/records";
-import { BackgroundSessionStore } from "../lib/background/session-store";
+import { sharedSessionStore } from "../lib/background/shared-session-store";
 import { createSystemMessage } from "../lib/message-factory";
 import {
   CONTINUE_INTERRUPTED_TURN_PROMPT,
@@ -64,7 +64,7 @@ export function useSessionManager(
   // ── Refs needed by extra pane loaders (declared early) ──
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
-  const backgroundStoreRef = useRef(new BackgroundSessionStore());
+  const backgroundStoreRef = useRef(sharedSessionStore);
 
   useEffect(() => {
     if (visibleSplitSessionIds.length === 0) return;

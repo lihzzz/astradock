@@ -1,109 +1,39 @@
-/** Shared types for the local Hindsight memory integration. */
-
-export type MemoryInjectionPolicy = "first-turn" | "every-turn" | "off";
-export type MemoryRecallBudget = "low" | "mid" | "high";
-export type MemoryMode = "auto" | "manual" | "off";
-
+/** SiYuan is the only live memory backend. No note bodies are persisted here. */
+export type MemoryScope = "project" | "personal";
+export type MemoryKind = "preference" | "convention" | "decision" | "troubleshooting" | "procedure" | "correction";
+export interface MemoryReadScope { notebookId: string; documentId: string; includeDescendants: boolean }
 export interface MemorySettings {
-  enabled: boolean;
-  localPort: number;
-  llmProvider?: string;
-  llmModel?: string;
-  llmBaseUrl?: string;
-  injectionPolicy: MemoryInjectionPolicy;
-  autoRetain: boolean;
-  clientSideRedact: boolean;
-  recallBudget: MemoryRecallBudget;
-  recallMaxTokens: number;
-  recallMaxItems: number;
-  recallTimeoutMs: number;
-  memoryDefense: "redact" | "block" | "off";
+  schemaVersion: 2; enabled: boolean; baseUrl: string; expectedWorkspacePath: string;
+  identityAnchorDocumentId: string; personalReadEnabled: boolean; personalAutoWriteEnabled: boolean;
+  personalSummaryBlockIds: string[]; personalReadScopes: MemoryReadScope[]; personalWriteDocumentId: string;
 }
-
 export interface MemoryProjectConfig {
-  memoryMode: MemoryMode;
-  memoryIsolated: boolean;
+  schemaVersion: 2; enabled: boolean; revision: number; summaryBlockIds: string[];
+  readScopes: MemoryReadScope[]; writeDocumentId: string; includePersonalMemory: boolean;
 }
-
-export interface MemoryDaemonStatus {
-  enabled: boolean;
-  running: boolean;
-  healthy: boolean;
-  baseUrl: string;
-  port: number;
-  uv: { installed: boolean; version?: string; error?: string };
-  hasLlmKey: boolean;
-  provider?: string;
-  model?: string;
-  llmBaseUrl?: string;
-  error?: string;
+export type MemoryConnectionState = "unconfigured" | "connecting" | "ready" | "unavailable" | "auth-required" | "incompatible" | "workspace-mismatch" | "binding-invalid";
+export interface MemoryStatusResult { state: MemoryConnectionState; message: string; version?: string; workspacePath?: string; hasToken: boolean }
+export interface MemoryRecallItem { ref: string; blockId: string; text: string; scope: MemoryScope; hash: string; readAt: number }
+export interface MemoryRecallState { items: MemoryRecallItem[]; usedAt: number | null; skipNext: boolean; status: string }
+export type MemoryWriteState = "prepared" | "submitted" | "verified" | "unknown" | "conflict" | "rejected" | "changed";
+export interface MemoryWriteRecord {
+  operationId: string; projectId: string; sessionId: string; turnId: string; target: string; scope: MemoryScope;
+  workspace: string; endpoint: string; anchor: string; hash: string; kind: MemoryKind; state: MemoryWriteState;
+  createdAt: number; updatedAt: number; blockId?: string;
 }
-
-export interface MemoryDocument {
-  id: string;
-  bankId: string;
-  originalText?: string;
-  memoryUnitCount?: number;
-  createdAt?: string;
-  updatedAt?: string;
-  tags?: string[];
-}
-
-export interface MemoryFact {
-  id: string;
-  bankId: string;
-  text: string;
-  context?: string;
-  factType?: string;
-  documentId?: string;
-  state?: string;
-  tags?: string[];
-  proofCount?: number;
-  sourceMemoryIds?: string[];
-  updatedAt?: string;
-}
-
-export interface MemoryGoldenCase {
-  id: string;
-  content: string;
-  expectedKeywords: string[];
-  context?: string;
-}
-
-export interface MemoryGoldenCaseScore {
-  id: string;
-  candidateCount: number;
-  matchedKeywords: string[];
-  precision: number;
-  recall: number;
-  f1: number;
-}
-
-export interface MemoryGoldenReport {
-  cases: MemoryGoldenCaseScore[];
-  precision: number;
-  recall: number;
-  f1: number;
-  generatedAt: string;
-}
-
-export interface MemoryRecallState {
-  items: MemoryRecallItem[];
-  usedAt: number | null;
-  skipNext: boolean;
-}
-
-export interface MemoryRecallItem {
-  bankId?: string;
-  text: string;
-  type?: string;
-  context?: string | null;
-  documentId?: string | null;
-  tags?: string[];
-  score?: number;
-  sourceFacts?: Array<{ id: string; text: string }>;
-}
-
-export interface MemoryStatusResult extends MemoryDaemonStatus {
-  banks: string[];
+export type MemoryResult<T> = { value: T; error?: never } | { error: string; value?: never };
+export interface MemoryEvent { projectId: string; message: string; level: "info" | "warning" }
+export interface MemoryApi {
+  onEvent(listener: (event: MemoryEvent) => void): () => void;
+  getStatus(): Promise<MemoryStatusResult>;
+  probe(baseUrl: string): Promise<MemoryResult<{ workspacePath: string; version: string }>>;
+  setToken(token: string): Promise<MemoryResult<{ persistent: boolean }>>;
+  getProjectConfig(projectId: string): Promise<MemoryResult<MemoryProjectConfig>>;
+  setProjectConfig(projectId: string, config: MemoryProjectConfig): Promise<MemoryResult<MemoryProjectConfig>>;
+  sessionRecall(sessionId: string): Promise<MemoryResult<MemoryRecallState | null>>;
+  skipNextRecall(sessionId: string, skip: boolean): Promise<MemoryResult<null>>;
+  rememberSession(sessionId: string, text: string): Promise<MemoryResult<MemoryWriteRecord>>;
+  remember(projectId: string, text: string, scope: MemoryScope): Promise<MemoryResult<MemoryWriteRecord>>;
+  writes(projectId: string): Promise<MemoryResult<MemoryWriteRecord[]>>;
+  reconcile(projectId: string, operationId: string): Promise<MemoryResult<MemoryWriteRecord>>;
 }

@@ -25,11 +25,11 @@ function persistenceError(label: string, error: unknown): { error: string; code?
 
 export function register(): void {
   ipcMain.handle("sessions:save", async (_event, data: SessionData, previousId?: string) => {
-    try { await getSessionRepository().save(data, previousId); return { ok: true }; }
+    try { const revision = await getSessionRepository().save(data, previousId); return { ok: true, revision }; }
     catch (error) { return persistenceError("SESSIONS:SAVE_ERR", error); }
   });
   ipcMain.handle("sessions:append", async (_event, data: SessionData, previousId?: string) => {
-    try { await getSessionRepository().append(data, previousId); return { ok: true }; }
+    try { const revision = await getSessionRepository().append(data, previousId); return { ok: true, revision }; }
     catch (error) { return persistenceError("SESSIONS:APPEND_ERR", error); }
   });
   ipcMain.handle("sessions:load", async (_event, projectId: string, id: string) => {
@@ -41,7 +41,7 @@ export function register(): void {
     catch (error) { reportError("SESSIONS:LIST_ERR", error); return []; }
   });
   ipcMain.handle("sessions:update-meta", async (_event, { projectId, sessionId, patch }: { projectId: string; sessionId: string; patch: SessionMetaPatch }) => {
-    try { await getSessionRepository().updateMeta(projectId, sessionId, patch); return { ok: true }; }
+    try { const revision = await getSessionRepository().updateMeta(projectId, sessionId, patch); return { ok: true, revision }; }
     catch (error) { return persistenceError("SESSIONS:UPDATE_META_ERR", error); }
   });
   ipcMain.handle("sessions:delete", async (_event, projectId: string, id: string) => {

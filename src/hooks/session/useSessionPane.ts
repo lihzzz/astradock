@@ -8,6 +8,9 @@
  * receive null sessionIds and hold dormant empty state.
  */
 
+import { useEffect, useRef } from "react";
+import { sharedSessionStore } from "@/lib/background/shared-session-store";
+import type { BackgroundSessionState } from "@/lib/background/session-store";
 import { useClaude } from "../useClaude";
 import { useACP } from "../useACP";
 import { useCodex } from "../useCodex";
@@ -111,6 +114,46 @@ export function useSessionPane({
 
   // Pick the active engine's state
   const engine = isCodex ? codex : isACP ? acp : claude;
+
+  const runtimeId = isCodex ? codexSessionId : isACP ? acpSessionId : claudeSessionId;
+  const snapshots = useRef(new Map<string, BackgroundSessionState>());
+  const messageSnapshots = useRef(new Map<string, () => UIMessage[]>());
+  if (runtimeId && (engine.isReadyForSession(runtimeId) || !snapshots.current.has(runtimeId))) {
+    const ready = engine.isReadyForSession(runtimeId);
+    messageSnapshots.current.set(runtimeId, ready ? engine.getMessagesSnapshot : () => initialMessages);
+    snapshots.current.set(runtimeId, {
+      messages: ready ? engine.messages : initialMessages,
+      isProcessing: ready ? engine.isProcessing : initialMeta?.isProcessing ?? false,
+      isConnected: ready ? engine.isConnected : initialMeta?.isConnected ?? false,
+      isCompacting: ready ? engine.isCompacting : initialMeta?.isCompacting ?? false,
+      sessionInfo: ready ? engine.sessionInfo : initialMeta?.sessionInfo ?? null,
+      totalCost: ready ? engine.totalCost : initialMeta?.totalCost ?? 0,
+      contextUsage: ready ? engine.contextUsage : initialMeta?.contextUsage ?? null,
+      pendingPermission: ready ? engine.pendingPermission : initialPermission,
+      rawAcpPermission: isACP ? (ready ? acp.getRawPermission() : initialRawAcpPermission ?? null) : null,
+      slashCommands: engine.slashCommands,
+      codexGoal: isCodex ? codex.codexGoal : null,
+      codexGoalSupported: isCodex ? codex.codexGoalSupported : null,
+      reconnectMessage: engine.reconnectMessage,
+    });
+  }
+  const stateForRuntime = runtimeId ? snapshots.current.get(runtimeId) : undefined;
+  useEffect(() => {
+    if (!runtimeId || !stateForRuntime) return;
+    const states = snapshots.current;
+    const readers = messageSnapshots.current;
+    // Base reset has restored commit-time history. Publish that reader now,
+    // rather than the stale bootstrap from the render preceding the reset.
+    readers.set(runtimeId, engine.getMessagesSnapshot);
+    const release = sharedSessionStore.registerLive(runtimeId, () => {
+      const state = states.get(runtimeId) ?? stateForRuntime;
+      return { ...state, messages: readers.get(runtimeId)?.() ?? state.messages };
+    });
+    return () => { release(); states.delete(runtimeId); readers.delete(runtimeId); };
+  }, [runtimeId]);
+  useEffect(() => {
+    if (runtimeId) sharedSessionStore.notifyChanged(runtimeId);
+  }, [runtimeId, engine.messages, engine.isProcessing, engine.pendingPermission, engine.totalCost, codex.codexGoal]);
 
   return {
     claude,

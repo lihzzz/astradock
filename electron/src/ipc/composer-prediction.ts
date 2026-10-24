@@ -1,4 +1,4 @@
-import { ipcMain } from "electron";
+import { ipcMain, type WebContents } from "electron";
 import { buildComposerPredictionPrompt, parseComposerPrediction } from "@shared/lib/composer-prediction";
 import type {
   ComposerPredictionCancelResult,
@@ -8,9 +8,11 @@ import type {
 import { acpUtilityPrompt } from "../lib/acp-utility-prompt";
 import { claudeUtilityPrompt } from "../lib/claude-utility-prompt";
 import { codexUtilityPrompt } from "../lib/codex-utility-prompt";
+import { retryComposerPrediction } from "../lib/composer-prediction-retry";
 import { reportError } from "../lib/error-utils";
 
-const PREDICTION_TIMEOUT_MS = 9_000;
+// Prediction lifetime is controlled by user input/session cancellation, not a deadline.
+const PREDICTION_TIMEOUT_MS = null;
 const MAX_SESSION_ID_LENGTH = 512;
 const MAX_SOURCE_REVISION_LENGTH = 512;
 const MAX_CONTEXT_TURNS = 80;
@@ -80,18 +82,21 @@ async function executePrediction(request: ComposerPredictionRequest, signal: Abo
   return acpUtilityPrompt(request.sessionId, prompt, PREDICTION_TIMEOUT_MS, signal);
 }
 
-async function handleRequest(request: ComposerPredictionRequest): Promise<ComposerPredictionResult> {
+async function handleRequest(request: ComposerPredictionRequest, sender: WebContents): Promise<ComposerPredictionResult> {
   const startedAt = Date.now();
   const existing = jobsBySession.get(request.sessionId);
   existing?.controller.abort();
 
   const controller = new AbortController();
+  const cancelOnDestroy = () => controller.abort();
+  sender.once("destroyed", cancelOnDestroy);
+  if (sender.isDestroyed()) controller.abort();
   const job: PredictionJob = { requestId: request.requestId, sessionId: request.sessionId, controller };
   jobsByRequest.set(request.requestId, job);
   jobsBySession.set(request.sessionId, job);
 
   try {
-    const raw = await executePrediction(request, controller.signal);
+    const raw = await retryComposerPrediction(() => executePrediction(request, controller.signal), controller.signal);
     if (controller.signal.aborted) {
       return { requestId: request.requestId, sourceRevision: request.sourceRevision, status: "cancelled", latencyMs: Date.now() - startedAt };
     }
@@ -110,16 +115,17 @@ async function handleRequest(request: ComposerPredictionRequest): Promise<Compos
     reportError("COMPOSER_PREDICTION_ERR", error, { engine: request.engine });
     return { requestId: request.requestId, sourceRevision: request.sourceRevision, status: "failed", latencyMs: Date.now() - startedAt };
   } finally {
+    sender.removeListener("destroyed", cancelOnDestroy);
     if (jobsByRequest.get(request.requestId) === job) jobsByRequest.delete(request.requestId);
     if (jobsBySession.get(request.sessionId) === job) jobsBySession.delete(request.sessionId);
   }
 }
 
 export function register(): void {
-  ipcMain.handle("composer-prediction:request", async (_event, value: unknown): Promise<ComposerPredictionResult> => {
+  ipcMain.handle("composer-prediction:request", async (event, value: unknown): Promise<ComposerPredictionResult> => {
     const request = validateRequest(value);
     if (!request) return invalidRequest((value ?? {}) as ComposerPredictionRequest);
-    return handleRequest(request);
+    return handleRequest(request, event.sender);
   });
 
   ipcMain.handle("composer-prediction:cancel", async (_event, requestId: unknown): Promise<ComposerPredictionCancelResult> => {

@@ -42,7 +42,7 @@ import type { ACPTextFileParams } from "@shared/lib/acp-helpers";
 import type { McpServerInput } from "@shared/lib/mcp-config";
 import type { ACPAuthMethod, ACPAuthenticateResult } from "@shared/types/acp";
 import { withComputerUseMcpServer } from "../lib/computer-use-runtime";
-import { withHindsightMcpServers, registerMemorySession, unregisterMemorySession, beforeMemorySend, observeAcpUpdate, completeMemoryTurn } from "../lib/memory/service";
+import { withMemoryMcpServers, registerMemorySession, unregisterMemorySession, cancelMemoryTurn, beforeMemorySend, isMemoryTool } from "../lib/memory/service";
 import { cancelProjectAppAgentPermissions, registerProjectAppAgentSession, revokeProjectAppAgentSession, withProjectAppMcpServer } from "../lib/project-apps/agent-bridge";
 import { beginUsageTurn, endUsageTurn, stopUsageSession } from "../lib/usage";
 import { bindSessionTokenUsage, recordAcpTokenUsage } from "../lib/token-usage";
@@ -434,7 +434,6 @@ async function createAcpConnection(
 
       // Full dump for tool calls and tool results
       const eventKind = update?.sessionUpdate as string;
-      if (!entry?.isReloading) observeAcpUpdate(internalId, update);
       if (eventKind === "tool_call" || eventKind === "tool_call_update") {
         log("ACP_EVENT_FULL", update);
       }
@@ -487,6 +486,11 @@ async function createAcpConnection(
         return { outcome: { outcome: "cancelled" } };
       }
 
+      const memoryTitle = params.toolCall.title;
+      const memoryAllow = params.options.find((option) => option.kind === "allow_once");
+      if (typeof memoryTitle === "string" && isMemoryTool(memoryTitle) && memoryAllow) {
+        return { outcome: { outcome: "selected", optionId: memoryAllow.optionId } };
+      }
       return new Promise<RequestPermissionResponse>((resolve) => {
         const requestId = crypto.randomUUID();
         const toolCall = (params as { toolCall: Record<string, unknown> }).toolCall;
@@ -611,10 +615,11 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
       );
       const { proc, connection, pendingPermissions, internalId, supportsLoadSession, capabilities, router, authMethods } = connResult;
 
-      if (options.memoryContext?.projectId) registerMemorySession(internalId, options.memoryContext.projectId, "acp");
+      const memoryProjectId = options.source?.projectId ?? options.memoryContext?.projectId;
+      if (memoryProjectId) await registerMemorySession(internalId, memoryProjectId, "acp");
       await registerProjectAppAgentSession(internalId, options.source?.projectId ?? options.memoryContext?.projectId, options.cwd);
       assertAcpProcessActive(internalId);
-      const sourceServers = withProjectAppMcpServer(withHindsightMcpServers(withComputerUseMcpServer(options.mcpServers), internalId), internalId);
+      const sourceServers = withProjectAppMcpServer(withMemoryMcpServers(withComputerUseMcpServer(options.mcpServers), internalId), internalId);
       const acpMcpServers = await buildAcpMcpServers(sourceServers);
       assertAcpProcessActive(internalId);
       const entry: ACPSessionEntry = {
@@ -775,10 +780,11 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
       );
       const { proc, connection, pendingPermissions, internalId, supportsLoadSession, capabilities, router, authMethods } = connResult;
 
-      if (options.memoryContext?.projectId) registerMemorySession(internalId, options.memoryContext.projectId, "acp");
+      const memoryProjectId = options.source?.projectId ?? options.memoryContext?.projectId;
+      if (memoryProjectId) await registerMemorySession(internalId, memoryProjectId, "acp");
       await registerProjectAppAgentSession(internalId, options.source.projectId, options.cwd);
       assertAcpProcessActive(internalId);
-      const sourceServers = withProjectAppMcpServer(withHindsightMcpServers(withComputerUseMcpServer(options.mcpServers), internalId), internalId);
+      const sourceServers = withProjectAppMcpServer(withMemoryMcpServers(withComputerUseMcpServer(options.mcpServers), internalId), internalId);
       const acpMcpServers = await buildAcpMcpServers(sourceServers);
       assertAcpProcessActive(internalId);
 
@@ -866,7 +872,6 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
 
       log("ACP_TURN_COMPLETE", `session=${sessionId.slice(0, 8)} stopReason=${result.stopReason} usage=${JSON.stringify(result.usage ?? null)}`);
       recordAcpTokenUsage(usageTurnId, result.usage, sessionId);
-      void completeMemoryTurn(sessionId);
       finishAcpTaskTurn(sessionId, session.turnCancelled ? "cancelled" : result.stopReason);
 
       safeSend(getMainWindow,"acp:turn_complete", {
@@ -939,7 +944,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
       const projectId = session.projectId;
       revokeProjectAppAgentSession(sessionId);
       await registerProjectAppAgentSession(sessionId, projectId, nextCwd);
-      const acpMcpServers = await buildAcpMcpServers(withProjectAppMcpServer(withHindsightMcpServers(withComputerUseMcpServer(mcpServers), sessionId), sessionId));
+      const acpMcpServers = await buildAcpMcpServers(withProjectAppMcpServer(withMemoryMcpServers(withComputerUseMcpServer(mcpServers), sessionId), sessionId));
       // Suppress history replay notifications so the renderer doesn't get duplicates
       assertAcpProcessActive(sessionId);
       session.isReloading = true;
@@ -968,6 +973,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
   });
 
   ipcMain.handle("acp:cancel", async (_event, sessionId: string) => {
+    cancelMemoryTurn(sessionId);
     cancelProjectAppAgentPermissions(sessionId);
     const session = acpSessions.get(sessionId);
     if (!session) {

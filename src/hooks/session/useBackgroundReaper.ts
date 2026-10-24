@@ -11,12 +11,13 @@
  * Guards: a session is never reaped while it is processing a turn or has a pending
  * permission request, and the active/visible-split/draft sessions are protected.
  */
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { DRAFT_ID } from "./types";
 import type { SharedSessionRefs } from "./types";
 import { buildPersistedSession } from "../../lib/session/records";
 import { invalidatePersistedCursor, saveSessionSmart } from "../../lib/session/persistence";
 import { suppressNextSessionCompletion } from "../../lib/notification-utils";
+import { reportError } from "@/lib/analytics/analytics";
 import { useSettingsStore } from "@/stores/settings-store";
 
 const REAP_INTERVAL_MS = 60_000;
@@ -53,76 +54,57 @@ export function selectReapCandidates(
     .map((c) => c.sid);
 }
 
+type ReaperRefs = Pick<SharedSessionRefs, "activeSessionIdRef" | "visibleSplitSessionIdsRef" | "preStartedSessionIdRef" | "draftAcpSessionIdRef" | "liveSessionIdsRef" | "backgroundStoreRef" | "sessionsRef">;
+export async function reapBackgroundSessions(refs: ReaperRefs): Promise<void> {
+  const limit = useSettingsStore.getState().backgroundProcessLimit;
+  if (!limit || limit <= 0) return;
+  const { activeSessionIdRef, visibleSplitSessionIdsRef, preStartedSessionIdRef,
+    draftAcpSessionIdRef, liveSessionIdsRef, backgroundStoreRef, sessionsRef } = refs;
+  const protectedSession = (id: string) => id === activeSessionIdRef.current || id === DRAFT_ID
+    || visibleSplitSessionIdsRef.current.includes(id) || id === preStartedSessionIdRef.current
+    || id === draftAcpSessionIdRef.current || backgroundStoreRef.current.hasLive(id);
+  const candidates = selectReapCandidates([...liveSessionIdsRef.current].filter((id) => !protectedSession(id)), limit, (id) => {
+    const state = backgroundStoreRef.current.get(id);
+    const session = sessionsRef.current.find((entry) => entry.id === id);
+    return state && session ? { sid: id, isProcessing: state.isProcessing,
+      hasPendingPermission: !!state.pendingPermission, lastActivityAt: session.lastMessageAt ?? session.createdAt } : undefined;
+  });
+  for (const id of candidates) {
+    const state = backgroundStoreRef.current.get(id);
+    const session = sessionsRef.current.find((entry) => entry.id === id);
+    if (!state || !session || protectedSession(id) || state.isProcessing || state.pendingPermission) continue;
+    try {
+      await saveSessionSmart(buildPersistedSession({ ...session,
+        model: session.model || state.sessionInfo?.model,
+        ...(session.engine === "codex" ? { codexGoal: state.codexGoal ?? null } : {}),
+      }, state.messages.filter((message) => !message.isQueued), state.totalCost, state.contextUsage));
+      // Saving yields: the user may have activated this pane or started a turn.
+      const latest = backgroundStoreRef.current.get(id);
+      if (protectedSession(id) || !liveSessionIdsRef.current.has(id) || !latest || latest.isProcessing || latest.pendingPermission) continue;
+      suppressNextSessionCompletion(id);
+      const result = session.engine === "codex" ? await window.claude.codex.stop(id)
+        : session.engine === "acp" ? await window.claude.acp.stop(id)
+        : await window.claude.stop(id, "background_reap");
+      if (result && "error" in result && result.error) throw new Error(result.error);
+      if (result && "ok" in result && result.ok === false) throw new Error("Engine refused to stop");
+      liveSessionIdsRef.current.delete(id);
+      if (!protectedSession(id)) backgroundStoreRef.current.delete(id);
+      invalidatePersistedCursor(id);
+    } catch (error) { reportError("BACKGROUND_REAP", error); }
+  }
+}
+
 export function useBackgroundReaper({ refs }: UseBackgroundReaperParams): void {
+  const latest = useRef(refs);
+  latest.current = refs;
   useEffect(() => {
-    const reap = async () => {
-      const limit = useSettingsStore.getState().backgroundProcessLimit;
-      if (!limit || limit <= 0) return;
-
-      const {
-        activeSessionIdRef, visibleSplitSessionIdsRef, preStartedSessionIdRef,
-        draftAcpSessionIdRef, liveSessionIdsRef, backgroundStoreRef, sessionsRef,
-      } = refs;
-
-      const protectedIds = new Set<string>();
-      const active = activeSessionIdRef.current;
-      if (active) protectedIds.add(active);
-      protectedIds.add(DRAFT_ID);
-      for (const sid of visibleSplitSessionIdsRef.current ?? []) protectedIds.add(sid);
-      const preStarted = preStartedSessionIdRef.current;
-      if (preStarted) protectedIds.add(preStarted);
-      const draftAcp = draftAcpSessionIdRef.current;
-      if (draftAcp) protectedIds.add(draftAcp);
-
-      const backgroundLive = [...liveSessionIdsRef.current].filter((sid) => !protectedIds.has(sid));
-      const reapIds = selectReapCandidates(backgroundLive, limit, (sid) => {
-        const bg = backgroundStoreRef.current.get(sid);
-        const session = sessionsRef.current.find((s) => s.id === sid);
-        if (!bg || !session) return undefined;
-        return {
-          sid,
-          isProcessing: bg.isProcessing,
-          hasPendingPermission: !!bg.pendingPermission,
-          lastActivityAt: session.lastMessageAt ?? session.createdAt ?? 0,
-        };
-      });
-
-      for (const sid of reapIds) {
-        const bgState = backgroundStoreRef.current.get(sid);
-        const session = sessionsRef.current.find((s) => s.id === sid);
-        if (!bgState || !session || bgState.isProcessing || bgState.pendingPermission) continue;
-
-        // Persist latest background state before stopping the process.
-        try {
-          await saveSessionSmart(buildPersistedSession(
-            {
-              ...session,
-              model: session.model || bgState.sessionInfo?.model,
-              ...(session.engine === "codex" ? { codexGoal: bgState.codexGoal ?? null } : {}),
-            },
-            bgState.messages,
-            bgState.totalCost,
-            bgState.contextUsage,
-          ));
-        } catch {
-          continue; // Don't reap a session we failed to persist.
-        }
-
-        suppressNextSessionCompletion(sid);
-        if (session.engine === "codex") {
-          await window.claude.codex.stop(sid).catch(() => undefined);
-        } else if (session.engine === "acp") {
-          await window.claude.acp.stop(sid).catch(() => undefined);
-        } else {
-          await window.claude.stop(sid, "background_reap").catch(() => undefined);
-        }
-        liveSessionIdsRef.current.delete(sid);
-        backgroundStoreRef.current.delete(sid);
-        invalidatePersistedCursor(sid);
-      }
-    };
-
-    const timer = setInterval(() => void reap(), REAP_INTERVAL_MS);
+    let running = false;
+    const timer = setInterval(() => {
+      if (running) return;
+      running = true;
+      void reapBackgroundSessions(latest.current).catch((error) => reportError("BACKGROUND_REAP", error))
+        .finally(() => { running = false; });
+    }, REAP_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [refs]);
+  }, []);
 }

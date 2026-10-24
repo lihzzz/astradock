@@ -29,7 +29,7 @@ interface PreloadGlobals {
 }
 
 import type { ThemeOption as ThemeSource, MacBackgroundEffect } from "@shared/types/settings";
-import type { MemoryProjectConfig } from "@shared/types/memory";
+import type { MemoryProjectConfig, MemoryEvent } from "@shared/types/memory";
 
 function readStoredThemeSource(storage: PreloadStorage | undefined): ThemeSource {
   const stored = storage?.getItem("harnss-theme");
@@ -232,6 +232,12 @@ contextBridge.exposeInMainWorld("claude", {
     reorder: (projectId: string, targetProjectId: string) => ipcRenderer.invoke("projects:reorder", projectId, targetProjectId),
   },
   sessions: {
+    onFlush: (callback: (id: string) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, id: string) => callback(id);
+      ipcRenderer.on("sessions:flush", handler);
+      return () => ipcRenderer.removeListener("sessions:flush", handler);
+    },
+    flushed: (id: string, error?: string) => ipcRenderer.send("sessions:flushed", { id, error }),
     batch: {
       recoveries: () => ipcRenderer.invoke("sessions:batch-recoveries"),
       start: (request: BatchStartRequest) => ipcRenderer.invoke("sessions:batch-start", request),
@@ -255,7 +261,7 @@ contextBridge.exposeInMainWorld("claude", {
     list: (projectId: string) => ipcRenderer.invoke("sessions:list", projectId),
     delete: (projectId: string, sessionId: string) => ipcRenderer.invoke("sessions:delete", projectId, sessionId),
     search: (projectIds: string[], query: string) => ipcRenderer.invoke("sessions:search", { projectIds, query }),
-    updateMeta: (projectId: string, sessionId: string, patch: { pinned?: boolean; folderId?: string | null; branch?: string; archived?: boolean }) =>
+    updateMeta: (projectId: string, sessionId: string, patch: import("@shared/lib/session-persistence").SessionMetadataPatch) =>
       ipcRenderer.invoke("sessions:update-meta", { projectId, sessionId, patch }),
     saveTransferContext: (markdown: string) =>
       ipcRenderer.invoke("sessions:save-transfer-context", markdown),
@@ -466,26 +472,18 @@ contextBridge.exposeInMainWorld("claude", {
     list: () => ipcRenderer.invoke("skills:list"),
   },
   memory: {
-    sessionRecall: (sessionId: string) => ipcRenderer.invoke("memory:session-recall", sessionId),
-    skipNextRecall: (sessionId: string, skip: boolean) => ipcRenderer.invoke("memory:skip-next-recall", { sessionId, skip }),
-    getDocument: (bankId: string, documentId: string) => ipcRenderer.invoke("memory:get-document", { bankId, documentId }),
-    projectBank: (projectId: string) => ipcRenderer.invoke("memory:project-bank", projectId),
-    retainProject: (projectId: string, content: string, scope: "project" | "user") => ipcRenderer.invoke("memory:retain-project", { projectId, content, scope }),
+    onEvent: (callback: (event: MemoryEvent) => void) => { const listener = (_event: IpcRendererEvent, value: MemoryEvent) => callback(value); ipcRenderer.on("memory:event", listener); return () => ipcRenderer.removeListener("memory:event", listener); },
     getStatus: () => ipcRenderer.invoke("memory:get-status"),
-    setLlmKey: (key: string) => ipcRenderer.invoke("memory:set-llm-key", key),
-    clearLlmKey: () => ipcRenderer.invoke("memory:clear-llm-key"),
-    testConnection: (key?: string) => ipcRenderer.invoke("memory:test-connection", key),
-    daemonStart: () => ipcRenderer.invoke("memory:daemon-start"),
-    daemonStop: () => ipcRenderer.invoke("memory:daemon-stop"),
-    daemonInstallDeps: () => ipcRenderer.invoke("memory:daemon-install-deps"),
-    listDocuments: (bankId: string) => ipcRenderer.invoke("memory:list-documents", bankId),
-    listMemories: (bankId: string) => ipcRenderer.invoke("memory:list-memories", bankId),
-    updateMemory: (bankId: string, memoryId: string, patch: Record<string, unknown>) => ipcRenderer.invoke("memory:update-memory", { bankId, memoryId, patch }),
-    runGoldenSet: (bankId: string) => ipcRenderer.invoke("memory:run-golden-set", bankId),
-    deleteDocument: (bankId: string, documentId: string) => ipcRenderer.invoke("memory:delete-document", { bankId, documentId }),
-    retainManual: (sessionId: string, content: string) => ipcRenderer.invoke("memory:retain-manual", { sessionId, content }),
-    getProjectConfig: (projectId: string) => ipcRenderer.invoke("memory:get-project-config", projectId),
-    setProjectConfig: (projectId: string, patch: Partial<MemoryProjectConfig>) => ipcRenderer.invoke("memory:set-project-config", { projectId, patch }),
+    probe: (url: string) => ipcRenderer.invoke("memory:probe", url),
+    setToken: (token: string) => ipcRenderer.invoke("memory:set-token", token),
+    getProjectConfig: (id: string) => ipcRenderer.invoke("memory:get-project-config", id),
+    setProjectConfig: (id: string, config: MemoryProjectConfig) => ipcRenderer.invoke("memory:set-project-config", id, config),
+    sessionRecall: (id: string) => ipcRenderer.invoke("memory:session-recall", id),
+    skipNextRecall: (id: string, skip: boolean) => ipcRenderer.invoke("memory:skip-next-recall", id, skip),
+    rememberSession: (id: string, text: string) => ipcRenderer.invoke("memory:remember-session", id, text),
+    remember: (id: string, text: string, scope: "project" | "personal") => ipcRenderer.invoke("memory:remember", id, text, scope),
+    writes: (id: string) => ipcRenderer.invoke("memory:writes", id),
+    reconcile: (id: string, operationId: string) => ipcRenderer.invoke("memory:reconcile", id, operationId),
   },
   analytics: {
     capture: (event: string, properties?: Record<string, unknown>) =>

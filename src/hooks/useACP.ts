@@ -1,3 +1,4 @@
+import { snapshotStreamingMessages } from "@/lib/session/message-snapshot";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type {
@@ -87,7 +88,7 @@ export function useACP({ sessionId, initialMessages, initialConfigOptions, initi
   // Engine-specific reset — runs after base reset via the same sessionId dependency
   useEffect(() => {
     configRequestRevision.current++;
-    acpPermissionRef.current = initialRawAcpPermission ?? null;
+    acpPermissionRef.current = base.restoredStateRef.current ? base.restoredStateRef.current.rawAcpPermission : initialRawAcpPermission ?? null;
     activeTaskRef.current = null;
     setConfigOptions(initialConfigOptions ?? []);
     setConfigOptionsLoading(false);
@@ -95,6 +96,13 @@ export function useACP({ sessionId, initialMessages, initialConfigOptions, initi
     setAuthRequired(false);
     setAuthMethods([]);
     buffer.current.reset();
+    const streaming = base.messagesRef.current.findLast((message) => message.role === "assistant" && message.isStreaming);
+    if (streaming) {
+      buffer.current.messageId = streaming.id;
+      buffer.current.appendText(streaming.content);
+      if (streaming.thinking) buffer.current.appendThinking(streaming.thinking);
+      buffer.current.thinkingComplete = !!streaming.thinkingComplete;
+    }
     cancelPendingFlush();
   }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -702,6 +710,7 @@ export function useACP({ sessionId, initialMessages, initialConfigOptions, initi
   }, []);
 
   return {
+    getMessagesSnapshot: () => snapshotStreamingMessages(base.messagesRef.current, buffer.current.messageId, buffer.current.getText(), buffer.current.getThinking(), buffer.current.thinkingComplete),
     isReadyForSession: base.isReadyForSession,
     messages, setMessages,
     isProcessing, setIsProcessing,
@@ -713,6 +722,7 @@ export function useACP({ sessionId, initialMessages, initialConfigOptions, initi
     reconnectMessage,
     send, sendRaw, stop, interrupt, compact,
     pendingPermission, respondPermission,
+    getRawPermission: () => acpPermissionRef.current,
     setPermissionMode,
     configOptions, setConfigOptions, setConfig, configOptionsLoading,
     slashCommands,

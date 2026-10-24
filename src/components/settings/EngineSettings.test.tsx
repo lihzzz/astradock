@@ -1,3 +1,4 @@
+import { MEMORY_DEFAULTS } from "@shared/lib/memory";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ComponentProps, ReactNode, SetStateAction } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -118,11 +119,7 @@ function createSettings(): AppSettings {
     showDevFillInChatTitleBar: false,
     macBackgroundEffect: "off",
     analyticsEnabled: false,
-    memory: {
-      enabled: false, localPort: 8888, injectionPolicy: "off", autoRetain: false,
-      clientSideRedact: true, recallBudget: "mid", recallMaxTokens: 1024,
-      recallMaxItems: 5, recallTimeoutMs: 2000, memoryDefense: "redact",
-    },
+    memory: { ...MEMORY_DEFAULTS },
   };
 }
 

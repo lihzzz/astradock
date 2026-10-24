@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NotificationHandler, ServerRequestHandler } from "../codex-rpc";
 import { codexUtilityPrompt } from "../codex-utility-prompt";
 
@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   notifications: [] as Parameters<NotificationHandler>[0][],
   destroy: vi.fn(),
   request: vi.fn(),
+  notify: null as NotificationHandler | null,
+  exit: null as ((code: number | null, signal: string | null) => void) | null,
 }));
 
 vi.mock("../command-launch", () => ({ spawnExecutable: vi.fn(() => ({ pid: 123 })) }));
@@ -20,6 +22,7 @@ vi.mock("@shared/lib/codex-helpers", () => ({
 vi.mock("../codex-rpc", () => ({
   CodexRpcClient: class {
     onNotification: NotificationHandler | null = null;
+    onExit: ((code: number | null, signal: string | null) => void) | null = null;
     onServerRequest: ServerRequestHandler | null = null;
     onStderr: ((text: string) => void) | null = null;
     destroy = mocks.destroy;
@@ -29,6 +32,8 @@ vi.mock("../codex-rpc", () => ({
       mocks.request(method, params);
       if (method === "thread/start") return { thread: { id: "thread-1" } };
       if (method === "turn/start") {
+        mocks.notify = this.onNotification;
+        mocks.exit = this.onExit;
         for (const notification of mocks.notifications) this.onNotification?.(notification);
         return { turn: { id: "turn-1" } };
       }
@@ -45,6 +50,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.notifications = [];
 });
+
+afterEach(() => vi.useRealTimers());
 
 describe("codexUtilityPrompt item filtering", () => {
   it.each(["COMPOSER_PREDICTION", "TITLE_GEN", "COMMIT_MSG_GEN"])(
@@ -82,5 +89,38 @@ describe("codexUtilityPrompt item filtering", () => {
         .rejects.toThrow(`Codex prediction refused tool item: ${type}`);
       expect(mocks.destroy).toHaveBeenCalled();
     }
+  });
+});
+
+describe("prediction cancellation without a deadline", () => {
+  it("waits beyond nine seconds and accepts a late completion", async () => {
+    vi.useFakeTimers();
+    const result = codexUtilityPrompt("Predict", process.cwd(), "COMPOSER_PREDICTION", { timeoutMs: null });
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(mocks.destroy).not.toHaveBeenCalled();
+    mocks.notify?.(item("item/completed", "agentMessage", "late suggestion"));
+    mocks.notify?.({ method: "turn/completed", params: { turn: { id: "turn-1", status: "completed" } } });
+    await expect(result).resolves.toBe("late suggestion");
+  });
+
+  it("settles and destroys the utility immediately when typing cancels it", async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    const result = codexUtilityPrompt("Predict", process.cwd(), "COMPOSER_PREDICTION", { timeoutMs: null, signal: controller.signal });
+    const assertion = expect(result).rejects.toThrow("cancelled");
+    await vi.advanceTimersByTimeAsync(20_000);
+    controller.abort();
+    await assertion;
+    expect(mocks.destroy).toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("does not hang if the utility process exits during inference", async () => {
+    vi.useFakeTimers();
+    const result = codexUtilityPrompt("Predict", process.cwd(), "COMPOSER_PREDICTION", { timeoutMs: null });
+    const assertion = expect(result).rejects.toThrow("process exited");
+    await vi.advanceTimersByTimeAsync(0);
+    mocks.exit?.(1, null);
+    await assertion;
   });
 });

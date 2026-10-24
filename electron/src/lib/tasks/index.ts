@@ -1,4 +1,5 @@
 import path from "node:path";
+import { conversationKey } from "@shared/lib/session-identity";
 import { getDataDir } from "../data-dir";
 import { readProjectCatalog } from "../project-catalog";
 import { getSessionRepository } from "../session-service";
@@ -32,7 +33,8 @@ export function getTaskService(): TaskService {
         }
         return;
       }
-      const meta = await repository.resolve(change.projectId, change.conversationKey);
+      const meta = await repository.currentMetadata(change.projectId, change.runtimeSessionId);
+      if (!meta || conversationKey(meta) !== change.conversationKey) return;
       let startupError: string | null = null;
       if (!taskRuntimeEvents.get(meta.id)) {
         const source = await repository.load(meta.projectId, meta.id);

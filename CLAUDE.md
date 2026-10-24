@@ -1,6 +1,6 @@
 # AstraDock
 
-Open-source, multi-engine desktop development workspace for Claude Code, Codex, and ACP agents. Combines persistent and concurrent agent sessions, project workspaces, Git/worktrees, terminal/browser/file tools, task deliverables and acceptance, cross-engine review and handoff, project app runtimes, searchable history, and optional Hindsight memory.
+Open-source, multi-engine desktop development workspace for Claude Code, Codex, and ACP agents. Combines persistent and concurrent agent sessions, project workspaces, Git/worktrees, terminal/browser/file tools, task deliverables and acceptance, cross-engine review and handoff, project app runtimes, searchable history, and optional local SiYuan memory.
 
 ## Naming and data compatibility
 

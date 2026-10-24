@@ -98,6 +98,6 @@ export interface AppSettings {
   analyticsUserId?: string;
   /** Last date (YYYY-MM-DD) when daily_active_user was sent */
   analyticsLastDailyActiveDate?: string;
-  /** Local Hindsight long-term memory configuration. API keys live in an encrypted main-process store. */
+  /** Local SiYuan memory configuration. Optional API token stays in the main process. */
   memory: MemorySettings;
 }

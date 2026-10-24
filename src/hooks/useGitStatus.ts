@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { GitRepoInfo, GitStatus, GitBranch, GitLogEntry } from "@/types";
 import { reportError } from "@/lib/analytics/analytics";
+import { repoDetails } from "@/lib/git/repo-details-cache";
 import { discoverReposCached, invalidateDiscoverReposCache } from "@/lib/git/discover-repos-cache";
 
 export interface DiffStat {
@@ -21,6 +22,10 @@ interface UseGitStatusOptions {
 }
 
 const repoStatesCache = new Map<string, RepoState[]>();
+function rememberRepoStates(path: string, states: RepoState[]): void {
+  repoStatesCache.delete(path); repoStatesCache.set(path, states);
+  while (repoStatesCache.size > 32) { const oldest = repoStatesCache.keys().next().value; if (oldest !== undefined) repoStatesCache.delete(oldest); }
+}
 
 export function useGitStatus({ projectPath }: UseGitStatusOptions) {
   const [repoStates, setRepoStates] = useState<RepoState[]>([]);
@@ -44,7 +49,7 @@ export function useGitStatus({ projectPath }: UseGitStatusOptions) {
   const applyRepoStates = useCallback((nextStates: RepoState[], scopePath?: string) => {
     setRepoStates(nextStates);
     if (!scopePath) return;
-    repoStatesCache.set(scopePath, nextStates);
+    rememberRepoStates(scopePath, nextStates);
   }, []);
 
   const loadRepoStates = useCallback(async (
@@ -56,12 +61,12 @@ export function useGitStatus({ projectPath }: UseGitStatusOptions) {
     const updated = await Promise.all(
       repos.map(async (repo) => {
         const previous = previousByPath.get(repo.path);
-        const [statusResult, branchesResult, logResult, diffStatResult] = await Promise.all([
-          window.claude.git.status(repo.path),
-          window.claude.git.branches(repo.path),
-          window.claude.git.log(repo.path, 30),
-          window.claude.git.diffStat(repo.path),
+        const [statusResult, diffStatResult] = await Promise.all([
+          window.claude.git.status(repo.path), window.claude.git.diffStat(repo.path),
         ]);
+        const details = await repoDetails(repo.path, "error" in statusResult ? previous?.status ?? null : statusResult, false);
+        const branchesResult = details.branches;
+        const logResult = details.log;
         return {
           repo,
           status: "error" in statusResult ? previous?.status ?? null : statusResult,
@@ -139,12 +144,12 @@ export function useGitStatus({ projectPath }: UseGitStatusOptions) {
     if (idx === -1 || !scopePath) return;
     const requestId = ++requestIdRef.current;
     const rs = states[idx];
-    const [statusResult, branchesResult, logResult, diffStatResult] = await Promise.all([
-      window.claude.git.status(rs.repo.path),
-      window.claude.git.branches(rs.repo.path),
-      window.claude.git.log(rs.repo.path, 30),
-      window.claude.git.diffStat(rs.repo.path),
+    const [statusResult, diffStatResult] = await Promise.all([
+      window.claude.git.status(rs.repo.path), window.claude.git.diffStat(rs.repo.path),
     ]);
+    const details = await repoDetails(rs.repo.path, "error" in statusResult ? rs.status : statusResult, true);
+    const branchesResult = details.branches;
+    const logResult = details.log;
     if (!isRequestCurrent(requestId, scopePath)) return;
     setRepoStates((prev) => {
       const nextIdx = prev.findIndex((state) => state.repo.path === repoPath);
@@ -158,7 +163,7 @@ export function useGitStatus({ projectPath }: UseGitStatusOptions) {
         log: Array.isArray(logResult) ? logResult : rs.log,
         diffStat: diffStatResult ?? rs.diffStat,
       };
-      repoStatesCache.set(scopePath, next);
+      rememberRepoStates(scopePath, next);
       return next;
     });
   }, [isRequestCurrent]);

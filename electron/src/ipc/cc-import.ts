@@ -1,7 +1,9 @@
+import type { ImportedMessage } from "../lib/cc-import-parser";
 import { ipcMain } from "electron";
 import path from "path";
 import fs from "fs";
-import crypto from "crypto";
+import { Worker } from "node:worker_threads";
+import { createInterface } from "node:readline";
 import { reportError } from "../lib/error-utils";
 import { getClaudeProjectDirectory } from "../lib/claude-project-path";
 
@@ -11,31 +13,20 @@ interface SessionPreview {
   timestamp: string;
 }
 
-interface UIMessage {
-  id: string;
-  role: string;
-  content: string;
-  thinking?: string;
-  thinkingComplete?: boolean;
-  isStreaming?: boolean;
-  timestamp: number;
-  toolName?: string;
-  toolInput?: unknown;
-  toolResult?: unknown;
-  subagentSteps?: unknown[];
-  subagentStatus?: string;
-}
 
-function extractSessionPreview(filePath: string): SessionPreview | null {
+const previews = new Map<string, { signature: string; value: SessionPreview | null }>();
+
+async function extractSessionPreview(filePath: string): Promise<SessionPreview | null> {
+  const stream = fs.createReadStream(filePath, { encoding: "utf8", end: 512 * 1024 - 1 });
+  const reader = createInterface({ input: stream, crlfDelay: Infinity });
   try {
-    const content = fs.readFileSync(filePath, "utf-8");
-    const lines = content.split("\n");
+
     let firstUserMessage: string | null = null;
     let model: string | null = null;
     let timestamp: string | null = null;
     let scanned = 0;
 
-    for (const line of lines) {
+    for await (const line of reader) {
       if (!line.trim()) continue;
       scanned++;
       if (scanned > 100) break;
@@ -76,132 +67,29 @@ function extractSessionPreview(filePath: string): SessionPreview | null {
     };
   } catch {
     return null;
-  }
+  } finally { reader.close(); stream.destroy(); }
 }
 
-function parseJsonlToUIMessages(filePath: string): UIMessage[] {
-  const content = fs.readFileSync(filePath, "utf-8");
-  const lines = content.split("\n").filter((l) => l.trim());
-  const parsed: Array<Record<string, unknown>> = [];
-
-  for (const line of lines) {
-    try {
-      parsed.push(JSON.parse(line));
-    } catch {
-      continue;
-    }
-  }
-
-  const mainThread = parsed.filter((msg) => {
-    if (msg.isSidechain) return false;
-    if (msg.isMeta) return false;
-    if (msg.type !== "user" && msg.type !== "assistant") return false;
-    return true;
+let importQueue: Promise<unknown> = Promise.resolve();
+const imports = new Map<string, Promise<ImportedMessage[]>>();
+function importMessages(filePath: string): Promise<ImportedMessage[]> {
+  const pending = imports.get(filePath);
+  if (pending) return pending;
+  const task = importQueue.catch(() => undefined).then(() => runImportWorker(filePath));
+  importQueue = task.catch(() => undefined);
+  imports.set(filePath, task);
+  void task.finally(() => { if (imports.get(filePath) === task) imports.delete(filePath); }).catch(() => undefined);
+  return task;
+}
+function runImportWorker(filePath: string): Promise<ImportedMessage[]> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(path.join(__dirname, "cc-import-worker.js"), { workerData: filePath });
+    let received = false;
+    const timer = setTimeout(() => { void worker.terminate(); reject(new Error("History import timed out")); }, 60_000);
+    worker.once("message", (messages: ImportedMessage[]) => { received = true; clearTimeout(timer); resolve(messages); });
+    worker.once("error", error => { clearTimeout(timer); reject(error); });
+    worker.once("exit", code => { clearTimeout(timer); if (!received) reject(new Error(`History import exited with code ${code}`)); });
   });
-
-  const uiMessages: UIMessage[] = [];
-  let pendingThinking: { thinking: string; uuid: string } | null = null;
-
-  for (const msg of mainThread) {
-    const ts = msg.timestamp ? new Date(msg.timestamp as string).getTime() : Date.now();
-    const message = msg.message as Record<string, unknown> | undefined;
-
-    if (msg.type === "user") {
-      pendingThinking = null;
-      const msgContent = message?.content;
-
-      if (typeof msgContent === "string" && msgContent.trim()) {
-        uiMessages.push({
-          id: `imported-user-${(msg.uuid as string) || crypto.randomUUID()}`,
-          role: "user",
-          content: msgContent,
-          timestamp: ts,
-        });
-      } else if (Array.isArray(msgContent)) {
-        for (const item of msgContent) {
-          if (item.type === "tool_result") {
-            const resultContent =
-              typeof item.content === "string"
-                ? item.content
-                : Array.isArray(item.content)
-                  ? item.content.map((c: { text?: string }) => c.text || "").join("\n")
-                  : "";
-
-            const rawResult = (msg.toolUseResult || msg.tool_use_result) as Record<string, unknown> | undefined;
-            const toolResult = rawResult
-              ? { ...rawResult }
-              : { stdout: resultContent };
-            const isError = !!item.is_error;
-            const toolUseId = item.tool_use_id as string | undefined;
-
-            // Link result back to matching tool_call so UI shows completed state
-            if (toolUseId) {
-              const toolCallMsg = uiMessages.find(
-                (m) => m.id === `tool-${toolUseId}` && m.role === "tool_call",
-              );
-              if (toolCallMsg) {
-                toolCallMsg.toolResult = toolResult;
-                if (isError) (toolCallMsg as UIMessage & { toolError?: boolean }).toolError = true;
-              }
-            }
-
-            uiMessages.push({
-              id: `imported-result-${(msg.uuid as string) || crypto.randomUUID()}-${toolUseId || ""}`,
-              role: "tool_result",
-              content: resultContent,
-              toolResult,
-              timestamp: ts,
-            });
-          }
-        }
-      }
-    } else if (msg.type === "assistant") {
-      const blocks = (message?.content as Array<Record<string, unknown>>) || [];
-
-      for (const block of blocks) {
-        if (block.type === "thinking") {
-          pendingThinking = { thinking: block.thinking as string, uuid: msg.uuid as string };
-        } else if (block.type === "text" && (block.text as string)?.trim()) {
-          uiMessages.push({
-            id: `imported-assistant-${(msg.uuid as string) || crypto.randomUUID()}`,
-            role: "assistant",
-            content: block.text as string,
-            thinking: pendingThinking?.thinking || undefined,
-            thinkingComplete: pendingThinking ? true : undefined,
-            isStreaming: false,
-            timestamp: ts,
-          });
-          pendingThinking = null;
-        } else if (block.type === "tool_use") {
-          if (pendingThinking) {
-            uiMessages.push({
-              id: `imported-thinking-${pendingThinking.uuid || crypto.randomUUID()}`,
-              role: "assistant",
-              content: "",
-              thinking: pendingThinking.thinking,
-              thinkingComplete: true,
-              isStreaming: false,
-              timestamp: ts,
-            });
-            pendingThinking = null;
-          }
-
-          const isTask = block.name === "Task";
-          uiMessages.push({
-            id: `tool-${block.id}`,
-            role: "tool_call",
-            content: "",
-            toolName: block.name as string,
-            toolInput: block.input,
-            timestamp: ts,
-            ...(isTask ? { subagentSteps: [], subagentStatus: "completed" } : {}),
-          });
-        }
-      }
-    }
-  }
-
-  return uiMessages;
 }
 
 export function register(): void {
@@ -210,7 +98,7 @@ export function register(): void {
       const projectDir = getClaudeProjectDirectory(projectPath);
       if (!fs.existsSync(projectDir)) return [];
 
-      const jsonlFiles = fs.readdirSync(projectDir).filter((f) => f.endsWith(".jsonl"));
+      const jsonlFiles = (await fs.promises.readdir(projectDir)).filter((f) => f.endsWith(".jsonl"));
       const result: Array<{
         sessionId: string;
         preview: string;
@@ -222,15 +110,24 @@ export function register(): void {
       for (const file of jsonlFiles) {
         const sessionId = file.slice(0, -6);
         const filePath = path.join(projectDir, file);
-        const stat = fs.statSync(filePath);
-        const preview = extractSessionPreview(filePath);
-        if (!preview) continue;
+        const stat = await fs.promises.stat(filePath);
+        const signature = `${stat.mtimeMs}:${stat.size}`;
+        const cached = previews.get(filePath);
+        const preview = cached?.signature === signature ? cached.value : await extractSessionPreview(filePath);
+        previews.delete(filePath);
+        previews.set(filePath, { signature, value: preview });
+        while (previews.size > 512) { const oldest = previews.keys().next().value; if (oldest !== undefined) previews.delete(oldest); }
+        // A bounded preview must not make a large, still-importable transcript disappear.
+        const display = preview ?? (stat.size > 512 * 1024 ? {
+          firstUserMessage: `Conversation ${sessionId}`, model: "unknown", timestamp: stat.mtime.toISOString(),
+        } : null);
+        if (!display) continue;
 
         result.push({
           sessionId,
-          preview: preview.firstUserMessage,
-          model: preview.model,
-          timestamp: preview.timestamp,
+          preview: display.firstUserMessage,
+          model: display.model,
+          timestamp: display.timestamp,
           fileModified: stat.mtimeMs,
         });
       }
@@ -252,7 +149,7 @@ export function register(): void {
         return { error: "Session file not found" };
       }
 
-      const messages = parseJsonlToUIMessages(filePath);
+      const messages = await importMessages(filePath);
       return { messages, ccSessionId };
     } catch (err) {
       const errMsg = reportError("CC_SESSIONS:IMPORT_ERR", err);
