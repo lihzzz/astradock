@@ -1,4 +1,5 @@
 import type { UIMessage, ImageAttachment } from "@/types";
+import { registerLiveRetryError } from "./session/live-retry-errors";
 
 export function nextId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
@@ -11,7 +12,7 @@ export function createSystemMessage(
   retryable?: boolean,
   continuable?: boolean,
 ): UIMessage {
-  return {
+  const message: UIMessage = {
     id: nextId(isError ? "sys-err" : "sys"),
     role: "system",
     content,
@@ -20,6 +21,8 @@ export function createSystemMessage(
     continuable: continuable || undefined,
     timestamp: Date.now(),
   };
+  registerLiveRetryError(message);
+  return message;
 }
 
 /** Create a user-role UIMessage with optional images and display text. */

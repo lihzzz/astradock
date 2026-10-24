@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { UIMessage } from "@/types";
+import { createSystemMessage } from "../message-factory";
+import { getRetryRequest } from "./retry";
 import {
   AUTO_RETRY_DELAYS_MS,
   AUTO_RETRY_MAX_ATTEMPTS,
@@ -17,15 +19,16 @@ function userMessage(content: string, timestamp = NOW - 1000): UIMessage {
 }
 
 function errorMessage(overrides: Partial<UIMessage> = {}): UIMessage {
-  return {
+  const message = Object.assign(createSystemMessage("stream disconnected", true, true), {
     id: "sys-err-1",
-    role: "system",
+    role: "system" as const,
     content: "stream disconnected",
     isError: true,
     retryable: true,
     timestamp: NOW - 500,
     ...overrides,
-  };
+  });
+  return message;
 }
 
 describe("getTailRetryableError", () => {
@@ -43,6 +46,14 @@ describe("getTailRetryableError", () => {
 });
 
 describe("planAutoRetry", () => {
+  it("never auto-retries a restored recent error, but preserves manual retry", () => {
+    const live = errorMessage();
+    const restored: UIMessage = JSON.parse(JSON.stringify(live));
+    const messages = [userMessage("hi"), restored];
+    expect(planAutoRetry(messages, null, NOW)).toBeNull();
+    expect(getRetryRequest(messages, restored.id)).not.toBeNull();
+    expect(planAutoRetry([userMessage("hi"), live], null, NOW)).not.toBeNull();
+  });
   it("schedules the first attempt with the first delay", () => {
     const plan = planAutoRetry([userMessage("hi"), errorMessage()], null, NOW);
     expect(plan?.attempt).toBe(1);

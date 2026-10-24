@@ -874,6 +874,7 @@ export function useCodex({
   // ── Exit handling ──
   const handleExit = useCallback((data: CodexExitEvent) => {
     if (data._sessionId !== sessionIdRef.current) return;
+    const wasProcessing = base.isProcessingRef.current;
     setIsConnected(false);
     setIsProcessing(false);
     setReconnectMessage(null);
@@ -885,7 +886,7 @@ export function useCodex({
         createSystemMessage(
           `Codex process exited with code ${data.code}`,
           true,
-          isRetryableUpstreamError(data.signal ?? `Codex process exited with code ${data.code}`),
+          wasProcessing && isRetryableUpstreamError(data.signal ?? `Codex process exited with code ${data.code}`),
         ),
       ]);
     }

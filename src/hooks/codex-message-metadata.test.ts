@@ -20,7 +20,7 @@ vi.mock("react", async (original) => ({
 vi.mock("@/lib/analytics/analytics", () => ({ captureException: vi.fn() }));
 
 const sessionId = "session";
-interface Driver { emit: (event: CodexSessionEvent) => void; disconnect: () => void; messages: () => UIMessage[]; processing: () => boolean }
+interface Driver { emit: (event: CodexSessionEvent) => void; disconnect: (code?: number) => void; messages: () => UIMessage[]; processing: () => boolean }
 function foreground(initialMessages: UIMessage[] = []): Driver {
   let handler: Driver["emit"] = () => { throw new Error("Not subscribed"); };
   let exit: (event: CodexExitEvent) => void = () => { throw new Error("Not subscribed"); };
@@ -33,7 +33,7 @@ function foreground(initialMessages: UIMessage[] = []): Driver {
   lifecycle.effects = [];
   const hook = useCodex({ sessionId, initialMessages });
   for (const effect of lifecycle.effects) { const cleanup = effect(); if (cleanup) lifecycle.cleanups.push(cleanup); }
-  return { emit: (event) => handler(event), disconnect: () => exit({ _sessionId: sessionId, code: null, signal: "SIGTERM" }),
+  return { emit: (event) => handler(event), disconnect: (code) => exit({ _sessionId: sessionId, code: code ?? null, signal: "SIGTERM" }),
     messages: () => { let value: UIMessage[] = []; hook.setMessages((current) => { value = current; return current; }); return value; },
     processing: () => { let value = false; hook.setIsProcessing((current) => { value = current; return current; }); return value; } };
 }
@@ -154,4 +154,27 @@ it("rebinds phase-aware assistant deltas after switching back", () => {
   itemEvent(restored, "item/completed", { type: "agentMessage", id: "answer", text: "", phase: "final_answer" });
   expect(restored.messages()).toHaveLength(1);
   expect(restored.messages()[0]).toMatchObject({ content: "one two", phase: "final_answer", isStreaming: false });
+});
+
+
+describe("Codex process exit retry eligibility", () => {
+  it("does not retry an idle session", () => {
+    const driver = foreground();
+    driver.disconnect(1);
+    expect(driver.messages().at(-1)).toMatchObject({ isError: true });
+    expect(driver.messages().at(-1)?.retryable).not.toBe(true);
+  });
+  it("does not retry after completion, even before React renders", () => {
+    const driver = foreground();
+    driver.emit({ _sessionId: sessionId, method: "turn/started", params: { threadId: "root", turn: { id: "turn", status: "inProgress", items: [], error: null } } });
+    driver.emit({ _sessionId: sessionId, method: "turn/completed", params: { threadId: "root", turn: { id: "turn", status: "completed", items: [], error: null } } });
+    driver.disconnect(1);
+    expect(driver.messages().at(-1)?.retryable).not.toBe(true);
+  });
+  it("still permits retry when an active turn crashes", () => {
+    const driver = foreground();
+    driver.emit({ _sessionId: sessionId, method: "turn/started", params: { threadId: "root", turn: { id: "turn", status: "inProgress", items: [], error: null } } });
+    driver.disconnect(1);
+    expect(driver.messages().at(-1)?.retryable).toBe(true);
+  });
 });

@@ -45,6 +45,7 @@ export interface EngineBaseState {
   // Refs
   sessionIdRef: React.RefObject<string | null>;
   messagesRef: React.RefObject<UIMessage[]>;
+  isProcessingRef: React.RefObject<boolean>;
   restoredStateRef: React.RefObject<BackgroundSessionState | undefined>;
   isReadyForSession: (id: string) => boolean;
 
@@ -62,7 +63,7 @@ export function useEngineBase({
   initialPermission,
 }: UseEngineBaseOptions): EngineBaseState {
   const [messages, setMessagesState] = useState<UIMessage[]>(initialMessages ?? []);
-  const [isProcessing, setIsProcessing] = useState(initialMeta?.isProcessing ?? false);
+  const [isProcessing, setIsProcessingState] = useState(initialMeta?.isProcessing ?? false);
   const [isConnected, setIsConnected] = useState(initialMeta?.isConnected ?? false);
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(initialMeta?.sessionInfo ?? null);
   const [totalCost, setTotalCost] = useState(initialMeta?.totalCost ?? 0);
@@ -71,6 +72,13 @@ export function useEngineBase({
   const [isCompacting, setIsCompacting] = useState(initialMeta?.isCompacting ?? false);
   const [reconnectMessage, setReconnectMessage] = useState<string | null>(initialMeta?.reconnectMessage ?? null);
 
+  // Exit notifications can follow completion in the same React batch.
+  const isProcessingRef = useRef(isProcessing);
+  const setIsProcessing = useCallback<Dispatch<SetStateAction<boolean>>>((update) => {
+    const next = typeof update === "function" ? update(isProcessingRef.current) : update;
+    isProcessingRef.current = next;
+    setIsProcessingState(next);
+  }, []);
   const sessionIdRef = useRef(sessionId);
   const restoredStateRef = useRef<BackgroundSessionState | undefined>(undefined);
   const messagesRef = useRef<UIMessage[]>(messages);
@@ -173,6 +181,7 @@ export function useEngineBase({
     reconnectMessage, setReconnectMessage,
     sessionIdRef,
     messagesRef,
+    isProcessingRef,
     restoredStateRef,
     pendingFlush,
     rafId,

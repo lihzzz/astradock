@@ -496,6 +496,7 @@ export function useACP({ sessionId, initialMessages, initialConfigOptions, initi
     const unsubExit = window.claude.acp.onExit((data: { _sessionId: string; code: number | null; error?: string }) => {
       if (data._sessionId !== sessionIdRef.current) return;
       acpLog("SESSION_EXIT", { code: data.code, error: data.error });
+      const wasProcessing = base.isProcessingRef.current;
       setIsConnected(false);
       setIsProcessing(false);
       setIsCompacting(false);
@@ -504,7 +505,7 @@ export function useACP({ sessionId, initialMessages, initialConfigOptions, initi
         const errorDetail = data.error || `Agent process exited with code ${data.code}`;
         setMessages((prev) => [
           ...prev,
-          createSystemMessage(errorDetail, true, isRetryableUpstreamError(errorDetail)),
+          createSystemMessage(errorDetail, true, wasProcessing && isRetryableUpstreamError(errorDetail)),
         ]);
       }
     });

@@ -1,4 +1,5 @@
 import type { UIMessage } from "@/types";
+import { isLiveRetryError } from "./live-retry-errors";
 import { getRetryRequest, type RetryRequest } from "./retry";
 
 /** Live state of a scheduled auto-retry, exposed for countdown UI. */
@@ -53,7 +54,7 @@ export interface AutoRetryPlan {
 
 /**
  * Decide whether the tail error should be auto-retried. Returns null when the
- * error is stale, has no retryable user turn, or the attempt budget is spent
+ * error was loaded from history, is stale, has no retryable user turn, or the attempt budget is spent
  * (in which case only the manual Retry button remains).
  */
 export function planAutoRetry(
@@ -62,7 +63,7 @@ export function planAutoRetry(
   now = Date.now(),
 ): AutoRetryPlan | null {
   const error = getTailRetryableError(messages);
-  if (!error) return null;
+  if (!error || !isLiveRetryError(error)) return null;
   if (now - error.timestamp > AUTO_RETRY_MAX_ERROR_AGE_MS) return null;
   const request = getRetryRequest(messages, error.id);
   if (!request) return null;

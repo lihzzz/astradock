@@ -963,6 +963,7 @@ export function useClaude({ sessionId, initialMessages, initialMeta, initialPerm
     });
     const unsubExit = window.claude.onExit((data) => {
       if (data._sessionId !== sessionIdRef.current) return;
+      const wasProcessing = base.isProcessingRef.current;
       setIsConnected(false);
       setIsProcessing(false);
       setIsCompacting(false);
@@ -975,7 +976,7 @@ export function useClaude({ sessionId, initialMessages, initialMeta, initialPerm
         const errorDetail = data.error || `Process exited with code ${data.code}`;
         setMessages((prev) => [
           ...prev,
-          createSystemMessage(errorDetail, true, isRetryableUpstreamError(errorDetail)),
+          createSystemMessage(errorDetail, true, wasProcessing && isRetryableUpstreamError(errorDetail)),
         ]);
       }
     });

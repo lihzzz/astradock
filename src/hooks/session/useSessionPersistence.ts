@@ -230,7 +230,7 @@ export function useSessionPersistence({
           if (backgroundState?.messages.at(-1)?.content !== errorText) {
             backgroundStoreRef.current.updateMessages(sid, (messages) => [
               ...messages,
-              createSystemMessage(errorText, true, isRetryableUpstreamError(errorText)),
+              createSystemMessage(errorText, true, !!backgroundState?.isProcessing && isRetryableUpstreamError(errorText)),
             ]);
           }
         }
