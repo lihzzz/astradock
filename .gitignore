@@ -38,3 +38,9 @@ cli
 !/docs/siyuan-memory/implementation-plan.md
 !/docs/siyuan-memory/implementation-status.md
 !/docs/siyuan-memory/user-guide.md
+
+# Runtime reliability and performance plan.
+!/docs/runtime-optimization/
+/docs/runtime-optimization/*
+!/docs/runtime-optimization/*.md
+!/docs/runtime-optimization/code-baseline.json

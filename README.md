@@ -179,6 +179,8 @@ pnpm exec tsc --project electron/tsconfig.json --noEmit
 
 打包成功不等于类型检查通过；当前已知诊断和功能验收范围见[实施与验证记录](docs/productivity-enhancements/implementation-status.md)。
 
+运行时可靠性、长会话性能与多端复用见[多引擎运行时与性能优化](docs/runtime-optimization/README.md)。实现状态与验证边界见该目录记录。
+
 #### 技术栈与目录
 
 核心技术包括 Electron 40、React 19、TypeScript 5.9、Vite 7、tsup、Tailwind CSS 4、Zustand、xterm.js / node-pty、Monaco 和 Vitest。历史索引通过独立 worker 使用 Electron 内置的 `node:sqlite`；本地语音与语义模型使用 Transformers.js / ONNX。
@@ -401,6 +403,8 @@ pnpm exec tsc --project electron/tsconfig.json --noEmit
 ```
 
 A successful bundle does not imply a clean type check. Known diagnostics and validation limits are recorded in the [implementation and validation record](docs/productivity-enhancements/implementation-status.md).
+
+See the [runtime reliability and performance plan](docs/runtime-optimization/README.md) for implementation status and validation limits.
 
 #### Stack and layout
 

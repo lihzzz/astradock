@@ -1,0 +1,380 @@
+{
+  "schemaVersion": 1,
+  "capturedOn": "2026-10-25",
+  "timezone": "Asia/Taipei",
+  "repository": "AstraDock",
+  "branch": "hy_dev",
+  "head": "42e2e641292ba3af607dc8452eb6b1be39fceead",
+  "packageVersion": "0.3.8",
+  "scope": "Static review of selected source sections and test fixtures. Whole-file hashes identify the baseline, not an exhaustive audit. No business tests, benchmarks, live providers or builds were run.",
+  "initialUntracked": [
+    "artifacts/"
+  ],
+  "observations": [
+    {
+      "id": "E01",
+      "files": [
+        "shared/lib/session-identity.ts"
+      ],
+      "symbols": [
+        "conversationKey"
+      ]
+    },
+    {
+      "id": "E02",
+      "files": [
+        "src/types/session.ts",
+        "shared/types/engine.ts"
+      ],
+      "symbols": [
+        "SessionBase",
+        "PersistedSession",
+        "EngineId"
+      ]
+    },
+    {
+      "id": "E03",
+      "files": [
+        "electron/src/lib/session-repository.ts"
+      ],
+      "symbols": [
+        "bindRuntime",
+        "registerRuntime",
+        "writeOperation",
+        "save",
+        "append",
+        "remove"
+      ]
+    },
+    {
+      "id": "E04",
+      "files": [
+        "electron/src/lib/session-jsonl.ts"
+      ],
+      "symbols": [
+        "parseSessionJsonlWithDiagnostics",
+        "serializeAppendLines"
+      ]
+    },
+    {
+      "id": "E05",
+      "files": [
+        "src/lib/session/persistence.ts"
+      ],
+      "symbols": [
+        "saveSessionSmart",
+        "saveSnapshot",
+        "rememberCursor"
+      ]
+    },
+    {
+      "id": "E06",
+      "files": [
+        "src/lib/session/checkpoint-scheduler.ts"
+      ],
+      "symbols": [
+        "CheckpointScheduler"
+      ]
+    },
+    {
+      "id": "E07",
+      "files": [
+        "src/hooks/useEngineBase.ts",
+        "src/lib/background/session-store.ts"
+      ],
+      "symbols": [
+        "useEngineBase",
+        "live snapshot readers"
+      ]
+    },
+    {
+      "id": "E08",
+      "files": [
+        "src/components/ChatView.tsx",
+        "src/lib/chat/structure.ts"
+      ],
+      "symbols": [
+        "ChatMessageRow",
+        "ChatView",
+        "createChatStructureTracker"
+      ]
+    },
+    {
+      "id": "E09",
+      "files": [
+        "src/hooks/session/useSessionCache.ts",
+        "src/hooks/session/useBackgroundReaper.ts"
+      ],
+      "symbols": [
+        "cacheSessionPayload",
+        "reapBackgroundSessions"
+      ]
+    },
+    {
+      "id": "E10",
+      "files": [
+        "electron/src/ipc/acp-sessions.ts"
+      ],
+      "symbols": [
+        "agentCapabilities",
+        "acp:get-capabilities"
+      ]
+    },
+    {
+      "id": "E11",
+      "files": [
+        "electron/src/ipc/claude-sessions.ts",
+        "electron/src/ipc/codex-sessions.ts",
+        "src/hooks/session/useSessionPersistence.ts"
+      ],
+      "symbols": [
+        "startEventLoop",
+        "codex:send",
+        "useSessionPersistence"
+      ]
+    },
+    {
+      "id": "E12",
+      "files": [
+        "src/hooks/useAutoRetry.ts",
+        "src/lib/session/auto-retry.ts"
+      ],
+      "symbols": [
+        "planAutoRetry",
+        "renderer retry timer"
+      ]
+    },
+    {
+      "id": "E13",
+      "files": [
+        "electron/src/lib/session-service.ts",
+        "electron/src/lib/tasks/runtime-events.ts"
+      ],
+      "symbols": [
+        "getSessionRepository",
+        "TaskRuntimeEvents"
+      ]
+    },
+    {
+      "id": "E14",
+      "files": [
+        "electron/src/ipc/session-runtime-races.test.ts"
+      ],
+      "symbols": [
+        "stdio peer fixture",
+        "SDK query fixture"
+      ]
+    },
+    {
+      "id": "E15",
+      "files": [
+        "scripts/performance-bench.mjs",
+        "scripts/performance-smoke/entry.tsx",
+        "scripts/performance-smoke/run.mjs"
+      ],
+      "symbols": [
+        "measure",
+        "Harness"
+      ]
+    },
+    {
+      "id": "E16",
+      "files": [
+        "electron/src/lib/history/service.ts",
+        "src/lib/session/session-transfer.ts"
+      ],
+      "symbols": [
+        "history service",
+        "buildTransferMarkdown"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "6ebdb617a8104a7756d0cf36578ab01103dc9f07e4dc6feb751296b9c402faf7",
+      "bytes": 9
+    },
+    {
+      "path": "CLAUDE.md",
+      "sha256": "3db90fb4dc41aafa0c726ddfa06f3b33a5b7059908617b2703a087b127cd055d",
+      "bytes": 69399
+    },
+    {
+      "path": "docs/session-consistency.md",
+      "sha256": "b1904a8b7458f401e8b382099dd5d3f08941b4be5ec922c9c8a411c70db6c9d1",
+      "bytes": 3451
+    },
+    {
+      "path": "electron/src/ipc/acp-sessions.ts",
+      "sha256": "dde737bf91ac72233c64bb329d7f0c78b81c48d21bec80b352b33e90427e7df9",
+      "bytes": 54804,
+      "initialReviewBaselineSha256": "2ef7ecf34adc1caceaccee496c5f2d619e9017cdebfad36a3f9f0dece972fcb7"
+    },
+    {
+      "path": "electron/src/ipc/claude-sessions.ts",
+      "sha256": "070c4ef5d709d20a8f083f132fea0abfc720cfdc8b7b199a3c30c672cdd7a020",
+      "bytes": 49538,
+      "initialReviewBaselineSha256": "db01d7e429f58988cd78e8dd8ca7f8ce963a27fc258ab75fa5c1f6cf0f613fd2"
+    },
+    {
+      "path": "electron/src/ipc/codex-sessions.ts",
+      "sha256": "1484b3f55f94ba284754dce700cb1f29de70ce71b9de243bf267abb6ecfcd064",
+      "bytes": 50309,
+      "initialReviewBaselineSha256": "c69545843ef4e3ff0c981a7bdb752382f69718e5de3363ad891aa4697fd57af4"
+    },
+    {
+      "path": "electron/src/ipc/session-runtime-races.test.ts",
+      "sha256": "82e34de550dafbfb41ac00a52d49b2e26d99c4753d6aa381a6a63207aed3bd71",
+      "bytes": 28067
+    },
+    {
+      "path": "electron/src/lib/history/service.ts",
+      "sha256": "319affe862b16ce9cfc04fb31ef8ae7d828f756cbc19c75ab4233c54bf72fe39",
+      "bytes": 4294
+    },
+    {
+      "path": "electron/src/lib/session-jsonl.ts",
+      "sha256": "69e2f82a25044a473a6730291adcda6932c1f70b81d54b649b878349815650a1",
+      "bytes": 3553
+    },
+    {
+      "path": "electron/src/lib/session-repository.ts",
+      "sha256": "c67973733261d88e9faed819e01dc6f5ed0cad1e22167e840cfbd4d49ff07549",
+      "bytes": 52261
+    },
+    {
+      "path": "electron/src/lib/session-service.ts",
+      "sha256": "be895d83bd4107dfbae692ac45f02e7663a3cd87d1698d35f673483315dee119",
+      "bytes": 1486
+    },
+    {
+      "path": "electron/src/lib/tasks/runtime-events.ts",
+      "sha256": "169378ed6ed2553f3ccd29d18f5b21b01ceeb8252bf192688f5d8f7954d4a97f",
+      "bytes": 3034
+    },
+    {
+      "path": "package.json",
+      "sha256": "b50e5ccf4fb5eb5215dcac19ebd3fc38170c031081226b6ec5db68bd6faee787",
+      "bytes": 4385
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "sha256": "18d3698065b695b82bc508e15137729f92f1770eed9421ab747649799387955c",
+      "bytes": 415883
+    },
+    {
+      "path": "scripts/performance-bench.mjs",
+      "sha256": "53cd6287d055a45964253511a51606a2c5705ffc4ed75126a7465765af469812",
+      "bytes": 2362
+    },
+    {
+      "path": "scripts/performance-smoke/entry.tsx",
+      "sha256": "80a2bebcb1a18aeca34a50c3379f2e751210f7c4e806ccb11db0b6d2725cc7a2",
+      "bytes": 2706
+    },
+    {
+      "path": "scripts/performance-smoke/run.mjs",
+      "sha256": "dc428fa5e2e83332a8b212b3e475b0a8a49a09752dd5f9329d3dba366aac8991",
+      "bytes": 1036
+    },
+    {
+      "path": "shared/lib/session-identity.ts",
+      "sha256": "65170ec50f6bdf1c6cb3b4d5fbd40a5f8180dabb0c3a796c40b4d65418f36e96",
+      "bytes": 617
+    },
+    {
+      "path": "shared/types/engine.ts",
+      "sha256": "7567a26a0db307686d4efdb447707f043cd9a4d8e14d3b52bff65d7fa72bd3d1",
+      "bytes": 1742
+    },
+    {
+      "path": "src/components/ChatView.tsx",
+      "sha256": "557d5078842af10046306ca8f0760708db081c94988f1d1f989d48be3d7226c8",
+      "bytes": 37110
+    },
+    {
+      "path": "src/hooks/session/useBackgroundReaper.ts",
+      "sha256": "3e538ef42eba20654ca6a4cfc3d1de08ddeb19857888fddf47e0fb4159fbb972",
+      "bytes": 5711
+    },
+    {
+      "path": "src/hooks/session/useSessionCache.ts",
+      "sha256": "2968dc371690afdf7caba6a9ad92e5686dcc94fa0847fbd139398bb1dd3ccb7d",
+      "bytes": 13567
+    },
+    {
+      "path": "src/hooks/session/useSessionPersistence.ts",
+      "sha256": "0d644d90d2e573a6cbeb62934e592d10465a96dc920a346430caa9049c794941",
+      "bytes": 24626
+    },
+    {
+      "path": "src/hooks/useAutoRetry.ts",
+      "sha256": "dd1fbdc8737ff6ce3435bf0ad0e170b190302d1a2291758caaa617fe033df01d",
+      "bytes": 3528
+    },
+    {
+      "path": "src/hooks/useEngineBase.ts",
+      "sha256": "90016df4c8cbef4f2d4d442c27c8120c6113ba197f1624ecb9cb305d57d0bb6f",
+      "bytes": 7835
+    },
+    {
+      "path": "src/lib/background/session-store.ts",
+      "sha256": "2fb4924bbfb3f3a1346af43f418ccb9060adcff718cffbef0a70f9d477f447ed",
+      "bytes": 12216
+    },
+    {
+      "path": "src/lib/chat/structure.ts",
+      "sha256": "c66f058cabdf8a9c8c443dae9d0d037e46c4e0c3e12cb10ea7cad4dbf5a1eb64",
+      "bytes": 1872
+    },
+    {
+      "path": "src/lib/session/auto-retry.ts",
+      "sha256": "3e6fc225728dc8a8518b96b3dfe75872448646eda4398820010904da99a215ab",
+      "bytes": 2809
+    },
+    {
+      "path": "src/lib/session/checkpoint-scheduler.ts",
+      "sha256": "7a34159132281ddfcc8a8ee1f38be7d336ad92fa10b8ad7a0a3ec2d773dc9010",
+      "bytes": 2146
+    },
+    {
+      "path": "src/lib/session/persistence.ts",
+      "sha256": "51cf08c198578e1737f9758d69e62724a3ce17364fa228be1378f82357e93220",
+      "bytes": 6544
+    },
+    {
+      "path": "src/lib/session/session-transfer.ts",
+      "sha256": "8fd6ce5cf20cb56dc65d918a416b706f6744f92386cbe45dcc9822e99dd4df7b",
+      "bytes": 3178
+    },
+    {
+      "path": "src/types/session.ts",
+      "sha256": "43f14801e20ec6718561ee26ae929a7293d8222c7dd34622bb8a0cc7cf81dc39",
+      "bytes": 5623
+    },
+    {
+      "path": "vitest.config.electron.ts",
+      "sha256": "014e4d0ea5d5af31f84e58c1ff36f682483e73c6b37f61df7c3b2ec4310d096b",
+      "bytes": 418
+    }
+  ],
+  "captureSemantics": "Working-tree file hashes captured after the static review; not a clean-HEAD snapshot. Concurrent changes outside this task were detected and preserved. Revalidate before implementation.",
+  "concurrentChangesObserved": [
+    "docs/siyuan-memory/implementation-plan.md",
+    "electron/src/ipc/acp-sessions.ts",
+    "electron/src/ipc/claude-sessions.ts",
+    "electron/src/ipc/codex-sessions.ts",
+    "electron/src/ipc/memory.ts",
+    "electron/src/lib/memory/service.ts",
+    "electron/src/lib/memory/siyuan/connection.ts",
+    "electron/src/lib/memory/write-journal.ts",
+    "electron/src/preload.ts",
+    "scripts/test-memory-bridge.cjs",
+    "shared/lib/memory-tools.ts",
+    "shared/lib/memory.ts",
+    "shared/types/memory.ts",
+    "src/components/memory/MemoryPanel.tsx",
+    "src/components/settings/MemorySettings.tsx"
+  ]
+}
