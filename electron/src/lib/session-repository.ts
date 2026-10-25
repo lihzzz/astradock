@@ -554,6 +554,18 @@ export class SessionRepository {
   }
 
   /** Exact-runtime lookup for committed change events, without scanning every conversation. */
+  /** Vetted read-only source; callers must recheck metadata after asynchronous work. */
+  async historySource(projectId: string, id: string): Promise<{ file: string; meta: SessionMeta } | null> {
+    const meta = await this.currentMetadata(projectId, id);
+    if (!meta) return null;
+    for (const extension of ["jsonl", "json"] as const) {
+      const file = this.sourceFile(projectId, id, extension);
+      try { await fs.access(file); return { file, meta }; }
+      catch (error) { if (!isMissingFile(error)) throw error; }
+    }
+    return null;
+  }
+
   async currentMetadata(projectId: string, id: string): Promise<SessionMeta | null> {
     this.file(projectId, id, "jsonl");
     await this.initialize();

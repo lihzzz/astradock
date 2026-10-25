@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { lazy, Suspense, useCallback, useState } from "react";
 import { useInlineRename } from "@/hooks/useInlineRename";
 import {
   Columns2,
@@ -40,6 +40,8 @@ import { toast } from "sonner";
 import { conversationKey } from "@shared/lib/session-identity";
 import { useSidebarSelection } from "./SessionSelection";
 
+const PagedHistoryDialog = lazy(() => import("@/components/history/PagedHistoryDialog"));
+
 const REVEAL_LABEL = isMac ? "Reveal in Finder" : "Show in Explorer";
 
 export function SessionItem({
@@ -79,6 +81,7 @@ export function SessionItem({
   surface?: "sidebar" | "settings";
 }) {
   const { t } = useI18n();
+  const [historyOpen, setHistoryOpen] = useState(false);
   const selection = useSidebarSelection();
   const selectionKey = conversationKey(session);
   const { isEditing, startEditing, inputProps: renameInputProps } = useInlineRename({
@@ -301,6 +304,10 @@ export function SessionItem({
             </DropdownMenuItem>
           )}
 
+          {session.id !== DRAFT_ID && (
+            <DropdownMenuItem onClick={() => setHistoryOpen(true)}>{t("Paged history")}</DropdownMenuItem>
+          )}
+
           <DropdownMenuItem onClick={startEditing}>
             <Pencil className="me-2 h-3.5 w-3.5" />
             Rename
@@ -314,6 +321,7 @@ export function SessionItem({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      {historyOpen && <Suspense fallback={null}><PagedHistoryDialog projectId={session.projectId} sessionId={session.id} title={session.title} onClose={() => setHistoryOpen(false)} /></Suspense>}
     </div>
   );
 }

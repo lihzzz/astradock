@@ -1,10 +1,11 @@
+import { prepareWireMessages, type WireMessageSnapshot } from "@shared/lib/runtime/message-wire";
 import type { PersistedSession, UIMessage } from "@/types";
 import { getLastUserMessageTimestamp } from "@shared/lib/session-persistence";
 import { isSessionFrozen, isSessionRecovering, isSessionRetired, replaceSessionRuntime } from "./batch-runtime";
 
 // ── Incremental persistence cursor ──
 // Immutable wire snapshots detect cloned messages and nested background mutations.
-interface MessageCursor { id: string; json: string }
+type MessageCursor = WireMessageSnapshot;
 const persistedCursors = new Map<string, MessageCursor[]>();
 const CURSOR_LIMIT = 20;
 const CURSOR_BYTE_LIMIT = 16 * 1024 * 1024;
@@ -34,7 +35,7 @@ export function patchSessionMetadata(projectId: string, id: string, patch: impor
 function rememberCursor(sessionId: string, messages: MessageCursor[]): void {
   totalCursorBytes -= cursorBytes.get(sessionId) ?? 0;
   persistedCursors.delete(sessionId);
-  const bytes = messages.reduce((sum, message) => sum + message.json.length * 2, 0);
+  const bytes = messages.reduce((sum, message) => sum + message.json.length * 4, 0);
   persistedCursors.set(sessionId, messages);
   cursorBytes.set(sessionId, bytes);
   totalCursorBytes += bytes;
@@ -59,7 +60,7 @@ export function invalidatePersistedCursor(sessionId: string): void {
  * save, or when the main process has no snapshot to append to.
  */
 export function saveSessionSmart(data: PersistedSession, previousSessionId?: string): Promise<void> {
-  const cursor = (data.messages ?? []).map(message => ({ id: message.id, json: JSON.stringify(message) }));
+  const cursor = prepareWireMessages(data.messages ?? [], persistedCursors.get(data.id));
   const lastMessageAt = getLastUserMessageTimestamp(data.messages ?? []) ?? data.createdAt ?? 0;
   const { messages: _messages, ...header } = data;
   return serial(data.id, async () => {

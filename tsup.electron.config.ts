@@ -8,6 +8,7 @@ export default defineConfig({
     "memory-mcp": "electron/src/memory-mcp.ts",
     "project-apps-mcp": "electron/src/project-apps-mcp.ts",
     "cc-import-worker": "electron/src/cc-import-worker.ts",
+    "runtime-history-worker": "electron/src/lib/runtime/history-worker.ts",
     "history-worker": "electron/src/lib/history/worker.ts",
     "embedding-worker": "electron/src/lib/history/embedding-worker.ts",
   },

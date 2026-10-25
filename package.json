@@ -33,7 +33,9 @@
     "typecheck:electron": "tsc --noEmit -p electron/tsconfig.json",
     "test:watch": "vitest --config vitest.config.electron.ts",
     "perf:bench": "node scripts/performance-bench.mjs",
-    "perf:smoke": "node scripts/performance-smoke/run.mjs"
+    "perf:smoke": "node scripts/performance-smoke/run.mjs",
+    "perf:runtime": "node scripts/runtime-bench.mjs",
+    "test:runtime-ui": "node scripts/runtime-history-smoke/run.mjs"
   },
   "packageManager": "pnpm@10.26.0",
   "dependencies": {

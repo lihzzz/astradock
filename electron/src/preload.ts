@@ -232,6 +232,8 @@ contextBridge.exposeInMainWorld("claude", {
     reorder: (projectId: string, targetProjectId: string) => ipcRenderer.invoke("projects:reorder", projectId, targetProjectId),
   },
   sessions: {
+    historyPage: (query: import("@shared/types/runtime-history").ThreadPageQuery) => ipcRenderer.invoke("sessions:history-page", query),
+    historyChunk: (query: import("@shared/types/runtime-history").ThreadChunkQuery) => ipcRenderer.invoke("sessions:history-chunk", query),
     onFlush: (callback: (id: string) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, id: string) => callback(id);
       ipcRenderer.on("sessions:flush", handler);

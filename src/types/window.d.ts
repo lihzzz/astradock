@@ -167,6 +167,8 @@ declare global {
         reorder: (projectId: string, targetProjectId: string) => Promise<IpcResult>;
       };
       sessions: {
+        historyPage: (query: import("@shared/types/runtime-history").ThreadPageQuery) => Promise<import("@shared/types/runtime-history").HistoryReadResult>;
+        historyChunk: (query: import("@shared/types/runtime-history").ThreadChunkQuery) => Promise<import("@shared/types/runtime-history").HistoryChunkResult>;
         onFlush: (callback: (id: string) => void) => () => void;
         flushed: (id: string, error?: string) => void;
         batch: SessionBatchApi;

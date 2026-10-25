@@ -42,6 +42,7 @@ import { terminals } from "./ipc/terminal";
 import * as spacesIpc from "./ipc/spaces";
 import * as projectsIpc from "./ipc/projects";
 import * as sessionsIpc from "./ipc/sessions";
+import * as runtimeHistoryIpc from "./ipc/runtime-history";
 import * as sessionOperationsIpc from "./ipc/session-operations";
 import * as historyIpc from "./ipc/history";
 import { configureSessionStopper, configureProjectAppCleanup } from "./lib/session-service";
@@ -484,6 +485,7 @@ projectAppsIpc.register(getMainWindow);
 tasksIpc.register(getMainWindow);
 configureProjectAppCleanup((projectId) => getProjectAppsService().removeProject(projectId));
 sessionsIpc.register();
+runtimeHistoryIpc.register(getMainWindow);
 sessionOperationsIpc.register(getMainWindow);
 historyIpc.register(getMainWindow);
 configureSessionStopper(async (runtimeIds, meta) => {

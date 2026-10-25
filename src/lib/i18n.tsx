@@ -15,6 +15,20 @@ import { TOKEN_USAGE_EN, TOKEN_USAGE_ZH } from "@/components/settings/usage-stri
  * used as the fallback so newly added copy stays readable before it is translated.
  */
 const ZH_CN: Record<string, string> = {
+  "Paged history": "分页历史",
+  "Read-only saved history. This window cannot overwrite or send conversation content.": "只读查看已保存的历史；此窗口不会覆盖历史或向 Agent 发送内容。",
+  "Latest messages": "最新消息",
+  "Older messages": "更早的消息",
+  "Loading saved history...": "正在读取已保存的历史…",
+  "messages loaded": "条消息已载入",
+  "Some source records are damaged. This is not a complete history.": "部分源记录损坏，当前结果不是完整历史。",
+  "Saved conversation history": "已保存的会话历史",
+  "Large message": "大消息",
+  "Legacy message": "旧格式消息",
+  "Preview only. Export to read the complete conversation.": "仅显示预览；请导出以阅读完整会话。",
+  "End of content": "内容结束",
+  "Read next content chunk": "读取下一段内容",
+  "Read-only JSON chunks; earlier chunks are not retained.": "以只读 JSON 分段展示；不累计保留前面的分段。",
   "Expand tool": "展开工具",
   "Collapse tool": "收起工具",
   ...MEMORY_PANEL_ZH,
