@@ -265,6 +265,8 @@ contextBridge.exposeInMainWorld("claude", {
     search: (projectIds: string[], query: string) => ipcRenderer.invoke("sessions:search", { projectIds, query }),
     updateMeta: (projectId: string, sessionId: string, patch: import("@shared/lib/session-persistence").SessionMetadataPatch) =>
       ipcRenderer.invoke("sessions:update-meta", { projectId, sessionId, patch }),
+    prepareHandoff: (input: import("@shared/types/session-handoff").PrepareHandoffInput) => ipcRenderer.invoke("sessions:prepare-handoff", input),
+    handoffState: (input: { operationId: string; state: "target_created" | "dispatch_confirmed" | "dispatch_unknown"; targetConversationId: string }) => ipcRenderer.invoke("sessions:handoff-state", input),
     saveTransferContext: (markdown: string) =>
       ipcRenderer.invoke("sessions:save-transfer-context", markdown),
     exportMarkdown: (projectId: string, sessionId: string) =>
@@ -474,6 +476,11 @@ contextBridge.exposeInMainWorld("claude", {
     list: () => ipcRenderer.invoke("skills:list"),
   },
   memory: {
+    reviewSources: (id: string, sources: string[]) => ipcRenderer.invoke("memory:review-sources", id, sources),
+    openReference: (id: string, ref: string) => ipcRenderer.invoke("memory:open-reference", id, ref),
+    correct: (id: string, ref: string, hash: string, text: string) => ipcRenderer.invoke("memory:correct", id, ref, hash, text),
+    trace: (id: string) => ipcRenderer.invoke("memory:trace", id),
+    feedback: (id: string, ref: string, hash: string, signal: import("@shared/types/memory-intelligence").MemoryFeedbackSignal) => ipcRenderer.invoke("memory:feedback", id, ref, hash, signal),
     onEvent: (callback: (event: MemoryEvent) => void) => { const listener = (_event: IpcRendererEvent, value: MemoryEvent) => callback(value); ipcRenderer.on("memory:event", listener); return () => ipcRenderer.removeListener("memory:event", listener); },
     getStatus: () => ipcRenderer.invoke("memory:get-status"),
     connect: (url: string) => ipcRenderer.invoke("memory:connect", url),

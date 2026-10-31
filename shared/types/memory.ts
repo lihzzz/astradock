@@ -1,9 +1,11 @@
+import type { MemoryIntelligenceSettings, MemoryTraceEvent, MemoryFeedbackSignal, MemoryReadDetails } from "./memory-intelligence";
 /** SiYuan is the only live memory backend. No note bodies are persisted here. */
 export type MemoryScope = "project" | "personal";
 export type MemoryKind = "preference" | "convention" | "decision" | "troubleshooting" | "procedure" | "correction";
 export interface MemoryReadScope { notebookId: string; documentId: string; includeDescendants: boolean }
 export interface MemorySettings {
   schemaVersion: 2; enabled: boolean; baseUrl: string;
+  intelligence?: MemoryIntelligenceSettings;
   /** Set only by the application-managed brain initializer. Absent on legacy bindings. */
   managedNotebookId?: string; expectedWorkspacePath: string;
   identityAnchorDocumentId: string; personalReadEnabled: boolean; personalAutoWriteEnabled: boolean;
@@ -15,17 +17,22 @@ export interface MemoryProjectConfig {
 }
 export type MemoryConnectionState = "unconfigured" | "connecting" | "ready" | "unavailable" | "auth-required" | "incompatible" | "workspace-mismatch" | "binding-invalid";
 export interface MemoryStatusResult { state: MemoryConnectionState; message: string; version?: string; workspacePath?: string; hasToken: boolean }
-export interface MemoryRecallItem { ref: string; blockId: string; text: string; scope: MemoryScope; hash: string; readAt: number }
+export interface MemoryRecallItem { ref: string; blockId: string; text: string; scope: MemoryScope; hash: string; readAt: number; details?: MemoryReadDetails }
 export interface MemoryRecallState { items: MemoryRecallItem[]; usedAt: number | null; skipNext: boolean; status: string }
 export type MemoryWriteState = "prepared" | "submitted" | "verified" | "unknown" | "conflict" | "rejected" | "changed";
 export interface MemoryWriteRecord {
   operationId: string; projectId: string; sessionId: string; turnId: string; target: string; scope: MemoryScope;
   workspace: string; endpoint: string; anchor: string; hash: string; kind: MemoryKind; state: MemoryWriteState;
-  createdAt: number; updatedAt: number; blockId?: string;
+  createdAt: number; updatedAt: number; blockId?: string; recordKind?: "knowledge" | "feedback";
 }
 export type MemoryResult<T> = { value: T; error?: never } | { error: string; value?: never };
 export interface MemoryEvent { projectId: string; message: string; level: "info" | "warning" }
 export interface MemoryApi {
+  reviewSources(sessionId: string, sourceSessionIds: string[]): Promise<MemoryResult<{ sources: number }>>;
+  openReference(sessionId: string, ref: string): Promise<MemoryResult<null>>;
+  correct(sessionId: string, ref: string, hash: string, text: string): Promise<MemoryResult<MemoryWriteRecord>>;
+  trace(sessionId: string): Promise<MemoryResult<MemoryTraceEvent[]>>;
+  feedback(sessionId: string, ref: string, hash: string, signal: MemoryFeedbackSignal): Promise<MemoryResult<MemoryWriteRecord>>;
   onEvent(listener: (event: MemoryEvent) => void): () => void;
   getStatus(): Promise<MemoryStatusResult>;
   connect(baseUrl: string): Promise<MemoryResult<MemorySettings>>;

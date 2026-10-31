@@ -1,3 +1,4 @@
+import { clearTrace } from "./memory/trace";
 import type { SessionMeta } from "@shared/lib/session-persistence";
 import { getDataDir } from "./data-dir";
 import { SessionRepository } from "./session-repository";
@@ -22,5 +23,6 @@ export async function deleteProject(projectId: string): Promise<"deleted" | "alr
   // Runtime leases have been cancelled and the repository's durable deletion
   // barrier now rejects new starts. A failed catalog cleanup is safe to retry.
   await cleanupProjectApps(projectId);
+  clearTrace(projectId);
   return result;
 }

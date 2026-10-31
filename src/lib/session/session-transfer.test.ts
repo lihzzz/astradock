@@ -78,3 +78,11 @@ describe("buildSessionTransferPrompt", () => {
     );
   });
 });
+
+// Handoff is visible evidence, not a transfer of hidden model reasoning or authority.
+describe("structured handoff safety",()=>{
+  it("does not export hidden thinking",()=>{
+    const markdown=buildTransferMarkdown(session,[{...msg("assistant","Visible result"),thinking:"PRIVATE HIDDEN REASONING"}]);
+    expect(markdown).toContain("Visible result");expect(markdown).not.toContain("PRIVATE HIDDEN REASONING");
+  });
+});

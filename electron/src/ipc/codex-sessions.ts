@@ -1,3 +1,4 @@
+import { observeMemoryEvent, recordMemoryDispatch } from "../lib/memory/runtime";
 /**
  * Codex app-server IPC handler.
  *
@@ -503,6 +504,7 @@ function setupCodexHandlers(
     if (isCodexSubagentItem(msg.method, msg.params)) return;
 
     observeCodexTaskEvent(internalId, notification.method, notification.params);
+    observeMemoryEvent(internalId,"codex",notification);
 
     // Track active turn from turn events
     if (notification.method === "turn/started") {
@@ -762,6 +764,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
 
         const result = await session.rpc.request<CodexTurnStartResponse>("turn/start", turnParams);
         session.activeTurnId = result.turn.id;
+        recordMemoryDispatch(data.sessionId,memory.turnId,"accepted",result.turn.id);
         if (session.fingerprintSettings) {
           session.fingerprintSettings = {
             ...session.fingerprintSettings,

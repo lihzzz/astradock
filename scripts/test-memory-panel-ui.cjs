@@ -18,12 +18,21 @@ app.whenReady().then(async () => {
     await build({ entryPoints: [path.join(__dirname, "fixtures/memory-panel-ui.tsx")], outfile: path.join(profile, "fixture.js"),
       bundle: true, platform: "browser", format: "iife", tsconfig: path.join(root, "tsconfig.json"),
       define: { "process.env.NODE_ENV": '"development"', "import.meta.env.DEV": "false" } });
-    fs.writeFileSync(path.join(profile, "index.html"), '<!doctype html><html><body><h1>Memory panel checks</h1><script src="fixture.js"></script></body></html>');
+    const builtIndex = fs.readFileSync(path.join(root,"dist/index.html"),"utf8");
+    const cssRef = /<link[^>]+href="([^"]+\.css)"/.exec(builtIndex)?.[1];
+    if(!cssRef) throw new Error("Build the app before the styled UI smoke test");
+    const cssPath = path.resolve(root,"dist",cssRef);
+    if(!cssPath.startsWith(path.join(root,"dist")+path.sep)) throw new Error("Unexpected stylesheet path");
+    fs.copyFileSync(cssPath,path.join(profile,"fixture.css"));
+    fs.writeFileSync(path.join(profile, "index.html"), '<!doctype html><html><head><link rel="stylesheet" href="fixture.css"></head><body><h1>Memory panel checks</h1><script src="fixture.js"></script></body></html>');
     const win = new BrowserWindow({ show: false, width: 900, height: 650, webPreferences: { contextIsolation: true, nodeIntegration: false } });
     win.webContents.on("console-message", (event) => { if (event.level === "error") console.error("renderer:", event.message); });
     await win.loadFile(path.join(profile, "index.html"));
-    const checks = await win.webContents.executeJavaScript("window.runMemoryPanelChecks()", true);
-    for (const check of checks) console.log(`memory-ui: ${check}`);
+    for(const width of [900,360]) {
+      win.setSize(width,700);
+      const checks = await win.webContents.executeJavaScript("window.runMemoryPanelChecks()", true);
+      for (const check of checks) console.log(`memory-ui (${width}px): ${check}`);
+    }
     exitCode = 0;
   } catch (error) { console.error(error); }
   finally { app.exit(exitCode); }

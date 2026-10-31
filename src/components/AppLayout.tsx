@@ -1,3 +1,4 @@
+import { HandoffPreviewDialog, type HandoffPreview } from "./HandoffPreviewDialog";
 import React, { lazy, Suspense, useCallback, useMemo, useRef, useEffect, useLayoutEffect, useState } from "react";
 import { LayoutGroup, motion } from "motion/react";
 import { PanelLeft } from "lucide-react";
@@ -99,7 +100,7 @@ import {
   mergeInputHistory,
 } from "@/lib/chat/input-history";
 import {
-  buildSessionTransferPrompt,
+  buildStructuredTransferPrompt,
   buildTransferMarkdown,
   type SessionTransferTarget,
 } from "@/lib/session/session-transfer";
@@ -216,7 +217,14 @@ export function AppLayout() {
   // ── Session transfer: export the live conversation as Markdown and hand it
   // to a fresh session running the selected engine/model. ──
   const [isTransferring, setIsTransferring] = useState(false);
+  const transferLock = useRef(false);
+  const [handoffPreview, setHandoffPreview] = useState<HandoffPreview | null>(null);
+  const handoffDecision = useRef<((accepted: boolean) => void) | null>(null);
+  const decideHandoff = useCallback((accepted: boolean) => { const resolve = handoffDecision.current; handoffDecision.current = null; setHandoffPreview(null); resolve?.(accepted); }, []);
+  useEffect(() => () => { handoffDecision.current?.(false); handoffDecision.current = null; }, []);
+  const lastTransfer = useRef<{ key: string; operationId: string; targetConversationId: string; created: boolean } | null>(null);
   const handleTransferSession = useCallback(async (target: SessionTransferTarget, objective?: string) => {
+    if (transferLock.current) return;
     const session = manager.activeSession;
     const projectId = session?.projectId ?? activeProjectId;
     const sourceMessages = manager.messages.filter((message) => !message.isQueued);
@@ -228,15 +236,25 @@ export function AppLayout() {
       toast.error(t("transferEmpty"));
       return;
     }
-    setIsTransferring(true);
+    const sourceIdentity = manager.quickCaptureDraftIdentity();
+    const key = JSON.stringify([session.id,target.engine,target.agentId,target.model,objective,sourceMessages.at(-1)?.id]);
+    const transfer = lastTransfer.current?.key === key ? lastTransfer.current : { key, operationId: crypto.randomUUID(), targetConversationId: crypto.randomUUID(), created: false };
+    lastTransfer.current = transfer;
+    if (transfer.created) { toast.error("该交接已有目标会话，请在侧栏继续目标，不要重复创建。"); return; }
+    transferLock.current = true; setIsTransferring(true);
     try {
       const markdown = buildTransferMarkdown(
         { ...session, lastMessageAt: session.lastMessageAt ?? session.createdAt },
         sourceMessages,
       );
-      const exported = await window.claude.sessions.saveTransferContext(markdown);
-      if ("error" in exported) throw new Error(exported.error);
-      const prompt = buildSessionTransferPrompt({ filePath: exported.filePath, objective });
+      const prepared = await window.claude.sessions.prepareHandoff({ operationId: transfer.operationId, projectId, sourceSessionId: session.id, sourceCwd: manager.sessionInfo?.cwd ?? session.workspaceBinding?.rootPath ?? activeProjectPath ?? "", objective: objective ?? "", targetEngine: target.engine, targetModel: target.model ?? "", markdown, messageCount: sourceMessages.length, lastMessageId: sourceMessages.at(-1)?.id ?? "" });
+      if (prepared.error) throw new Error(prepared.error);
+      if (!prepared.value) throw new Error("交接快照不可用");
+      const exported = prepared.value;
+      if (exported.packet.targetConversationId) throw new Error("该交接已有目标会话，不重复创建");
+      const accepted = await new Promise<boolean>(resolve => { handoffDecision.current = resolve; setHandoffPreview({ prepared: exported, permissionMode: session.permissionMode ?? "default", planMode: session.planMode ?? false }); });
+      if (!accepted) { lastTransfer.current = null; return; }
+      const prompt = buildStructuredTransferPrompt({ filePath: exported.filePath, packetPath: exported.packetPath, objective: objective ?? "" });
       const messageCount = sourceMessages.length;
       const targetAgent = target.agentId
         ? agents.find((agent) => agent.id === target.agentId) ?? null
@@ -246,14 +264,19 @@ export function AppLayout() {
         agentId: target.agentId ?? targetAgent?.id ?? (target.engine === "claude" ? "claude-code" : undefined),
         cachedConfigOptions: target.cachedConfigOptions ?? targetAgent?.cachedConfigOptions,
         model: target.model ?? (settings.getModelForEngine(target.engine) || undefined),
-        permissionMode: settings.permissionMode,
-        planMode: false,
+        conversationId: transfer.targetConversationId,
+        workspaceBinding: exported.packet.workspace,
+        permissionMode: session.permissionMode ?? "default",
+        planMode: session.planMode ?? false,
         thinkingEnabled: settings.thinking,
         effort:
           target.engine === "claude"
             ? ((target.effort as ClaudeEffort | undefined) ?? settings.claudeEffort)
             : undefined,
-      });
+      }, { beforeActivate: () => { if (manager.quickCaptureDraftIdentity() !== sourceIdentity) throw new Error("来源会话已切换，交接未启动"); } });
+      transfer.created = true;
+      const created = await window.claude.sessions.handoffState({ operationId: transfer.operationId, state: "target_created", targetConversationId: transfer.targetConversationId });
+      if (created.error) throw new Error(created.error);
       // Codex reads the effort at send time from the current store value --
       // point it at the requested level before the first message goes out.
       if (target.engine === "codex" && target.effort) {
@@ -264,19 +287,23 @@ export function AppLayout() {
         .replace("{{count}}", String(messageCount))
         .replace("{{target}}", target.label);
       const displayText = objective?.trim() ? `${transferSummary}\n\n${objective.trim()}` : transferSummary;
+      if (!manager.ownsQuickCaptureDraft({ projectId, agentId: target.agentId ?? targetAgent?.id ?? "claude-code" }, transfer.targetConversationId)) throw new Error("目标会话已切换，未发送交接内容");
       const result = await manager.send(prompt, undefined, displayText);
       if (!result?.sessionId) {
         throw new Error(result?.error ?? "Target session did not start.");
       }
+      const delivered = await window.claude.sessions.handoffState({ operationId: transfer.operationId, state: "dispatch_confirmed", targetConversationId: transfer.targetConversationId });
+      if (delivered.error) throw new Error(delivered.error);
       toast.success(t("transferStarted").replace("{{target}}", target.label));
     } catch (error) {
+      if (transfer.created) await window.claude.sessions.handoffState({ operationId: transfer.operationId, state: "dispatch_unknown", targetConversationId: transfer.targetConversationId }).catch(() => undefined);
       toast.error(t("transferFailed"), {
         description: error instanceof Error ? error.message : String(error),
       });
     } finally {
-      setIsTransferring(false);
+      transferLock.current = false; setIsTransferring(false);
     }
-  }, [activeProjectId, agents, manager, settings, t]);
+  }, [activeProjectId, activeProjectPath, agents, manager, settings, t]);
 
 
   // Wrap handleSend to clear grabbed elements after sending
@@ -1984,6 +2011,7 @@ export function AppLayout() {
           onCancel={manager.cancelAcpAuth}
         />
       )}
+      <HandoffPreviewDialog preview={handoffPreview} onDecision={decideHandoff} />
       <FilePreviewOverlay
         filePath={previewFile?.path ?? null}
         sourceRect={previewFile?.sourceRect ?? null}

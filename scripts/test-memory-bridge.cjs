@@ -20,7 +20,7 @@ const { StdioClientTransport } = require("@modelcontextprotocol/sdk/client/stdio
   try {
     await client.connect(transport);
     const list = await client.listTools();
-    assert.deepEqual(list.tools.map(t => t.name), ["memory_status", "memory_search", "memory_read", "memory_remember"]);
+    assert.deepEqual(list.tools.map(t => t.name), ["memory_status", "memory_search", "memory_read", "memory_remember", "memory_evidence"]);
     const result = await client.callTool({ name: "memory_status", arguments: {} });
     assert.equal(result.isError, false); assert.equal(calls, 1);
     assert.equal(JSON.parse(result.content[0].text).value.state, "ready");

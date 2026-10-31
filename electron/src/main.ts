@@ -1,4 +1,6 @@
 import "./lib/app-profile";
+import { invalidateMemorySessions } from "./lib/memory/service";
+import * as sessionHandoffIpc from "./ipc/session-handoff";
 import { execSync } from "child_process";
 import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, powerMonitor, screen, session, shell, systemPreferences, Tray, webContents } from "electron";
 import path from "path";
@@ -486,6 +488,7 @@ tasksIpc.register(getMainWindow);
 configureProjectAppCleanup((projectId) => getProjectAppsService().removeProject(projectId));
 sessionsIpc.register();
 runtimeHistoryIpc.register(getMainWindow);
+sessionHandoffIpc.register(getMainWindow);
 sessionOperationsIpc.register(getMainWindow);
 historyIpc.register(getMainWindow);
 configureSessionStopper(async (runtimeIds, meta) => {
@@ -518,7 +521,10 @@ usageIpc.register(getMainWindow);
 
 // Listen for analytics settings changes and reinitialize PostHog
 let lastAnalyticsEnabled: boolean | undefined;
+let memorySettingsSnapshot = JSON.stringify(getAppSettings().memory);
 onSettingsChanged((settings) => {
+  const memorySnapshot = JSON.stringify(settings.memory);
+  if (memorySnapshot !== memorySettingsSnapshot) { memorySettingsSnapshot = memorySnapshot; invalidateMemorySessions(); }
   if (app.isReady()) updateRecoveryEntry();
   if (process.platform === "darwin") {
     backgroundEffects.setMacEffect(normalizeMacBackgroundEffect(settings.macBackgroundEffect));

@@ -1,0 +1,20 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { randomUUID } from "node:crypto";
+import { beforeEach, afterEach, describe, expect, it } from "vitest";
+import { HandoffStore, type HandoffFacts } from "./session-handoff";
+import type { PrepareHandoffInput } from "@shared/types/session-handoff";
+let directory:string,store:HandoffStore,input:PrepareHandoffInput,facts:HandoffFacts;
+beforeEach(async()=>{directory=await fs.mkdtemp(path.join(os.tmpdir(),"astradock-handoff-test-"));store=new HandoffStore(directory);input={operationId:randomUUID(),projectId:"p",sourceSessionId:"s",sourceCwd:directory,objective:"Finish the task",targetEngine:"codex",targetModel:"",markdown:"# Visible history\nOriginal user request",messageCount:2,lastMessageId:"m2"};facts={workspace:{projectId:"p",rootKind:"project",rootPath:directory,repoCommonDir:null,relativeCwd:""},git:{head:null,branch:null,dirty:null},objective:"",acceptanceCriteria:[],completed:[],remaining:["unknown"],blockers:[]};});
+afterEach(async()=>{if(path.dirname(directory)!==os.tmpdir()||!path.basename(directory).startsWith("astradock-handoff-test-"))throw new Error("Unsafe test cleanup");await fs.rm(directory,{recursive:true,force:true});});
+describe("immutable structured handoff",()=>{
+  it("writes a complete packet plus visible history and keeps unknown fields honest",async()=>{const result=await store.prepare(input,facts);expect(result.packet.completed).toEqual([]);expect(result.packet.git.head).toBeNull();expect(await fs.readFile(result.filePath,"utf8")).toBe(input.markdown);expect(JSON.parse(await fs.readFile(result.packetPath,"utf8")).workspace.rootPath).toBe(directory);});
+  it("deduplicates simultaneous prepare calls and after restart",async()=>{const [a,b]=await Promise.all([store.prepare(input,facts),store.prepare(input,facts)]);expect(a).toEqual(b);expect(await new HandoffStore(directory).prepare(input,facts)).toEqual(a);});
+  it("refuses an operation ID reused with different content or target",async()=>{await store.prepare(input,facts);await expect(store.prepare({...input,targetEngine:"claude"},facts)).rejects.toThrow("不同");});
+  it("rejects path traversal operation IDs",async()=>{await expect(store.prepare({...input,operationId:"../../outside"},facts)).rejects.toThrow();expect(await fs.readdir(directory)).toEqual([]);});
+  it("refuses modified history",async()=>{const result=await store.prepare(input,facts);await fs.writeFile(result.filePath,"Edited");await expect(store.prepare(input,facts)).rejects.toThrow("已变化");});
+  it("records unknown delivery without creating another target",async()=>{await store.prepare(input,facts);await store.advance(input.operationId,"target_created","target-a");await store.advance(input.operationId,"dispatch_unknown","target-a");const resumed=await new HandoffStore(directory).prepare(input,facts);expect(resumed.packet.state).toBe("dispatch_unknown");expect(resumed.packet.targetConversationId).toBe("target-a");await expect(store.advance(input.operationId,"target_created","target-b")).rejects.toThrow("已有目标");});
+  it("does not call export success delivery confirmation",async()=>{await store.prepare(input,facts);await expect(store.advance(input.operationId,"dispatch_confirmed","target")).rejects.toThrow("状态");await store.advance(input.operationId,"target_created","target");await store.advance(input.operationId,"dispatch_confirmed","target");expect((await store.prepare(input,facts)).packet.state).toBe("dispatch_confirmed");});
+  it("rejects tampered partial history instead of overwriting it",async()=>{await fs.writeFile(path.join(directory,input.operationId+".md"),"unrelated");await expect(store.prepare(input,facts)).rejects.toThrow("不一致");expect(await fs.readFile(path.join(directory,input.operationId+".md"),"utf8")).toBe("unrelated");});
+});

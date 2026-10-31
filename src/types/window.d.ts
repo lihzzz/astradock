@@ -186,6 +186,8 @@ declare global {
           sessionResults: SearchSessionResult[];
         }>;
         updateMeta: (projectId: string, sessionId: string, patch: import("@shared/lib/session-persistence").SessionMetadataPatch) => Promise<IpcResult & { revision?: number }>;
+        prepareHandoff: (input: import("@shared/types/session-handoff").PrepareHandoffInput) => Promise<import("@shared/types/session-handoff").HandoffResult>;
+        handoffState: (input: { operationId: string; state: "target_created" | "dispatch_confirmed" | "dispatch_unknown"; targetConversationId: string }) => Promise<{ ok?: boolean; error?: string }>;
         saveTransferContext: (markdown: string) => Promise<{ filePath: string } | { error: string }>;
         exportMarkdown: (projectId: string, sessionId: string) => Promise<{
           ok?: boolean;

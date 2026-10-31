@@ -38,8 +38,10 @@ cli
 !/docs/siyuan-memory/implementation-plan.md
 !/docs/siyuan-memory/implementation-status.md
 !/docs/siyuan-memory/user-guide.md
+!/docs/siyuan-memory/intelligence-upgrade-plan.md
+!/docs/siyuan-memory/intelligence-upgrade-status.md
 
-# Runtime reliability and performance plan.
+# Track the runtime reliability and performance optimization plan.
 !/docs/runtime-optimization/
 /docs/runtime-optimization/*
 !/docs/runtime-optimization/*.md

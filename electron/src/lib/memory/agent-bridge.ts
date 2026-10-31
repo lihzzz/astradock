@@ -1,3 +1,5 @@
+import { MemoryError } from "./siyuan/connection";
+import { MemoryOperationError } from "./operation";
 import http from "node:http";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
@@ -19,7 +21,7 @@ function listen(): Promise<string> {
         const input = z.object({ tool: z.string(), args: z.unknown() }).strict().parse(JSON.parse(Buffer.concat(chunks).toString("utf8")));
         if (![...scopes.values()].includes(scope)) throw new Error("Session revoked");
         send(200, { value: await scope.call(input.tool, input.args) });
-      } catch { send(400, { error: "记忆操作不可用或不在授权范围内，请检查记忆状态" }); }
+      } catch (error) { send(400, error instanceof MemoryError ? { error: error.message, code: error.code } : error instanceof MemoryOperationError ? { error: error.message, code: error.reason } : { error: "记忆操作不可用或不在授权范围内，请检查记忆状态" }); }
     })(); });
     server.requestTimeout = 30000; server.headersTimeout = 5000;
     server.once("error", reject); server.listen(0, "127.0.0.1", () => { const addr = server?.address(); if (!addr || typeof addr === "string") { reject(new Error("Memory bridge unavailable")); return; } url = "http://127.0.0.1:" + addr.port + "/call"; resolve(url); });

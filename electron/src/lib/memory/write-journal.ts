@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { MemoryWriteRecord } from "@shared/types/memory";
 import { getDataDir } from "../data-dir";
-const recordSchema = z.object({ operationId: z.string(), projectId: z.string(), sessionId: z.string(), turnId: z.string(), target: z.string(), scope: z.enum(["project", "personal"]), workspace: z.string(), endpoint: z.string(), anchor: z.string(), hash: z.string(), kind: z.enum(["preference", "convention", "decision", "troubleshooting", "procedure", "correction"]), state: z.enum(["prepared", "submitted", "verified", "unknown", "conflict", "rejected", "changed"]), createdAt: z.number(), updatedAt: z.number(), blockId: z.string().optional() });
+const recordSchema = z.object({ operationId: z.string(), projectId: z.string(), sessionId: z.string(), turnId: z.string(), target: z.string(), scope: z.enum(["project", "personal"]), workspace: z.string(), endpoint: z.string(), anchor: z.string(), hash: z.string(), kind: z.enum(["preference", "convention", "decision", "troubleshooting", "procedure", "correction"]), state: z.enum(["prepared", "submitted", "verified", "unknown", "conflict", "rejected", "changed"]), createdAt: z.number(), updatedAt: z.number(), blockId: z.string().optional(), recordKind: z.enum(["knowledge", "feedback"]).optional() });
 export class MemoryJournal {
   private records: MemoryWriteRecord[] | null = null;
   constructor(private readonly directory: () => string = getDataDir) {}

@@ -1,3 +1,4 @@
+import { memoryRequestSignal, MemoryOperationError } from "../operation";
 import { z } from "zod";
 import { localMemoryUrl } from "@shared/lib/memory";
 
@@ -20,7 +21,7 @@ export class SiyuanClient {
   constructor(baseUrl: string, private readonly token: string, private readonly transport: typeof fetch = fetch) { this.baseUrl = localMemoryUrl(baseUrl); }
   private async request(route: string, body: unknown, timeoutMs = 5000): Promise<unknown> {
     try {
-      const response = await this.transport(this.baseUrl + route, { method: "POST", redirect: "error", signal: AbortSignal.timeout(timeoutMs),
+      const response = await this.transport(this.baseUrl + route, { method: "POST", redirect: "error", signal: memoryRequestSignal(timeoutMs),
         headers: { "content-type": "application/json", accept: "application/json, text/event-stream", ...(this.token ? { Authorization: "Token " + this.token } : {}),
           ...(route === "/mcp" && this.session ? { "Mcp-Session-Id": this.session, "MCP-Protocol-Version": "2025-03-26" } : {}) }, body: JSON.stringify(body) });
       if ([401, 403].includes(response.status)) throw new MemoryError("auth-required", "思源鉴权失败，请检查 API Token");
@@ -38,7 +39,7 @@ export class SiyuanClient {
       }
       return raw ? JSON.parse(raw) : null;
     } catch (error) {
-      if (error instanceof MemoryError) throw error;
+      if (error instanceof MemoryError || error instanceof MemoryOperationError) throw error;
       if (error instanceof SyntaxError) throw new MemoryError("incompatible", "Invalid JSON memory response");
       // Never propagate server bodies, credentials, note content or fetch URLs to telemetry.
       throw new MemoryError("unavailable", "思源未连接或响应超时，长期记忆暂时失效");

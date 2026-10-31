@@ -1,3 +1,4 @@
+import { observeMemoryEvent, recordMemoryDispatch } from "../lib/memory/runtime";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { AcpSerialQueue, AcpEventRouter, acpMcpStatuses, canRestoreAcpSession, restoreAcpSession, setAcpConfig, closeAcpSession, withAcpTimeout as withTimeout } from "../lib/acp-runtime";
 import type { ChildProcess } from "child_process";
@@ -457,6 +458,7 @@ async function createAcpConnection(
       // During session/load, suppress history replay from reaching the renderer
       if (entry?.isReloading) return;
 
+      observeMemoryEvent(internalId,"acp",update);
       safeSend(getMainWindow, "acp:event", {
         _sessionId: internalId,
         sessionId: acpSessionId,
@@ -870,6 +872,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
         prompt,
       });
 
+      recordMemoryDispatch(sessionId,memory.turnId,"finished");
       log("ACP_TURN_COMPLETE", `session=${sessionId.slice(0, 8)} stopReason=${result.stopReason} usage=${JSON.stringify(result.usage ?? null)}`);
       recordAcpTokenUsage(usageTurnId, result.usage, sessionId);
       finishAcpTaskTurn(sessionId, session.turnCancelled ? "cancelled" : result.stopReason);

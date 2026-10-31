@@ -4,6 +4,7 @@ import { register } from "./memory";
 type Handler = (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown;
 const f = vi.hoisted(() => ({ handlers: new Map<string, Handler>(), remember: vi.fn(), connect: vi.fn(), open: vi.fn(), document: vi.fn(), validate: vi.fn(), save: vi.fn() }));
 vi.mock("electron", () => ({ BrowserWindow: {}, shell: { openExternal: f.open }, ipcMain: { handle: (name: string, handler: Handler) => f.handlers.set(name, handler) } }));
+vi.mock("../lib/error-utils", () => ({ reportError: vi.fn() }));
 vi.mock("./projects", () => ({ readProjects: () => [{ id: "project" }] }));
 vi.mock("../lib/memory/secrets", () => ({ setMemoryToken: vi.fn() }));
 vi.mock("../lib/memory/service", () => ({ connectMemory: f.connect, getBrainDocument: f.document, remember: f.remember, rememberSession: vi.fn(), getMemoryStatus: vi.fn(), probeMemory: vi.fn(), getMemoryProjectConfig: vi.fn(), setMemoryProjectConfig: f.save, validateProjectBinding: f.validate, getMemoryRecallState: vi.fn(), setSkipNextMemoryRecall: vi.fn(), memoryJournal: { list: () => [] }, reconcileMemory: vi.fn() }));

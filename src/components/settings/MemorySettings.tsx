@@ -1,3 +1,5 @@
+import { useI18n } from "@/lib/i18n";
+import { intelligenceDefaults } from "@shared/lib/memory-entry";
 import { memo, useEffect, useRef, useState } from "react";
 import { Brain, ExternalLink, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +9,7 @@ import type { MemoryStatusResult } from "@shared/types/memory";
 import { MEMORY_DEFAULTS } from "@shared/lib/memory";
 interface Props { appSettings: AppSettings | null; onUpdateAppSettings: (patch: Partial<AppSettings>) => Promise<void> }
 export const MemorySettings = memo(function MemorySettings({ appSettings, onUpdateAppSettings }: Props) {
+  const { t } = useI18n();
   const memory = appSettings?.memory ?? MEMORY_DEFAULTS;
   const [baseUrl, setBaseUrl] = useState(memory.baseUrl);
   const [token, setToken] = useState("");
@@ -70,6 +73,7 @@ export const MemorySettings = memo(function MemorySettings({ appSettings, onUpda
       <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" disabled={busy || !appSettings} onClick={() => void act(connect)}>保存并连接</Button>
         {status?.hasToken ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => void act(async () => { const result = await window.claude.memory.setToken(""); if (result.error) throw new Error(result.error); setStatus(await window.claude.memory.getStatus()); setMessage("已清除保存的 Token。"); })}>清除 Token</Button> : null}</div>
     </details>
+    <details className="space-y-3 rounded-lg border p-4"><summary className="text-sm">{t("Memory intelligence (experimental)")}</summary><p className="text-xs text-muted-foreground">{t("No extra model service or content copy. Off by default; real model quality requires environment-specific acceptance.")}</p>{([['enabled',"Structured extraction, multi-query recall and feedback"],['briefing',"Progressive briefing at session start"],['persistTrace',"Keep 7 days of process metadata (no content or queries)"]] as const).map(([key,label])=><label key={key} className="flex items-center justify-between gap-2 text-xs"><span>{t(label)}</span><input type="checkbox" checked={(memory.intelligence ?? intelligenceDefaults)[key]} disabled={busy||!appSettings} onChange={e=>{const enabled=e.target.checked;void act(()=>onUpdateAppSettings({memory:{...memory,intelligence:{...(memory.intelligence ?? intelligenceDefaults),[key]:enabled}}}));}} /></label>)}</details>
     {message ? <p role="status" className="whitespace-pre-wrap text-xs">{message}</p> : null}
     {memory.enabled && !memory.managedNotebookId ? <p className="text-xs text-muted-foreground">旧版手动绑定不会自动搬迁或删除。点击「连接并启用」后，新记忆统一存入专用库；原笔记仍保留在思源。</p> : null}
     <p className="text-xs text-muted-foreground">助手自动保存有依据的结论与明确偏好，不逐条询问。项目知识与通用偏好自动分类，只访问专用库，不读取其他笔记本。思源未运行时记忆暂时不可用，聊天仍可继续。</p>

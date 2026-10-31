@@ -575,6 +575,13 @@ export class SessionRepository {
     return meta;
   }
 
+  /** Read-only source lookup across a committed runtime replacement, respecting deletion barriers. */
+  async sourceMetadata(projectId: string, runtimeId: string): Promise<SessionMeta | null> {
+    this.file(projectId, runtimeId, "jsonl");
+    await this.initialize();
+    return this.currentMetadata(projectId, this.currentRuntime(projectId, runtimeId));
+  }
+
   async resolve(projectId: string, key: string): Promise<SessionMeta> {
     const meta = (await this.list(projectId)).find((meta) => conversationKey(meta) === this.currentKey(key));
     if (!meta) throw new ProductivityError("SOURCE_GONE", "The conversation is no longer available");

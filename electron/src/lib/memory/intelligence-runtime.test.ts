@@ -1,0 +1,21 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { randomUUID } from "node:crypto";
+import { registerMemoryRuntime, beginMemoryRuntime, endMemoryRuntime, evidenceList, observeMemoryEvent, memoryTrace, recordMemoryDispatch, remainingMemoryBytes, consumeMemoryBytes, cancelMemoryRuntime, memorySignal, traceMemory } from "./runtime";
+import { memoryRequestSignal, withMemoryOperation } from "./operation";
+vi.mock("../app-settings",()=>({getAppSettings:()=>({memory:{enabled:true,intelligence:{enabled:true,persistTrace:false}}})}));
+vi.mock("./trace",()=>({saveTrace:vi.fn()}));
+let turn:string;
+beforeEach(()=>{registerMemoryRuntime("s","p");turn=randomUUID();beginMemoryRuntime("s",turn,"Use pnpm in this project");});
+afterEach(()=>endMemoryRuntime("s"));
+describe("host-observed evidence and bounded runtime",()=>{
+  it("registers only original user text and rejects foreign session references",()=>{expect(evidenceList("s")).toHaveLength(1);expect(evidenceList("foreign")).toEqual([]);expect(evidenceList("s")[0].kind).toBe("explicit_user_statement");});
+  it("does not expose sensitive user input",()=>{beginMemoryRuntime("s",randomUUID(),"password=do-not-store-this");expect(evidenceList("s")).toEqual([]);});
+  it.each(["claude","codex","acp"] as const)("ignores unpaired completed events and thinking in %s",engine=>{observeMemoryEvent("s",engine,{method:"item/completed",params:{item:{id:"foreign",type:"commandExecution",status:"completed",exitCode:0,aggregatedOutput:"unrelated"}},thinking:"secret"});expect(evidenceList("s")).toHaveLength(1);});
+  it("captures paired Claude tool results, not memory echoes or errors",()=>{observeMemoryEvent("s","claude",{type:"assistant",message:{content:[{type:"tool_use",id:"t",name:"Bash"}]}});observeMemoryEvent("s","claude",{type:"user",message:{content:[{type:"tool_result",tool_use_id:"t",content:"3 tests passed"}]}});expect(evidenceList("s")[1].kind).toBe("observed_tool_result");observeMemoryEvent("s","claude",{type:"user",message:{content:[{type:"tool_result",tool_use_id:"t",content:"replay"}]}});expect(evidenceList("s")).toHaveLength(2);});
+  it("rejects a Codex result for another native turn",()=>{recordMemoryDispatch("s",turn,"accepted","turn-a");observeMemoryEvent("s","codex",{method:"item/started",params:{turnId:"turn-a",item:{id:"t",type:"commandExecution"}}});observeMemoryEvent("s","codex",{method:"item/completed",params:{turnId:"turn-b",item:{id:"t",type:"commandExecution",status:"completed",exitCode:0,aggregatedOutput:"wrong"}}});expect(evidenceList("s")).toHaveLength(1);});
+  it("records queueing separately from acceptance and refuses stale receipts",()=>{recordMemoryDispatch("s",turn,"queued");recordMemoryDispatch("s","stale","accepted");expect(memoryTrace("s").map(e=>e.stage)).toEqual(["dispatch_attempted"]);recordMemoryDispatch("s",turn,"accepted");expect(memoryTrace("s").at(-1)?.stage).toBe("dispatch_confirmed");});
+  it("never persists text through the trace shape and bounds event count",()=>{for(let i=0;i<300;i++)traceMemory("s","body_read","ok",1,50);expect(memoryTrace("s")).toHaveLength(256);expect(JSON.stringify(memoryTrace("s"))).not.toContain("pnpm");});
+  it("shares byte allowance and discards sources on cancellation",()=>{consumeMemoryBytes("s",1500);consumeMemoryBytes("s",800);expect(remainingMemoryBytes("s")).toBe(0);cancelMemoryRuntime("s");expect(memorySignal("s").aborted).toBe(true);expect(evidenceList("s")).toEqual([]);});
+  it("limits all nested transport requests with one operation budget",async()=>{await expect(withMemoryOperation("s",memorySignal("s"),async()=>{for(let i=0;i<193;i++)memoryRequestSignal(1000);})).rejects.toThrow("预算");});
+  it("propagates cancellation to in-flight read signals",async()=>{await withMemoryOperation("s",memorySignal("s"),async()=>{const signal=memoryRequestSignal(5000);cancelMemoryRuntime("s");expect(signal.aborted).toBe(true);});});
+});

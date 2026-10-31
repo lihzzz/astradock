@@ -1,3 +1,4 @@
+import { observeMemoryEvent, recordMemoryDispatch } from "../lib/memory/runtime";
 import { BrowserWindow, ipcMain } from "electron";
 import crypto from "crypto";
 import fs from "fs";
@@ -319,7 +320,7 @@ function startEventLoop(
           log("EVENT_FULL", message);
         }
         tokenObserver.observe(msgObj);
-        if (!session.stopping) observeClaudeTaskEvent(sessionId, msgObj);
+        if (!session.stopping) { observeClaudeTaskEvent(sessionId, msgObj); observeMemoryEvent(sessionId,"claude",msgObj); }
         if (msgObj.type === "system" && typeof msgObj.task_id === "string") {
           if (msgObj.subtype === "task_started") beginUsageTurn(sessionId, `task:${msgObj.task_id}`);
           if (msgObj.subtype === "task_notification") endUsageTurn(sessionId, `task:${msgObj.task_id}`);
@@ -738,6 +739,7 @@ export function register(getMainWindow: () => BrowserWindow | null): void {
       parent_tool_use_id: null,
       session_id: sessionId,
     });
+    recordMemoryDispatch(sessionId,memory.turnId,"queued");
     beginUsageTurn(sessionId);
     taskRuntimeEvents.publish(sessionId, "claude", "running");
     return { ok: true };
