@@ -1,3 +1,4 @@
+import type { CouncilsApi, CouncilSnapshot, CouncilDelta } from "@shared/types/council";
 import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron";
 import type { CodexFingerprintProbeRequest } from "@shared/types/codex-fingerprint";
 import type { CodexCandyTestRequest } from "@shared/types/codex-model-test";
@@ -132,7 +133,28 @@ const tasks: TasksApi = {
   },
 };
 
+const councils: CouncilsApi = {
+  list: () => ipcRenderer.invoke("councils:list"),
+  capabilities: () => ipcRenderer.invoke("councils:capabilities"),
+  create: (input) => ipcRenderer.invoke("councils:create", input),
+  start: (input) => ipcRenderer.invoke("councils:start", input),
+  command: (input) => ipcRenderer.invoke("councils:command", input),
+  supplement: (input) => ipcRenderer.invoke("councils:supplement", input),
+  taskBrief: (input) => ipcRenderer.invoke("councils:task-brief", input),
+  remove: (id) => ipcRenderer.invoke("councils:remove", id),
+  onChanged: (callback) => {
+    const listener = (_event: IpcRendererEvent, state: CouncilSnapshot) => callback(state);
+    ipcRenderer.on("councils:changed", listener);
+    return () => ipcRenderer.removeListener("councils:changed", listener);
+  },
+  onDelta: (callback) => {
+    const listener = (_event: IpcRendererEvent, event: CouncilDelta) => callback(event);
+    ipcRenderer.on("councils:delta", listener);
+    return () => ipcRenderer.removeListener("councils:delta", listener);
+  },
+};
 contextBridge.exposeInMainWorld("claude", {
+  councils,
   tasks,
   projectApps,
   getGlassSupported: () => ipcRenderer.invoke("app:getGlassSupported"),

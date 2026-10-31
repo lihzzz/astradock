@@ -1,3 +1,4 @@
+import type { CouncilsApi } from "@shared/types/council";
 import type { ClaudeEvent } from "./protocol";
 import type { CCSessionInfo, ChatFolder, PersistedSession, Project, UIMessage, ClaudeEffort } from "./session";
 import type { Space } from "./spaces";
@@ -49,6 +50,7 @@ declare global {
     claude: {
       projectApps: ProjectAppsApi;
       tasks: TasksApi;
+      councils: CouncilsApi;
       getGlassSupported: () => Promise<boolean>;
       getBackgroundEffect: () => Promise<BackgroundEffectState>;
       setTransparency: (enabled: boolean) => Promise<BackgroundEffectState>;

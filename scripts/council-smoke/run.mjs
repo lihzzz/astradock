@@ -1,0 +1,11 @@
+import {createServer} from "vite";
+import {spawn} from "node:child_process";
+import {createRequire} from "node:module";
+import path from "node:path";
+const root=path.resolve(import.meta.dirname,"../..");
+const server=await createServer({root,server:{host:"127.0.0.1",port:0,strictPort:true}});await server.listen();
+const env={...process.env,COUNCIL_SMOKE_URL:"http://127.0.0.1:"+server.httpServer.address().port+"/scripts/council-smoke/index.html"};delete env.ELECTRON_RUN_AS_NODE;
+const child=spawn(createRequire(import.meta.url)("electron"),[path.join(import.meta.dirname,"electron.cjs")],{cwd:root,env,windowsHide:true,stdio:"inherit"});
+const timer=setTimeout(()=>child.kill(),90000);
+child.once("error",async error=>{clearTimeout(timer);console.error(error);await server.close();process.exitCode=1;});
+child.once("exit",async code=>{clearTimeout(timer);await server.close();process.exitCode=code??1;});

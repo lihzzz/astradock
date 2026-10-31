@@ -12,6 +12,8 @@ import { isAllowedPreviewUrl } from "./lib/browser-safety";
 import { flushRendererSessions } from "./lib/renderer-flush";
 import { prepareManagedQuit } from "./lib/app-quit";
 import * as projectAppsIpc from "./ipc/project-apps";
+import * as councilsIpc from "./ipc/councils";
+import { getCouncilService } from "./lib/councils";
 import * as tasksIpc from "./ipc/tasks";
 import { getProjectAppsService } from "./lib/project-apps";
 import { shutdownProjectAppAgentBridge } from "./lib/project-apps/agent-bridge";
@@ -186,6 +188,7 @@ app.on("before-quit", (event) => {
   preparingQuit = true;
   void prepareManagedQuit({
     stop: async () => {
+      await getCouncilService().shutdown();
       await getProjectAppsService().shutdown();
       await Promise.all([claudeSessionsIpc.stopAll(), acpSessionsIpc.stopAll(), codexSessionsIpc.stopAll()]);
       await flushRendererSessions(mainWindow);
@@ -485,7 +488,11 @@ spacesIpc.register();
 projectsIpc.register(getMainWindow);
 projectAppsIpc.register(getMainWindow);
 tasksIpc.register(getMainWindow);
-configureProjectAppCleanup((projectId) => getProjectAppsService().removeProject(projectId));
+councilsIpc.register(getMainWindow);
+configureProjectAppCleanup(async (projectId) => {
+  await getCouncilService().removeProject(projectId);
+  await getProjectAppsService().removeProject(projectId);
+});
 sessionsIpc.register();
 runtimeHistoryIpc.register(getMainWindow);
 sessionHandoffIpc.register(getMainWindow);

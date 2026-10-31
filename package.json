@@ -35,7 +35,9 @@
     "perf:bench": "node scripts/performance-bench.mjs",
     "perf:smoke": "node scripts/performance-smoke/run.mjs",
     "perf:runtime": "node scripts/runtime-bench.mjs",
-    "test:runtime-ui": "node scripts/runtime-history-smoke/run.mjs"
+    "test:runtime-ui": "node scripts/runtime-history-smoke/run.mjs",
+    "test:council-ui": "tsup scripts/council-smoke/backend.ts --format cjs --out-dir .cache/council-smoke && node scripts/council-smoke/run.mjs",
+    "test:council-live": "tsup scripts/council-smoke/live-backend.ts --external electron --format cjs --out-dir .cache/council-smoke && node scripts/council-smoke/live.mjs"
   },
   "packageManager": "pnpm@10.26.0",
   "dependencies": {

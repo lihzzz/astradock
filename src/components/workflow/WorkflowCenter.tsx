@@ -12,7 +12,8 @@ import { parseUnifiedDiff } from "@/lib/workflow/unified-diff";
 
 import type { TaskWorkbenchProps } from "../tasks/TaskWorkbench";
 const TaskWorkbench = lazy(() => import("../tasks/TaskWorkbench").then((module) => ({ default: module.TaskWorkbench })));
-type Tab = "tasks" | "inbox" | "review" | "handoff";
+const CouncilView = lazy(() => import("../council/CouncilView").then(module => ({ default: module.CouncilView })));
+type Tab = "councils" | "tasks" | "inbox" | "review" | "handoff";
 
 interface WorkflowCenterProps {
   taskActions: Pick<TaskWorkbenchProps, "agents" | "onPrepareDraft" | "onOpenConversation">;
@@ -95,7 +96,7 @@ export function WorkflowCenter({
   onClose,
   onHandoff,
 }: WorkflowCenterProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [tab, setTab] = useState<Tab>("tasks");
   const [selectedAttentionId, setSelectedAttentionId] = useState<string | null>(null);
   const [selectedCommentIds, setSelectedCommentIds] = useState<string[]>([]);
@@ -374,15 +375,16 @@ export function WorkflowCenter({
       </header>
       <div className="flex min-h-0 flex-1">
         <nav className="w-52 shrink-0 border-e border-border/50 p-3">
-          {(["tasks", "inbox", "review", "handoff"] as const).map((item) => (
+          {(["tasks", "councils", "inbox", "review", "handoff"] as const).map((item) => (
             <button key={item} className={`mb-1 flex w-full items-center gap-2 rounded-md px-3 py-2 text-start text-xs ${tab === item ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"}`} onClick={() => setTab(item)}>
-              {item === "tasks" ? <Clipboard className="h-3.5 w-3.5" /> : item === "inbox" ? <Inbox className="h-3.5 w-3.5" /> : item === "review" ? <GitPullRequest className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
-              {item === "tasks" ? t("tasksTitle") : item === "inbox" ? t("workflowTaskInbox") : item === "review" ? t("workflowReviewChanges") : t("workflowHandoff")}
+              {item === "councils" ? <MessageSquare className="h-3.5 w-3.5" /> : item === "tasks" ? <Clipboard className="h-3.5 w-3.5" /> : item === "inbox" ? <Inbox className="h-3.5 w-3.5" /> : item === "review" ? <GitPullRequest className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
+              {item === "councils" ? (language === "zh-CN" ? "多模型讨论组" : "Model Councils") : item === "tasks" ? t("tasksTitle") : item === "inbox" ? t("workflowTaskInbox") : item === "review" ? t("workflowReviewChanges") : t("workflowHandoff")}
               {item === "inbox" && actionItems.length > 0 ? <Badge className="ms-auto px-1.5 text-[10px]">{actionItems.length}</Badge> : null}
             </button>
           ))}
         </nav>
         <main className="min-w-0 flex-1 overflow-auto p-6">
+          {tab === "councils" ? <Suspense fallback={<p role="status">{t("tasksLoading")}</p>}><CouncilView projects={projects} sourceMaterials={activeMessages.filter(m => m.role === "user" || m.role === "assistant").map(m => m.role + ": " + m.content).join("\n\n")} onOpenTasks={() => setTab("tasks")} /></Suspense> : null}
           {tab === "tasks" ? <Suspense fallback={<p role="status">{t("tasksLoading")}</p>}><TaskWorkbench projects={projects} {...taskActions} /></Suspense> : null}
           {tab === "inbox" && (
             <div className="mx-auto max-w-3xl space-y-6">

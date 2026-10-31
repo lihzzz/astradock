@@ -46,3 +46,6 @@ cli
 /docs/runtime-optimization/*
 !/docs/runtime-optimization/*.md
 !/docs/runtime-optimization/code-baseline.json
+
+# Track Council architecture, capability boundaries and verification commands.
+!/docs/council-implementation.md

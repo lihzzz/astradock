@@ -1,0 +1,33 @@
+const labels: Record<string, string> = {
+  running: "讨论中",
+  pausing: "等待当前调用结束",
+  paused: "已暂停",
+  waiting_user: "等待处理",
+  interrupted: "已中断",
+  completed: "已完成",
+  cancelled: "已停止",
+  failed: "失败",
+  dispatching: "响应中",
+  dispatch_unknown: "发送状态未知",
+  skipped: "已跳过",
+  participants: "成员分析",
+  participant: "成员发言",
+  assessment: "主持人评估",
+  repair: "格式修复",
+  consensus: "已达成共识",
+  recommendation_with_dissent: "推荐方案（请核对异议）",
+  inconclusive: "尚无结论",
+  partial: "部分结论",
+  held: "保留观点",
+  shifted: "修正观点",
+  converged: "同意",
+  "new-point": "新增观点",
+  fact: "事实",
+  assumption: "假设",
+  framing: "方案",
+  risk: "风险",
+  action: "行动",
+};
+export function councilLabel(value: string, chinese: boolean): string {
+  return chinese ? labels[value] ?? value : value;
+}
