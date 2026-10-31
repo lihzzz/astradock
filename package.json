@@ -1,6 +1,6 @@
 {
   "name": "astradock",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "productName": "AstraDock",
   "description": "A desktop development workbench for Claude Code, Codex, and ACP agents, with tasks, tools, and project context.",
   "author": {
