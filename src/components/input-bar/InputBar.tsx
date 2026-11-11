@@ -71,6 +71,8 @@ import { useMentionAutocomplete } from "./useMentionAutocomplete";
 import { CommandPicker } from "./CommandPicker";
 import { useCommandAutocomplete } from "./CommandPicker";
 import { InputHistoryDialog } from "./InputHistoryDialog";
+import { CollaborationGroupControl, CollaborationGroupStrip } from "./CollaborationGroupControl";
+import type { SessionCollaboration } from "@shared/types/collaboration";
 
 const EMPTY_INPUT_HISTORY: string[] = [];
 
@@ -133,6 +135,10 @@ export interface InputBarProps {
   inputHistory?: string[];
   /** Session identity used to reset keyboard history navigation when switching sessions. */
   inputHistorySessionId?: string | null;
+  /** Group currently pulled into this conversation. */
+  collaboration?: SessionCollaboration | null;
+  /** Pull a group into this conversation, or detach it. */
+  onCollaborationChange?: (next: SessionCollaboration | null) => void;
 }
 
 export const InputBar = memo(function InputBar({
@@ -175,6 +181,8 @@ export const InputBar = memo(function InputBar({
   onManageACPs,
   inputHistory,
   inputHistorySessionId,
+  collaboration,
+  onCollaborationChange,
 }: InputBarProps) {
   const { t } = useI18n();
   // ── Core state ──
@@ -981,6 +989,14 @@ export const InputBar = memo(function InputBar({
         </div>
 
         {/* Attachment & grabbed element previews */}
+        {onCollaborationChange && (
+          <CollaborationGroupStrip
+            sessionId={inputHistorySessionId ?? null}
+            collaboration={collaboration ?? null}
+            onCollaborationChange={onCollaborationChange}
+          />
+        )}
+
         <AttachmentPreview
           attachments={attachments}
           onRemoveAttachment={removeAttachment}
@@ -1082,6 +1098,15 @@ export const InputBar = memo(function InputBar({
               className="mx-0.5 h-3.5 w-px shrink-0 bg-border/20"
               aria-hidden="true"
             />
+
+            {onCollaborationChange && (
+              <CollaborationGroupControl
+                sessionId={inputHistorySessionId ?? null}
+                agents={agents ?? []}
+                collaboration={collaboration ?? null}
+                onCollaborationChange={onCollaborationChange}
+              />
+            )}
 
             {/* Engine picker */}
             <EnginePickerDropdown

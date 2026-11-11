@@ -1,5 +1,5 @@
 import { lazy, memo, Suspense, useEffect, useState, useMemo, useCallback, createContext, useContext, type ReactNode, type MouseEvent as ReactMouseEvent } from "react";
-import { AlertCircle, Brain, ChevronDown, ChevronUp, Clock, Crosshair, File, Folder, Info, RotateCcw, Send, Undo2, X } from "lucide-react";
+import { AlertCircle, Brain, ChevronDown, ChevronUp, Clock, Crosshair, File, Folder, Info, RotateCcw, Send, Undo2, Users, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -628,6 +628,16 @@ export const MessageBubble = memo(function MessageBubble({
                     storageKey={`thinking:${message.id}`}
                   />
                 )}
+                {message.collaboration && (
+                  <div className="mb-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <Users className="size-3 shrink-0" />
+                    <span className="font-medium text-foreground/80">{message.collaboration.memberName}</span>
+                    <span className="truncate text-muted-foreground/70">
+                      {message.collaboration.engine}
+                      {message.collaboration.model ? ` · ${message.collaboration.model}` : ""}
+                    </span>
+                  </div>
+                )}
                 {message.content ? (
                   <div
                     ref={proseRef}
@@ -669,6 +679,8 @@ export const MessageBubble = memo(function MessageBubble({
   prev.message.retryable === next.message.retryable &&
   prev.message.checkpointId === next.message.checkpointId &&
   prev.message.isQueued === next.message.isQueued &&
+  prev.message.collaboration?.memberId === next.message.collaboration?.memberId &&
+  prev.message.collaboration?.status === next.message.collaboration?.status &&
   prev.assistantTurnDividerLabel === next.assistantTurnDividerLabel &&
   prev.isSendNextQueued === next.isSendNextQueued &&
   prev.showThinking === next.showThinking &&

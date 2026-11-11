@@ -4,6 +4,7 @@ import type { PersistedSession, Project } from "../../types";
 import { toChatSession } from "../../lib/session/records";
 import { DRAFT_ID } from "./types";
 import { parseThreadGoal } from "@shared/lib/codex-goal";
+import { parseSessionCollaboration } from "@shared/lib/collaboration";
 import type { SharedSessionRefs, SharedSessionSetters, EngineHooks } from "./types";
 import { isSessionFrozen, releaseSession } from "@/lib/session/batch-runtime";
 import { invalidatePersistedCursor } from "@/lib/session/persistence";
@@ -122,6 +123,7 @@ export function useSessionCache({
             ...(data.effort ? { effort: data.effort } : {}),
             ...(data.permissionMode ? { permissionMode: data.permissionMode } : {}),
             planMode: !!data.planMode,
+            collaboration: parseSessionCollaboration(data.collaboration),
             hasPendingPermission: false,
             hasUnreadCompletion: false,
           } : {}),

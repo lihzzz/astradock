@@ -31,6 +31,7 @@ import type { CodexFingerprintProbeRequest, CodexFingerprintProbeResult } from "
 import type { BackgroundEffectState } from "@shared/types/background-effect";
 import type { SessionMeta as SessionListItem } from "@shared/lib/session-persistence";
 import type { HistoryApi, OperationResult, QuickCaptureApi, SessionBatchApi, SessionResumeSource, ShortcutStatus } from "@shared/types/productivity";
+import type { CollaborationContributeRequest } from "@shared/types/collaboration";
 
 /** Standard IPC result envelope — most IPC calls return this shape. */
 interface IpcResult {
@@ -109,6 +110,9 @@ declare global {
         engine?: EngineId,
         sessionId?: string,
       ) => Promise<{ title?: string; error?: string }>;
+      collaboration: {
+        contribute: (request: CollaborationContributeRequest) => Promise<{ result?: string; error?: string }>;
+      };
       log: (label: string, data: unknown) => void;
       onEvent: (callback: (event: ClaudeEvent & { _sessionId: string }) => void) => () => void;
       onStderr: (callback: (data: { data: string; _sessionId: string }) => void) => () => void;

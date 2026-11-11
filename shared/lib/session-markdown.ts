@@ -195,6 +195,12 @@ export function buildSessionMarkdown(session: SessionMeta, messages: MarkdownMes
   if (session.engine) meta.push(`- **Engine:** ${session.engine}`);
   if (session.model) meta.push(`- **Model:** ${session.model}`);
   if (session.branch) meta.push(`- **Branch:** ${session.branch}`);
+  if (session.collaboration?.name) {
+    const members = session.collaboration.members
+      .map((member) => member.model ? `${member.name} (${member.model})` : member.name)
+      .join(", ");
+    meta.push(`- **Collaboration group:** ${session.collaboration.name}${members ? ` — ${members}` : ""}`);
+  }
   if (typeof session.totalCost === "number" && session.totalCost > 0) {
     meta.push(`- **Cost:** $${session.totalCost.toFixed(4)}`);
   }

@@ -20,6 +20,7 @@ import { SplitChatPane } from "@/components/split/SplitChatPane";
 import { SplitPaneHost } from "@/components/split/SplitPaneHost";
 import type { PanelToolId, ToolId } from "@/types/tools";
 import type { ChatSession, InstalledAgent, Project, TodoItem, BackgroundAgent } from "@/types";
+import type { SessionCollaboration } from "@shared/types/collaboration";
 import type { SessionPaneState } from "@/hooks/session/useSessionPane";
 import type { CodexModelSummary, SessionPaneBootstrap } from "@/hooks/session/types";
 import type { PaneControllerContext } from "@/hooks/usePaneController";
@@ -140,6 +141,8 @@ export interface SplitTopRowItemProps {
 
   // Navigation
   onManageACPs?: () => void;
+  draftCollaboration?: SessionCollaboration | null;
+  onSessionCollaborationChange?: (sessionId: string, next: SessionCollaboration | null) => void;
 
   // Layout metrics
   getPreviewPaneMetrics: (previewIndex: number) => { widthPercent: number; handleSharePx: number };
@@ -528,6 +531,8 @@ function SplitTopRowItemInner(props: SplitTopRowItemProps) {
         });
       },
       onManageACPs: props.onManageACPs,
+      draftCollaboration: props.draftCollaboration,
+      onSessionCollaborationChange: props.onSessionCollaborationChange,
       onToolDragEnd: resetSplitToolDrag,
       onChatPaneDragOver: splitToolDrag ? (event: React.DragEvent<HTMLDivElement>) => {
         event.preventDefault();

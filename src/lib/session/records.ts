@@ -1,4 +1,5 @@
 import type { SessionMeta as SessionListItem } from "@shared/lib/session-persistence";
+import { parseSessionCollaboration } from "@shared/lib/collaboration";
 import type { ChatSession, ClaudeEffort, ContextUsage, PersistedSession, UIMessage } from "@/types";
 
 const VALID_EFFORTS = new Set<string>(["low", "medium", "high", "max"]);
@@ -32,6 +33,7 @@ export function toChatSession(
     agentId: session.agentId,
     agentSessionId: session.agentSessionId,
     codexGoal: session.codexGoal,
+    collaboration: parseSessionCollaboration(session.collaboration),
   };
 }
 
@@ -63,5 +65,6 @@ export function buildPersistedSession(
     ...(session.agentSessionId ? { agentSessionId: session.agentSessionId } : {}),
     ...(session.engine === "codex" && session.codexThreadId ? { codexThreadId: session.codexThreadId } : {}),
     ...(session.engine === "codex" ? { codexGoal: session.codexGoal ?? null } : {}),
+    collaboration: session.collaboration ?? null,
   };
 }

@@ -638,6 +638,9 @@ export function useDraftMaterialization({
           agentId: options.agentId ?? "codex",
           codexThreadId,
         } : {}),
+        ...(refs.startOptionsRef.current.collaboration
+          ? { collaboration: refs.startOptionsRef.current.collaboration }
+          : {}),
       };
 
       // The draft may have been switched away while the engine was starting.
@@ -732,9 +735,11 @@ export function useDraftMaterialization({
         setTimeout(() => { claude.refreshMcpStatus(); }, 500);
       }
 
-      // Fire-and-forget AI title generation — routes through ACP if that's the active engine
-      if (text.trim()) {
-        generateSessionTitle(sessionId, text, getProjectCwd(project), draftEngine);
+      // Fire-and-forget AI title generation — routes through ACP if that's the active engine.
+      // Prefer the user-visible text so file context and collaboration briefs do not become the title.
+      const titleSource = displayText?.trim() ? displayText : text;
+      if (titleSource.trim()) {
+        generateSessionTitle(sessionId, titleSource, getProjectCwd(project), draftEngine);
       }
 
       materializingRef.current = false;

@@ -9,7 +9,7 @@
 
 import { useMemo, useRef } from "react";
 import { toast } from "sonner";
-import type { ACPConfigOption, ChatSession, ClaudeEffort, EngineId, ImageAttachment, InstalledAgent, ModelInfo } from "@/types";
+import type { ACPConfigOption, ChatSession, ClaudeEffort, EngineId, ImageAttachment, InstalledAgent, ModelInfo, UIMessage } from "@/types";
 import type { SessionPaneState } from "@/hooks/session/useSessionPane";
 import type { CodexModelSummary } from "@/hooks/session/types";
 import { buildCodexCollabMode, DEFAULT_PERMISSION_MODE } from "@/hooks/session/types";
@@ -18,6 +18,7 @@ import type { PaneController } from "@/types";
 import { getRetryRequest, isRetryableUpstreamError } from "@/lib/session/retry";
 import { useAutoRetry } from "./useAutoRetry";
 import { isSessionFrozen } from "@/lib/session/batch-runtime";
+import type { CollaborationTurnPlan } from "@shared/types/collaboration";
 
 // ── Model catalog builders (moved from AppLayout) ──
 
@@ -94,6 +95,20 @@ export interface PaneControllerContext {
     acpConfigOptionsLoading: boolean;
     setACPConfig: (key: string, value: string) => void;
     retryLastMessage: (errorMessageId: string) => Promise<void>;
+    prepareCollaboration: (
+      sessionId: string,
+      text: string,
+      messages: UIMessage[],
+      hasImages: boolean,
+    ) => CollaborationTurnPlan | null;
+    launchCollaboration: (launch: {
+      sessionId: string;
+      plan: CollaborationTurnPlan;
+      cwd: string;
+      appendMessages: (messages: UIMessage[]) => void;
+      sendIntegration: (text: string, displayText: string) => Promise<void>;
+    }) => void;
+    getSessionCwd: (sessionId: string) => string | null;
   };
   // Split-view helpers (optional — absent in single-chat mode)
   splitView?: {
@@ -260,8 +275,36 @@ export function usePaneController(
         return;
       }
 
+      const plan = ctx.manager.prepareCollaboration(sessionId, text, paneState.messages, !!images?.length);
+      const cwd = plan ? ctx.manager.getSessionCwd(sessionId) : null;
+      const outbound = plan && cwd ? plan.leadPrompt : text;
+      const visible = plan && cwd ? (displayText ?? text) : displayText;
+      const launchGroup = () => {
+        if (!plan || !cwd) return;
+        ctx.manager.launchCollaboration({
+          sessionId,
+          plan,
+          cwd,
+          appendMessages: (messages) => {
+            paneState.engine.setMessages((prev) => [...prev, ...messages]);
+          },
+          sendIntegration: async (prompt, integrationDisplay) => {
+            if (paneEngine === "acp") {
+              await paneState.acp.send(prompt, undefined, integrationDisplay);
+              return;
+            }
+            if (paneEngine === "codex") {
+              const collaborationMode = buildCodexCollabMode(panePlanMode, paneModel);
+              await paneState.codex.send(prompt, undefined, integrationDisplay, collaborationMode);
+              return;
+            }
+            await paneState.claude.send(prompt, undefined, integrationDisplay);
+          },
+        });
+      };
+
       if (paneEngine === "acp") {
-        const promptResult = await paneState.acp.send(text, images, displayText);
+        const promptResult = await paneState.acp.send(outbound, images, visible);
         if (!promptResult.ok) {
           if (isRetryableUpstreamError(promptResult.error ?? "")) {
             if (promptResult.userMessageId) {
@@ -269,6 +312,8 @@ export function usePaneController(
             }
             await ctx.queueSplitPaneSendAfterSwitch?.(sessionId, text, images, displayText);
           }
+        } else {
+          launchGroup();
         }
         return;
       }
@@ -276,9 +321,11 @@ export function usePaneController(
       if (paneEngine === "codex") {
         try {
           const collaborationMode = buildCodexCollabMode(panePlanMode, paneModel);
-          const sendResult = await paneState.codex.send(text, images, displayText, collaborationMode);
+          const sendResult = await paneState.codex.send(outbound, images, visible, collaborationMode);
           if (!sendResult.ok && isRetryableUpstreamError(sendResult.error ?? "")) {
             await ctx.queueSplitPaneSendAfterSwitch?.(sessionId, text, images, displayText);
+          } else if (sendResult.ok) {
+            launchGroup();
           }
         } catch (err) {
           toast.error("Failed to send message", {
@@ -288,9 +335,11 @@ export function usePaneController(
         return;
       }
 
-      const sent = await paneState.claude.send(text, images, displayText);
+      const sent = await paneState.claude.send(outbound, images, visible);
       if (!sent) {
         await ctx.queueSplitPaneSendAfterSwitch?.(sessionId, text, images, displayText);
+      } else {
+        launchGroup();
       }
     };
 

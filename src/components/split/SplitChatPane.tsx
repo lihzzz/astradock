@@ -13,6 +13,7 @@
 import React, { useMemo } from "react";
 import { motion } from "motion/react";
 import type { ChatSession, EngineId, InstalledAgent, TodoItem, BackgroundAgent } from "@/types";
+import type { SessionCollaboration } from "@shared/types/collaboration";
 import type { SessionPaneState } from "@/hooks/session/useSessionPane";
 import { usePaneController, type PaneControllerContext } from "@/hooks/usePaneController";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -125,6 +126,9 @@ export interface SplitChatPaneProps {
 
   // Ref callback
   paneRef?: (element: HTMLDivElement | null) => void;
+
+  draftCollaboration?: SessionCollaboration | null;
+  onSessionCollaborationChange?: (sessionId: string, next: SessionCollaboration | null) => void;
 }
 
 function SplitChatPaneInner({
@@ -180,6 +184,8 @@ function SplitChatPaneInner({
   onChatPaneDragOver,
   onChatPaneDrop,
   paneRef,
+  draftCollaboration,
+  onSessionCollaborationChange,
 }: SplitChatPaneProps) {
   // ── Display preferences from Zustand store ──
   const expandEditToolCallsByDefault = useSettingsStore((s) => s.expandEditToolCallsByDefault);
@@ -330,6 +336,10 @@ function SplitChatPaneInner({
               onManageACPs={onManageACPs}
               inputHistory={inputHistory}
               inputHistorySessionId={sessionId}
+              collaboration={session?.collaboration ?? (isActiveSessionPane ? draftCollaboration ?? null : null)}
+              onCollaborationChange={onSessionCollaborationChange
+                ? (next) => onSessionCollaborationChange(sessionId, next)
+                : undefined}
             />
           </div>
         </div>

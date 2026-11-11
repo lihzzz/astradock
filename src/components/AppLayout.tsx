@@ -915,6 +915,9 @@ export function AppLayout() {
       acpConfigOptionsLoading: manager.acpConfigOptionsLoading,
       setACPConfig: manager.setACPConfig,
       retryLastMessage: manager.retryLastMessage,
+      prepareCollaboration: manager.prepareCollaboration,
+      launchCollaboration: manager.launchCollaboration,
+      getSessionCwd: manager.getSessionCwd,
     },
     splitView: {
       setFocusedSession: splitView.setFocusedSession,
@@ -1355,6 +1358,8 @@ export function AppLayout() {
                             bgAgents={bgAgents}
                             getPreviewPaneMetrics={getPreviewPaneMetrics}
                             onManageACPs={() => setShowSettings("agents")}
+                            draftCollaboration={manager.isDraft ? manager.collaboration : null}
+                            onSessionCollaborationChange={manager.setSessionCollaboration}
                           />
                         )}
 
@@ -1645,6 +1650,8 @@ export function AppLayout() {
                   onManageACPs={() => setShowSettings("agents")}
                   inputHistory={inputHistory}
                   inputHistorySessionId={manager.activeSessionId}
+                  collaboration={manager.collaboration}
+                  onCollaborationChange={(next) => manager.setSessionCollaboration(manager.activeSessionId, next)}
                 />
               </div>
               </>
