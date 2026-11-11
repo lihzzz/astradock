@@ -1,10 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import path from "path";
 import {
   assistantTextFromEvent,
   attachCollaboration,
   chooseContributionText,
-  confineToWorkspace,
   createCollaborationGroup,
   isDirectCommand,
   parseContributeRequest,
@@ -228,13 +226,9 @@ describe("contribution requests", () => {
     expect(resolveClaudeContributionModel("opus")).toBe("opus");
   });
 
-  it("reads assistant text blocks and refuses paths outside the workspace", () => {
+  it("reads assistant text blocks", () => {
     expect(assistantTextFromEvent({
       message: { content: [{ type: "text", text: "Hello" }, { type: "tool_use" }, { type: "text", text: " there" }] },
     })).toBe("Hello there");
-
-    const root = path.resolve("/tmp/workspace");
-    expect(confineToWorkspace(root, "src/app.ts")).toBe(path.join(root, "src/app.ts"));
-    expect(() => confineToWorkspace(root, "../secret")).toThrow(/outside the workspace/);
   });
 });

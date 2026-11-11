@@ -8,9 +8,9 @@ import { getAgent } from "./agent-registry";
 import {
   assistantTextFromEvent,
   chooseContributionText,
-  confineToWorkspace,
   resolveClaudeContributionModel,
 } from "@shared/lib/collaboration";
+import { confineToWorkspace } from "./collaboration-workspace";
 import { ACP_CLIENT_CAPABILITIES, applyReadRange, resolveACPFilePath } from "@shared/lib/acp-helpers";
 import type { CollaborationContributeRequest } from "@shared/types/collaboration";
 

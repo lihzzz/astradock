@@ -1,5 +1,3 @@
-import path from "path";
-import { fileURLToPath } from "url";
 import type { EngineId } from "../types/engine";
 import type {
   CollaborationCall,
@@ -223,16 +221,6 @@ export function assistantTextFromEvent(event: Record<string, unknown>): string {
     if (record.type === "text" && typeof record.text === "string") text += record.text;
   }
   return text;
-}
-
-export function confineToWorkspace(cwd: string, requested: string): string {
-  const raw = requested.startsWith("file://") ? fileURLToPath(requested) : requested;
-  const root = path.resolve(cwd);
-  const target = path.resolve(root, raw);
-  if (target !== root && !target.startsWith(root + path.sep)) {
-    throw new Error("Path is outside the workspace");
-  }
-  return target;
 }
 
 export function chooseContributionText(assistantText: string, resultText: string): string {
