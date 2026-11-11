@@ -25,6 +25,7 @@ AstraDock（原 Harnss）是基于 Electron 与 React 的 AI 编程桌面工作�
 | 能力 | 可以做什么 |
 | --- | --- |
 | 多代理会话 | 使用 Claude Agent SDK、Codex app-server 和 ACP 三类引擎；独立保存会话，切换时继续接收后台任务进度。OpenCode 通过内置 ACP 配置接入。 |
+| 协作组 | 在输入栏随时把一组代理和模型拉进当前会话。当前会话负责改代码，其他模型并行处理同一任务，完成后由当前会话整合。 |
 | 项目与工作区 | 用 Spaces 组织项目，切换 Git worktree，分屏查看会话，自定义工具面板布局，归档和恢复历史会话。 |
 | 可读的执行过程 | 查看流式回复、思考内容、工具卡片、命令输出、逐词差异和每轮文件变更；支持 Markdown、Mermaid 和数学公式。 |
 | 集成开发工具 | 多标签终端与浏览器、网页元素上下文、项目文件浏览、Git 暂存与提交、分支切换和 worktree 管理。 |
@@ -93,6 +94,14 @@ AstraDock 提供客户端和工作区；模型访问使用你自己的代理账�
 | Codex | JSON-RPC app-server | 支持自动检测、托管下载或自定义路径；应用提供 ChatGPT 登录和 API key 登录入口。功能受本机 Codex 版本影响。 |
 | OpenCode | ACP，启动命令为 `opencode acp` | 先安装并配置 OpenCode；默认从 `PATH` 查找，也可在引擎设置指定绝对路径。 |
 | 其他 ACP 代理 | Agent Client Protocol | 在 **设置 → ACP Agents** 的 **Agent Store** 浏览代理，或在 **My Agents** 填写命令、参数与环境变量。运行环境和认证要求由具体代理决定。 |
+
+#### 协作组
+
+在输入栏点击 **拉取协作组**。新建一个组时至少选择两个不同的代理或模型，也可以为同一代理填写不同模型。保存后，这个组会立刻进入当前会话；已经开始的会话同样可以拉取或移出，不必新建聊天。
+
+之后每条普通消息都会交给当前会话，并同时发给组里的其他成员。其他成员阅读工作区，返回做法、风险和具体修改建议，不会改文件。当前会话继续使用自己的工具完成修改，并在收到建议后自动再进行一轮，把有用的部分整合进去。以 `/` 开头的命令仍只发给当前会话。
+
+Claude 与 Codex 成员会按所选模型直接运行。ACP 成员会单独启动一次协作回合，需要本机已经安装该代理并完成登录。没有拉取协作组时，发送行为与原来一致。
 
 #### MCP 与 Skills
 
@@ -235,6 +244,7 @@ This README describes the **`hy_dev` development branch** of [lihzzz/astradock](
 | Capability | Available workflows |
 | --- | --- |
 | Multiple agents | Use three execution engines: Claude Agent SDK, Codex app-server, and ACP. Sessions retain their own history and receive background progress while you switch between them. OpenCode has a built-in ACP definition. |
+| Collaboration groups | Pull a saved group of agents and models into the current chat at any time. The open session implements the task while the other models work on it in parallel, then the session integrates their contributions. |
 | Projects and workspaces | Organize projects in Spaces, switch Git worktrees, use split chat panes, arrange tool panels, and archive or reopen conversations. |
 | Inspectable execution | Read streamed responses, thinking blocks, tool cards, command output, word-level diffs, and per-turn file changes, with Markdown, Mermaid, and math rendering. |
 | Development tools | Use tabbed terminals and browsers, attach webpage element context, browse project files, stage and commit changes, switch branches, and manage worktrees. |
@@ -303,6 +313,14 @@ AstraDock provides the client and workspace. Model access uses your own agent ac
 | Codex | JSON-RPC app-server | Supports automatic detection, managed download, or a custom path. The app exposes ChatGPT and API key login flows. Features depend on the installed Codex version. |
 | OpenCode | ACP, launched with `opencode acp` | Install and configure OpenCode first. AstraDock uses `PATH` unless an absolute executable path is set in engine settings. |
 | Other ACP agents | Agent Client Protocol | Browse **Settings → ACP Agents → Agent Store**, or define the command, arguments, and environment variables in **My Agents**. Runtime and authentication requirements are agent-specific. |
+
+#### Collaboration groups
+
+Click **Pull group** in the composer. A new group needs at least two different agents, or two models of the same agent. Saving it pulls the group into the open conversation immediately. You can attach or remove a group after a chat has already started.
+
+Each normal message then goes to the current session and, in parallel, to the other members. Those members read the workspace and return an approach, risks, and concrete edits. They do not change files. The current session keeps using its tools, then automatically takes another turn to integrate the useful contributions. Commands that start with `/` stay on the current session only.
+
+Claude and Codex members run directly with the model you chose. An ACP member starts its own collaboration turn, which requires that agent to be installed and signed in. Sending without a group attached behaves as before.
 
 #### MCP and Skills
 

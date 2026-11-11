@@ -25,6 +25,7 @@ import { useBackgroundReaper } from "./session/useBackgroundReaper";
 import { useDraftMaterialization } from "./session/useDraftMaterialization";
 import { useSessionRevival } from "./session/useSessionRevival";
 import { useSessionLifecycle } from "./session/useSessionLifecycle";
+import { useCollaborationController } from "./session/useCollaborationController";
 
 export function useSessionManager(
   projects: Project[],
@@ -337,7 +338,7 @@ export function useSessionManager(
     restartAcpSession,
     restartActiveSessionInCurrentWorktree,
     fullRevertSession,
-    send,
+    send: sendDirect,
   } = useSessionLifecycle({
     refs,
     setters,
@@ -387,6 +388,7 @@ export function useSessionManager(
   const pauseCodexGoal = useCallback(async () => codex.pauseGoal(), [codex.pauseGoal]);
   const resumeCodexGoal = useCallback(async () => codex.resumeGoal(), [codex.resumeGoal]);
 
+  const collaborationSendRef = useRef(sendDirect);
   const retryLastMessage = useCallback(async (errorMessageId: string) => {
     if (isProcessingRef.current) return;
     if (retryInFlightRef.current.has(errorMessageId)) return;
@@ -400,11 +402,11 @@ export function useSessionManager(
       message.id === errorMessageId ? { ...message, retryable: false } : message,
     ));
     try {
-      await send(request.content, request.images, request.displayContent);
+      await collaborationSendRef.current(request.content, request.images, request.displayContent);
     } finally {
       retryInFlightRef.current.delete(errorMessageId);
     }
-  }, [engine, send]);
+  }, [engine]);
 
   const seedDevExampleConversation = useCallback(async () => {
     if (!import.meta.env.DEV) return;
@@ -458,6 +460,19 @@ export function useSessionManager(
   // ── Derived state ──
   const isDraft = activeSessionId === DRAFT_ID;
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
+  const collaborationController = useCollaborationController({
+    sendDirect,
+    refs,
+    setSessions,
+    setStartOptions,
+    engineSetMessages: engine.setMessages,
+    findProject,
+    getProjectCwd,
+    activeSession,
+    activeSessionId,
+    startOptions,
+  });
+  collaborationSendRef.current = collaborationController.send;
 
   const setCurrentBranch = useCallback((branch: string | undefined) => {
     currentBranchRef.current = branch;
@@ -653,7 +668,12 @@ export function useSessionManager(
     isConnected: engine.isConnected || isDraft,
     sessionInfo: engine.sessionInfo,
     totalCost: engine.totalCost,
-    send,
+    send: collaborationController.send,
+    collaboration: collaborationController.collaboration,
+    setSessionCollaboration: collaborationController.setSessionCollaboration,
+    prepareCollaboration: collaborationController.prepareCollaboration,
+    launchCollaboration: collaborationController.launchCollaboration,
+    getSessionCwd: collaborationController.getSessionCwd,
     quickCaptureDraftIdentity: () => startOptionsRef.current.conversationId ?? null,
     ownsQuickCaptureDraft: (target: { projectId: string; agentId: string }, identity: string) => activeSessionIdRef.current === DRAFT_ID
       && draftProjectIdRef.current === target.projectId && (startOptionsRef.current.agentId ?? "claude-code") === target.agentId

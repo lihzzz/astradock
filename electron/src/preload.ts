@@ -170,6 +170,15 @@ contextBridge.exposeInMainWorld("claude", {
   showItemInFolder: (filePath: string) => ipcRenderer.invoke("shell:show-item-in-folder", filePath),
   generateTitle: (message: string, cwd?: string, engine?: string, sessionId?: string) =>
     ipcRenderer.invoke("claude:generate-title", { message, cwd, engine, sessionId }),
+  collaboration: {
+    contribute: (request: {
+      engine: "claude" | "acp" | "codex";
+      agentId: string;
+      model?: string;
+      cwd: string;
+      prompt: string;
+    }) => ipcRenderer.invoke("collaboration:contribute", request),
+  },
   projects: {
     list: () => ipcRenderer.invoke("projects:list"),
     create: (spaceId?: string) => ipcRenderer.invoke("projects:create", spaceId),

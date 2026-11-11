@@ -3,6 +3,7 @@ import type { EngineId } from "./engine";
 import type { ImageAttachment } from "./attachments";
 import type { ContextUsage } from "./mcp";
 import type { CodexThreadGoal } from "./codex";
+import type { SessionCollaboration } from "@shared/types/collaboration";
 
 // ── Effort ──
 
@@ -54,6 +55,16 @@ export interface UIMessage {
   checkpointId?: string;
   /** When true, this user message is waiting in the queue -- not yet sent to the agent */
   isQueued?: boolean;
+  /** Set on a contribution written by a collaboration-group member. */
+  collaboration?: {
+    groupId: string;
+    groupName: string;
+    memberId: string;
+    memberName: string;
+    engine: EngineId;
+    model?: string;
+    status: "completed" | "error";
+  };
 }
 
 // ── Session metadata ──
@@ -117,6 +128,8 @@ export interface SessionBase {
   branch?: string;
   /** Last server-reported Codex Goal snapshot, if any. */
   codexGoal?: CodexThreadGoal | null;
+  /** Collaboration group pulled into this conversation, if any. */
+  collaboration?: SessionCollaboration | null;
 }
 
 export interface ChatSession extends SessionBase {

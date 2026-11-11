@@ -1,4 +1,5 @@
 import type { ChatSession, UIMessage, SessionInfo, PermissionRequest, ImageAttachment, McpServerStatus, ModelInfo, AcpPermissionBehavior, EngineId, Project, SlashCommand, ClaudeEffort, ContextUsage, ACPConfigOption, ACPPermissionEvent, CodexThreadGoal } from "@/types";
+import type { SessionCollaboration } from "@shared/types/collaboration";
 import type { BackgroundSessionStore } from "../../lib/background/session-store";
 import { permissionModeToCodexPolicy, permissionModeToCodexSandbox } from "../../lib/engine/codex-adapter";
 import type { CollaborationMode } from "../../types/codex-protocol/CollaborationMode";
@@ -18,6 +19,8 @@ export interface StartOptions {
   agentId?: string;
   /** Cached config options from previous sessions */
   cachedConfigOptions?: ACPConfigOption[];
+  /** Group pulled into a draft before the runtime session exists. */
+  collaboration?: SessionCollaboration;
 }
 
 export interface CodexModelSummary {

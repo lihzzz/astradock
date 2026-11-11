@@ -68,6 +68,40 @@ describe("session records", () => {
     expect(session.isActive).toBe(false);
   });
 
+  it("keeps a collaboration group on the session and clears a null attachment", () => {
+    const collaboration = {
+      groupId: "group-1",
+      name: "Review",
+      attachedAt: 20,
+      members: [
+        { id: "m1", agentId: "claude-code", engine: "claude" as const, name: "Claude Code", model: "sonnet" },
+        { id: "m2", agentId: "codex", engine: "codex" as const, name: "Codex" },
+      ],
+    };
+    const session: ChatSession = {
+      id: "session-1",
+      projectId: "project-1",
+      title: "Chat",
+      createdAt: 100,
+      totalCost: 0,
+      isActive: true,
+      engine: "claude",
+      collaboration,
+    };
+
+    expect(buildPersistedSession(session, [], 0, null).collaboration).toEqual(collaboration);
+    expect(buildPersistedSession({ ...session, collaboration: null }, [], 0, null).collaboration).toBeNull();
+    expect(toChatSession({
+      id: session.id,
+      projectId: session.projectId,
+      title: session.title,
+      createdAt: session.createdAt,
+      lastMessageAt: 100,
+      collaboration,
+    }, false).collaboration?.name).toBe("Review");
+    expect(extractSessionMeta({ ...session, collaboration: { groupId: "bad" } }, 100).collaboration).toBeUndefined();
+  });
+
   it("keeps folder, pin, archive, and branch metadata when building persisted sessions", () => {
     const session: ChatSession = {
       id: "session-1",

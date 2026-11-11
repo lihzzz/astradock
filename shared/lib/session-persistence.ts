@@ -3,6 +3,8 @@
  */
 
 import { parseThreadGoal } from "./codex-goal";
+import { parseSessionCollaboration } from "./collaboration";
+import type { SessionCollaboration } from "../types/collaboration";
 
 export interface SessionMeta {
   conversationId?: string;
@@ -32,6 +34,8 @@ export interface SessionMeta {
   /** ACP-side session ID used to restore the agent conversation. */
   agentSessionId?: string;
   codexGoal?: import("../types/codex-protocol/v2/ThreadGoal").ThreadGoal | null;
+  /** Collaboration group attached to this conversation, if any. */
+  collaboration?: SessionCollaboration;
 }
 
 /**
@@ -75,5 +79,6 @@ export function extractSessionMeta(data: Record<string, unknown>, lastMessageAt:
     codexGoal: data.codexGoal === null || data.codexGoal === undefined
       ? null
       : parseThreadGoal(data.codexGoal),
+    collaboration: parseSessionCollaboration(data.collaboration),
   };
 }
